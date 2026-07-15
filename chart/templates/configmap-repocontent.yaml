@@ -4,5 +4,6 @@ metadata:
   name: {{ .Release.Name }}-repocontent
   namespace: {{ .Release.Namespace }}
 data:
+  # tpl-rendered so the put/get servers overrides resolve to the plugin's in-cluster URL.
   repocontent.yaml: |
-{{ .Files.Get "assets/repocontent.yaml" | indent 4 }}
+{{ tpl (.Files.Get "assets/repocontent.yaml") . | indent 4 }}

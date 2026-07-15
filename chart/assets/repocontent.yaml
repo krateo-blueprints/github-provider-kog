@@ -9,6 +9,8 @@ security:
 paths:
   "/repos/{owner}/{repo}/contents/{path}":
     put:
+      servers:
+      - url: {{ include "webServiceUrl" . }}
       summary: Create or update file contents
       operationId: repos/create-or-update-file-contents
       parameters:
@@ -61,6 +63,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/FileCommit'
     get:
+      servers:
+      - url: {{ include "webServiceUrl" . }}
       summary: Get repository content
       operationId: repos/get-content
       parameters:
