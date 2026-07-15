@@ -4,5 +4,7 @@ metadata:
   name: {{ .Release.Name }}-gitref
   namespace: {{ .Release.Namespace }}
 data:
+  # tpl-rendered so the get-operation `servers` override resolves {{ `{{ include "webServiceUrl" . }}` }}
+  # to the plugin's in-cluster URL (the OAS otherwise contains no template expressions).
   gitref.yaml: |
-{{ .Files.Get "assets/gitref.yaml" | indent 4 }}
+{{ tpl (.Files.Get "assets/gitref.yaml") . | indent 4 }}

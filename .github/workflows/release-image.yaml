@@ -1,0 +1,51 @@
+# Builds + pushes the rest-dynamic-controller PLUGIN image on the same bare-semver tag
+# that release-oci uses for the chart — so one tag push publishes both, and the chart's
+# deployment (image tag = .Chart.Version) lines up with the pushed image tag.
+# Single-arch (linux/amd64) — mirrors the org's fast-CI precedent.
+name: release-image
+
+on:
+  push:
+    tags: ["[0-9]+.[0-9]+.[0-9]+"]
+
+env:
+  GHCR_REPO: ghcr.io/braghettos/krateo-github-provider-kog-plugin
+
+jobs:
+  build:
+    name: Build & push plugin image (linux/amd64)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.GHCR_REPO }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push (linux/amd64)
+        uses: docker/build-push-action@v7
+        with:
+          context: ./plugin
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Inspect image
+        run: docker buildx imagetools inspect ${{ env.GHCR_REPO }}:${{ steps.meta.outputs.version }}

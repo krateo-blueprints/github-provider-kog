@@ -33,9 +33,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GitRef'
-  "/repos/{owner}/{repo}/git/ref/{ref}":
+  "/gitref/{owner}/{repo}/{ref}":
     get:
-      summary: Get a reference
+      servers:
+      - url: {{ include "webServiceUrl" . }}
+      summary: Get a reference (via the plugin — fixes GitHub's git/ref-vs-git/refs path asymmetry so the controller can observe a created ref)
       operationId: git/get-ref
       parameters:
       - { $ref: '#/components/parameters/owner' }

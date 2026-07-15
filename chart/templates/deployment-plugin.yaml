@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "krateo-github-provider-kog.pluginName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "krateo-github-provider-kog.pluginName" . }}
+    app.kubernetes.io/component: rest-dynamic-controller-plugin
+    app.kubernetes.io/part-of: krateo-github-provider-kog
+    app.kubernetes.io/managed-by: krateo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "krateo-github-provider-kog.pluginName" . }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "krateo-github-provider-kog.pluginName" . }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: plugin
+          image: "ghcr.io/braghettos/krateo-github-provider-kog-plugin:{{ .Chart.Version }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8080"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi

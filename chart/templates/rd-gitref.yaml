@@ -18,9 +18,11 @@ spec:
       - action: create
         method: POST
         path: /repos/{owner}/{repo}/git/refs
+      # get goes through the plugin (per-operation servers override in assets/gitref.yaml)
+      # so the controller can OBSERVE a created ref despite GitHub's git/ref path asymmetry.
       - action: get
         method: GET
-        path: /repos/{owner}/{repo}/git/ref/{ref}
+        path: /gitref/{owner}/{repo}/{ref}
       - action: update
         method: PATCH
         path: /repos/{owner}/{repo}/git/refs/{ref}
