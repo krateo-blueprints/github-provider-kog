@@ -7,6 +7,11 @@
       "type": "string",
       "default": "github.krateo.io",
       "description": "The API group the generated CRDs (RepoContent/GitRef/PullRequest + BearerAuth) land under."
+    },
+    "global": {
+      "type": "object",
+      "title": "Global values",
+      "description": "Helm global values (injected by the chart-inspector / when used as a subchart)."
     }
   }
 }
