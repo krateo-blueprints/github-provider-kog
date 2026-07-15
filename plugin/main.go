@@ -191,9 +191,25 @@ func getRepoContent(w http.ResponseWriter, r *http.Request) {
 	if branch == "" {
 		branch = q.Get("ref")
 	}
+	// The controller url-encodes query values when it builds the observe request, and the
+	// value arrives percent-encoded MORE THAN ONCE (a "builder/x" branch reaches us as
+	// "builder%252Fx"). Fully decode it — loop until stable — so GitHub gets a clean ref;
+	// otherwise GitHub 404s on a literally-%-named ref and the CR loops "Creating". Use
+	// PathUnescape (not QueryUnescape) so a '+' in a ref name is not turned into a space.
+	for {
+		dec, err := url.PathUnescape(branch)
+		if err != nil || dec == branch {
+			break
+		}
+		branch = dec
+	}
 	target := "https://api.github.com/repos/" + owner + "/" + repo + "/contents/" + path
 	if branch != "" {
-		target += "?ref=" + url.QueryEscape(branch)
+		// url.Values.Encode re-encodes the fully-decoded ref exactly once (slash -> %2F),
+		// which GitHub decodes back to the real branch name.
+		v := url.Values{}
+		v.Set("ref", branch)
+		target += "?" + v.Encode()
 	}
 	status, body, ok := proxy(w, r, http.MethodGet, target, nil)
 	if !ok {
