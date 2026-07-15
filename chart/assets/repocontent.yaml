@@ -71,7 +71,12 @@ paths:
         - $ref: '#/components/parameters/owner'
         - $ref: '#/components/parameters/repo'
         - $ref: '#/components/parameters/path'
-        - name: ref
+        # Named `branch` (NOT GitHub's `ref`) on purpose: the rest-dynamic-controller only
+        # populates a query param whose name matches a CR spec field, and the CR carries
+        # spec.branch. The plugin's get handler forwards this to GitHub as `?ref=<branch>` so
+        # the observe reads the correct branch (else it 404s on the default branch → the CR is
+        # stuck "Creating"). See plugin getRepoContent.
+        - name: branch
           in: query
           required: false
           schema:

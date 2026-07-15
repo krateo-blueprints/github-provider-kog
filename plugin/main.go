@@ -13,6 +13,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -22,12 +23,12 @@ func main() {
 	mux.HandleFunc("GET /healthz", ok)
 	mux.HandleFunc("GET /readyz", ok)
 	// GitRef observe (get-after-create) — fixes the git/ref-vs-git/refs path asymmetry.
-	mux.HandleFunc("GET /gitref/{owner}/{repo}/{ref...}", getGitRef)
+	mux.HandleFunc("GET /gitref/{owner}/{repo}/{ref...}", logReq(getGitRef))
 	// RepoContent create/update + get (same path shape as GitHub, reached via the OAS
 	// per-operation servers override) — flattens GitHub's nested content{} response to the
 	// root so the controller's same-level field comparison succeeds (no spurious re-PUT).
-	mux.HandleFunc("PUT /repos/{owner}/{repo}/contents/{path...}", putRepoContent)
-	mux.HandleFunc("GET /repos/{owner}/{repo}/contents/{path...}", getRepoContent)
+	mux.HandleFunc("PUT /repos/{owner}/{repo}/contents/{path...}", logReq(putRepoContent))
+	mux.HandleFunc("GET /repos/{owner}/{repo}/contents/{path...}", logReq(getRepoContent))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -40,6 +41,20 @@ func main() {
 func ok(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
+}
+
+// logReq logs the method + path + query of each proxied request (health checks excluded).
+// Cheap and permanently useful: it makes the controller's observe/create URLs (and any
+// missing query params) visible in `kubectl logs deploy/...-plugin` for diagnosis.
+func logReq(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if q := r.URL.RawQuery; q != "" {
+			log.Printf("%s %s?%s", r.Method, r.URL.Path, q)
+		} else {
+			log.Printf("%s %s", r.Method, r.URL.Path)
+		}
+		next(w, r)
+	}
 }
 
 // proxy performs the upstream GitHub request, forwarding the Authorization header, and
@@ -122,6 +137,27 @@ func flattenContent(body []byte) []byte {
 	return out
 }
 
+// stripUncomparable removes response fields the controller cannot reliably diff against the
+// CR spec. GitHub's get-content returns the file `content` as base64 with embedded RFC-2045
+// newlines ("\n" every 60 chars); the CR's spec.content is newline-free base64, so a
+// byte-IDENTICAL file still string-differs — and the controller's spec-vs-response compare
+// (compareExisting, keys present in BOTH) would then flag drift and loop "update" forever
+// instead of settling Ready. `path` (the identifier) + the additionalStatusFields (sha,
+// html_url) are enough to observe identity and status, so `content`/`encoding` are dropped.
+func stripUncomparable(body []byte) []byte {
+	var m map[string]any
+	if json.Unmarshal(body, &m) != nil {
+		return body
+	}
+	delete(m, "content")
+	delete(m, "encoding")
+	out, err := json.Marshal(m)
+	if err != nil {
+		return body
+	}
+	return out
+}
+
 // putRepoContent proxies the create-or-update-file PUT to GitHub and FLATTENS the nested
 // content{} response so the controller can observe path/sha at the root.
 func putRepoContent(w http.ResponseWriter, r *http.Request) {
@@ -139,18 +175,33 @@ func putRepoContent(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, status, body)
 }
 
-// getRepoContent proxies the get-file GET; GitHub's single-file response already exposes
-// path/sha at the root, but flattenContent is applied defensively (no-op when unnested).
+// getRepoContent proxies the get-file GET, reading from the CR's BRANCH. GitHub's contents
+// GET defaults to the repo's default branch, so a file created on a builder/* branch 404s
+// there and the controller never observes it (stuck "Creating"). The OAS get operation's
+// query param is named `branch` to match the CR's spec.branch (the controller only fills a
+// query param whose name matches a spec field — support.go processFields); forward it to
+// GitHub as `?ref`. `?ref` is also accepted as a fallback. The base64 `content`/`encoding`
+// are then stripped (see stripUncomparable) so observe settles Ready instead of looping.
 func getRepoContent(w http.ResponseWriter, r *http.Request) {
 	owner := r.PathValue("owner")
 	repo := r.PathValue("repo")
 	path := r.PathValue("path")
-	status, body, ok := proxy(w, r, http.MethodGet, "https://api.github.com/repos/"+owner+"/"+repo+"/contents/"+path, nil)
+	q := r.URL.Query()
+	branch := q.Get("branch")
+	if branch == "" {
+		branch = q.Get("ref")
+	}
+	target := "https://api.github.com/repos/" + owner + "/" + repo + "/contents/" + path
+	if branch != "" {
+		target += "?ref=" + url.QueryEscape(branch)
+	}
+	status, body, ok := proxy(w, r, http.MethodGet, target, nil)
 	if !ok {
 		return
 	}
 	if status >= 200 && status < 300 {
-		body = flattenContent(body)
+		body = flattenContent(body)    // no-op for single-file GET (already root-level)
+		body = stripUncomparable(body) // drop content/encoding → no base64-newline false diff
 	}
 	writeJSON(w, status, body)
 }
