@@ -1,0 +1,49 @@
+# The PAT wiring each resource CR references via spec.configurationRef. Provision
+# out-of-band (never via the portal write-path). First create the token Secret:
+#
+#   kubectl create secret generic gh-token -n krateo-system \
+#     --from-literal=token=<YOUR_GITHUB_PAT>   # scopes: repo (contents/refs/pulls write)
+#
+# Then one <Kind>Configuration per kind, each pointing at that Secret. oasgen 0.9.x
+# generates these Configuration CRDs from the OAS securityScheme and auto-adds a
+# spec.configurationRef field to every resource CR. All three may share a name (the
+# kind is implied by the resource that references it).
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: RepoContentConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: GitRefConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: PullRequestConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token

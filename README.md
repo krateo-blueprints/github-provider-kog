@@ -24,29 +24,34 @@ This chart ships **only**:
 
 ## Authentication
 
-Each RestDefinition's OpenAPI declares a bearer `securityScheme`, so `oasgen-provider` also mints a **`BearerAuth`** CRD in the `github.krateo.io` group. Provision, out-of-band, a token Secret + a `BearerAuth` CR that points at it:
+Each RestDefinition's OpenAPI declares a bearer `securityScheme`, so `oasgen-provider` (0.9.x) generates a per-kind **`<Kind>Configuration`** CRD (`RepoContentConfiguration` / `GitRefConfiguration` / `PullRequestConfiguration`) in the `github.krateo.io` group and auto-adds a `spec.configurationRef` field to every resource CR. Provision, out-of-band, a token Secret + one Configuration CR per kind that points at it:
 
 ```bash
 kubectl create secret generic gh-token \
   --namespace krateo-system \
-  --from-literal=token=<YOUR_GITHUB_PAT>   # PAT scopes: repo (+ contents:write, pull_requests:write)
+  --from-literal=token=<YOUR_GITHUB_PAT>   # PAT scopes: repo (contents/refs/pulls write)
 ```
 
 ```yaml
-# a BearerAuth CR the resource CRs reference via spec.authenticationRefs.bearerAuthRef
+# one <Kind>Configuration per kind — resource CRs reference it via spec.configurationRef.name.
+# (All three may share a name; the kind is implied by the resource that references it.)
 apiVersion: github.krateo.io/v1alpha1
-kind: BearerAuth
+kind: RepoContentConfiguration   # + GitRefConfiguration + PullRequestConfiguration
 metadata:
-  name: github-blueprints-token
+  name: github-blueprints-config
   namespace: krateo-system
 spec:
-  tokenRef:
-    name: gh-token
-    namespace: krateo-system
-    key: token
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
 ```
 
-> The Krateo portal write-path **references** this `BearerAuth`/Secret; it never creates it. The PAT is created and stored by an operator (never handled by the browser or snowplow).
+See `chart/samples/configurations.yaml` for all three.
+
+> The Krateo portal write-path **references** these Configuration CRs (`spec.configurationRef.name`); it never creates them or the Secret. The PAT is created and stored by an operator (never handled by the browser or snowplow).
 
 ## Install
 

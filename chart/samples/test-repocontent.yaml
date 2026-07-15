@@ -8,8 +8,8 @@ metadata:
   annotations:
     krateo.io/connector-verbose: "true"
 spec:
-  authenticationRefs:
-    bearerAuthRef: github-blueprints-token
+  configurationRef:
+    name: github-blueprints-config
   owner: braghettos
   repo: krateo-blueprints
   path: charts/demo/Chart.yaml
