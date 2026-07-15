@@ -20,6 +20,11 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+        # distroless `nonroot` = UID/GID 65532; the numeric id lets the kubelet verify
+        # non-root (a non-numeric image user fails with runAsNonRoot).
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
       containers:
         - name: plugin
           image: "ghcr.io/braghettos/krateo-github-provider-kog-plugin:{{ .Chart.Version }}"
