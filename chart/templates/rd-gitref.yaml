@@ -1,4 +1,3 @@
-{{- if .Values.restdefinitions.gitref.enabled }}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -28,4 +27,3 @@ spec:
       - action: delete
         method: DELETE
         path: /repos/{owner}/{repo}/git/refs/{ref}
-{{- end }}

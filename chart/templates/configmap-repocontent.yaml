@@ -1,4 +1,3 @@
-{{- if .Values.restdefinitions.repocontent.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,4 +6,3 @@ metadata:
 data:
   repocontent.yaml: |
 {{ .Files.Get "assets/repocontent.yaml" | indent 4 }}
-{{- end }}

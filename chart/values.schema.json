@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "resourceGroup": {
+      "type": "string",
+      "default": "github.krateo.io",
+      "description": "The API group the generated CRDs (RepoContent/GitRef/PullRequest + BearerAuth) land under."
+    }
+  }
+}

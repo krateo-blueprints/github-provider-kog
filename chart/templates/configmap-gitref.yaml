@@ -1,4 +1,3 @@
-{{- if .Values.restdefinitions.gitref.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,4 +6,3 @@ metadata:
 data:
   gitref.yaml: |
 {{ .Files.Get "assets/gitref.yaml" | indent 4 }}
-{{- end }}

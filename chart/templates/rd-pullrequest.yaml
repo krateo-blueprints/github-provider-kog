@@ -1,4 +1,3 @@
-{{- if .Values.restdefinitions.pullrequest.enabled }}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -32,4 +31,3 @@ spec:
         requestFieldMapping:
           - inPath: pull_number
             inCustomResource: status.number
-{{- end }}
