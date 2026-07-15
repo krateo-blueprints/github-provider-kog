@@ -9,6 +9,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log"
@@ -29,6 +30,9 @@ func main() {
 	// root so the controller's same-level field comparison succeeds (no spurious re-PUT).
 	mux.HandleFunc("PUT /repos/{owner}/{repo}/contents/{path...}", logReq(putRepoContent))
 	mux.HandleFunc("GET /repos/{owner}/{repo}/contents/{path...}", logReq(getRepoContent))
+	// PullRequest observe (get-after-create) — flattens GitHub's head/base OBJECTS to their
+	// ref STRINGS so the controller's spec(string)-vs-response(object) compare stops looping.
+	mux.HandleFunc("GET /repos/{owner}/{repo}/pulls/{number}", logReq(getPullRequest))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -111,6 +115,50 @@ func getGitRef(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, status, body)
 }
 
+// flattenPRRefs lifts a GitHub PR's head/base branch names up to the response ROOT as strings.
+// GitHub's get-PR returns head/base as OBJECTS ({ref, sha, repo, ...}); the CR's spec.head /
+// spec.base are the plain branch-name STRINGS the create body carried. The controller's
+// spec-vs-response compare (compareExisting) then hits "types differ" (string vs map) at head,
+// decides the CR needs an update, and issues a PATCH — which 422s on an already-merged/closed PR
+// (and is spurious even on an open one) — so the CR loops "Creating" forever even though the pull
+// request was created (and possibly merged) successfully. Replacing head/base with head.ref /
+// base.ref makes the compare string-vs-string → equal → the CR settles Ready with no PATCH.
+func flattenPRRefs(body []byte) []byte {
+	var m map[string]any
+	if json.Unmarshal(body, &m) != nil {
+		return body
+	}
+	for _, k := range []string{"head", "base"} {
+		if obj, isObj := m[k].(map[string]any); isObj {
+			if ref, ok := obj["ref"].(string); ok {
+				m[k] = ref
+			}
+		}
+	}
+	out, err := json.Marshal(m)
+	if err != nil {
+		return body
+	}
+	return out
+}
+
+// getPullRequest proxies the get-PR GET and flattens head/base objects → ref strings (see
+// flattenPRRefs) so the controller's observe compare settles Ready instead of looping update->422.
+// Only the GET (observe) is routed here; create (POST) and update (PATCH) still go to GitHub.
+func getPullRequest(w http.ResponseWriter, r *http.Request) {
+	owner := r.PathValue("owner")
+	repo := r.PathValue("repo")
+	number := r.PathValue("number")
+	status, body, ok := proxy(w, r, http.MethodGet, "https://api.github.com/repos/"+owner+"/"+repo+"/pulls/"+number, nil)
+	if !ok {
+		return
+	}
+	if status >= 200 && status < 300 {
+		body = flattenPRRefs(body)
+	}
+	writeJSON(w, status, body)
+}
+
 // flattenContent lifts the fields the controller compares (path, sha, html_url, name,
 // size, type) out of GitHub's nested `content` object up to the response ROOT, so the
 // rest-dynamic-controller's same-level comparison of the CR against the response body
@@ -137,20 +185,40 @@ func flattenContent(body []byte) []byte {
 	return out
 }
 
-// stripUncomparable removes response fields the controller cannot reliably diff against the
-// CR spec. GitHub's get-content returns the file `content` as base64 with embedded RFC-2045
-// newlines ("\n" every 60 chars); the CR's spec.content is newline-free base64, so a
-// byte-IDENTICAL file still string-differs — and the controller's spec-vs-response compare
-// (compareExisting, keys present in BOTH) would then flag drift and loop "update" forever
-// instead of settling Ready. `path` (the identifier) + the additionalStatusFields (sha,
-// html_url) are enough to observe identity and status, so `content`/`encoding` are dropped.
-func stripUncomparable(body []byte) []byte {
+// normalizeContent rewrites the response's base64 `content` into canonical, newline-free
+// StdEncoding base64 so it byte-matches the CR's spec.content (which the frontend/builder emits
+// via standard base64, no line wrapping). GitHub's get-content returns the file `content` as
+// base64 with embedded RFC-2045 soft newlines ("\n" every 60 chars); leaving them in makes a
+// byte-IDENTICAL file string-DIFFER from spec.content, so the controller's spec-vs-response
+// compare (compareExisting → compareAny on the string leaf) flags drift and loops "update"
+// forever instead of settling Ready.
+//
+// The earlier fix DROPPED content/encoding to break that loop — but compareExisting skips any
+// spec key the response omits (`rmValue, ok := rm[key]; if !ok { continue }`), so a stripped
+// `content` made observe CONTENT-BLIND: a genuine content change was never detected and
+// RepoContent could not UPDATE a file in place (only create). Normalizing instead of stripping
+// keeps observe able to detect REAL drift — spec.content != normalized-response.content → the
+// controller issues the update PUT, which putRepoContent auto-shas — while the newline-only
+// difference of an unchanged file no longer false-flags. `encoding` is still dropped (the CR
+// spec carries no `encoding` field, so it is never on the compare's spec side anyway).
+func normalizeContent(body []byte) []byte {
 	var m map[string]any
 	if json.Unmarshal(body, &m) != nil {
 		return body
 	}
-	delete(m, "content")
 	delete(m, "encoding")
+	raw, ok := m["content"].(string)
+	if !ok {
+		return body // no content (e.g. a create/PUT response already flattened) — nothing to do
+	}
+	// Strip RFC-2045 soft line breaks, then re-encode canonically so padding/wrapping match
+	// spec.content regardless of how GitHub wrapped it.
+	compact := strings.NewReplacer("\n", "", "\r", "").Replace(raw)
+	if decoded, err := base64.StdEncoding.DecodeString(compact); err == nil {
+		m["content"] = base64.StdEncoding.EncodeToString(decoded)
+	} else {
+		m["content"] = compact // not decodable as StdEncoding — at least drop the newlines
+	}
 	out, err := json.Marshal(m)
 	if err != nil {
 		return body
@@ -248,8 +316,9 @@ func putRepoContent(w http.ResponseWriter, r *http.Request) {
 // there and the controller never observes it (stuck "Creating"). The OAS get operation's
 // query param is named `branch` to match the CR's spec.branch (the controller only fills a
 // query param whose name matches a spec field — support.go processFields); forward it to
-// GitHub as `?ref`. `?ref` is also accepted as a fallback. The base64 `content`/`encoding`
-// are then stripped (see stripUncomparable) so observe settles Ready instead of looping.
+// GitHub as `?ref`. `?ref` is also accepted as a fallback. The base64 `content` is then
+// CANONICALIZED (see normalizeContent) so observe detects real drift yet never false-loops
+// on GitHub's newline-wrapped base64.
 func getRepoContent(w http.ResponseWriter, r *http.Request) {
 	owner := r.PathValue("owner")
 	repo := r.PathValue("repo")
@@ -284,8 +353,8 @@ func getRepoContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if status >= 200 && status < 300 {
-		body = flattenContent(body)    // no-op for single-file GET (already root-level)
-		body = stripUncomparable(body) // drop content/encoding → no base64-newline false diff
+		body = flattenContent(body)   // no-op for single-file GET (already root-level)
+		body = normalizeContent(body) // canonicalize content base64 → accurate drift detection, no newline false diff
 	}
 	writeJSON(w, status, body)
 }

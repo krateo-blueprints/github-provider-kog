@@ -44,6 +44,11 @@ paths:
                 $ref: '#/components/schemas/PullRequest'
   "/repos/{owner}/{repo}/pulls/{pull_number}":
     get:
+      # Observe goes through the plugin (getPullRequest) so head/base OBJECTS are flattened to
+      # their ref STRINGS — otherwise the controller's spec(string)-vs-response(object) compare
+      # loops "update" and 422s on the closed PR. Rendered via `tpl` (see configmap-pullrequest).
+      servers:
+      - url: {{ include "webServiceUrl" . }}
       summary: Get a pull request
       operationId: pulls/get
       parameters:
