@@ -158,16 +158,84 @@ func stripUncomparable(body []byte) []byte {
 	return out
 }
 
-// putRepoContent proxies the create-or-update-file PUT to GitHub and FLATTENS the nested
-// content{} response so the controller can observe path/sha at the root.
+// jsonStringField returns body[key] iff it is a non-empty JSON string, else "".
+func jsonStringField(body []byte, key string) string {
+	var m map[string]any
+	if json.Unmarshal(body, &m) != nil {
+		return ""
+	}
+	if s, ok := m[key].(string); ok {
+		return s
+	}
+	return ""
+}
+
+// withJSONField returns body with key set to val (best-effort — original bytes on any error).
+func withJSONField(body []byte, key, val string) []byte {
+	var m map[string]any
+	if json.Unmarshal(body, &m) != nil {
+		return body
+	}
+	m[key] = val
+	out, err := json.Marshal(m)
+	if err != nil {
+		return body
+	}
+	return out
+}
+
+// currentFileSha best-effort GETs a file's current blob sha on `branch` (forwarding the caller's
+// Authorization). Returns "" on any failure, so the caller leaves the original response intact.
+func currentFileSha(r *http.Request, owner, repo, path, branch string) string {
+	target := "https://api.github.com/repos/" + owner + "/" + repo + "/contents/" + path
+	if branch != "" {
+		v := url.Values{}
+		v.Set("ref", branch)
+		target += "?" + v.Encode()
+	}
+	req, err := http.NewRequest(http.MethodGet, target, nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	if auth := r.Header.Get("Authorization"); auth != "" {
+		req.Header.Set("Authorization", auth)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return ""
+	}
+	b, _ := io.ReadAll(resp.Body)
+	return jsonStringField(b, "sha")
+}
+
+// putRepoContent proxies the create-or-update-file PUT to GitHub, FLATTENS the nested content{}
+// response, and makes the write IDEMPOTENT create-OR-update: GitHub's PUT /contents 422s if the
+// file already exists and the body omits `sha`. When that happens (and the CR did not supply a
+// sha), fetch the file's current sha on the target branch and retry the PUT once — so RepoContent
+// can UPDATE an existing file (e.g. append a nav entry, re-publish a changed chart file), not only
+// create it. A CR that DOES carry a sha, or a genuine other-422, is passed through unchanged.
 func putRepoContent(w http.ResponseWriter, r *http.Request) {
 	owner := r.PathValue("owner")
 	repo := r.PathValue("repo")
 	path := r.PathValue("path")
 	reqBody, _ := io.ReadAll(r.Body)
-	status, body, ok := proxy(w, r, http.MethodPut, "https://api.github.com/repos/"+owner+"/"+repo+"/contents/"+path, reqBody)
+	target := "https://api.github.com/repos/" + owner + "/" + repo + "/contents/" + path
+	status, body, ok := proxy(w, r, http.MethodPut, target, reqBody)
 	if !ok {
 		return
+	}
+	if status == http.StatusUnprocessableEntity && jsonStringField(reqBody, "sha") == "" {
+		if sha := currentFileSha(r, owner, repo, path, jsonStringField(reqBody, "branch")); sha != "" {
+			status, body, ok = proxy(w, r, http.MethodPut, target, withJSONField(reqBody, "sha", sha))
+			if !ok {
+				return
+			}
+		}
 	}
 	if status >= 200 && status < 300 {
 		body = flattenContent(body)
