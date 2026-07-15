@@ -1,0 +1,15 @@
+# Create a branch off an existing commit. `sha` = the SHA to branch from (e.g. main's HEAD).
+apiVersion: github.krateo.io/v1alpha1
+kind: GitRef
+metadata:
+  name: test-builder-branch
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  authenticationRefs:
+    bearerAuthRef: github-blueprints-token
+  owner: braghettos
+  repo: krateo-blueprints
+  ref: refs/heads/builder/demo-branch
+  sha: REPLACE_WITH_BASE_COMMIT_SHA

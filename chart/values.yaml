@@ -1,0 +1,21 @@
+# Default values for krateo-github-provider-kog.
+#
+# This chart ships RestDefinitions (ogen.krateo.io/v1alpha1) + the trimmed OpenAPI
+# specs they reference (as ConfigMaps). oasgen-provider (already installed
+# cluster-wide) watches the RestDefinitions, generates the CRDs under
+# resourceGroup `github.krateo.io`, and auto-deploys a rest-dynamic-controller
+# Deployment per kind. There is NO provider image in this chart.
+
+# The generated CRDs land under this API group. Each RestDefinition also mints a
+# BearerAuth CRD in this group (from the OAS securityScheme); a BearerAuth CR +
+# a token Secret must be provisioned out-of-band (see chart/samples/bearerauth.yaml).
+resourceGroup: github.krateo.io
+
+# Per-kind toggles. Disable a kind to skip its RestDefinition + OAS ConfigMap.
+restdefinitions:
+  repocontent:
+    enabled: true
+  gitref:
+    enabled: true
+  pullrequest:
+    enabled: true

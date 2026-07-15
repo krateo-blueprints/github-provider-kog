@@ -1,0 +1,31 @@
+{{- if .Values.restdefinitions.repocontent.enabled }}
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-repocontent
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-repocontent/repocontent.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: RepoContent
+    identifiers:
+      - path
+    additionalStatusFields:
+      - sha
+      - html_url
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: PUT
+        path: /repos/{owner}/{repo}/contents/{path}
+      - action: update
+        method: PUT
+        path: /repos/{owner}/{repo}/contents/{path}
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/contents/{path}
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/contents/{path}
+{{- end }}

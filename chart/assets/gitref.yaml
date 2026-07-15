@@ -1,0 +1,133 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Git References
+servers:
+- url: https://api.github.com
+paths:
+  "/repos/{owner}/{repo}/git/refs":
+    post:
+      summary: Create a reference
+      operationId: git/create-ref
+      parameters:
+      - { $ref: '#/components/parameters/owner' }
+      - { $ref: '#/components/parameters/repo' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ref:
+                  type: string
+                sha:
+                  type: string
+              required:
+              - ref
+              - sha
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitRef'
+  "/repos/{owner}/{repo}/git/ref/{ref}":
+    get:
+      summary: Get a reference
+      operationId: git/get-ref
+      parameters:
+      - { $ref: '#/components/parameters/owner' }
+      - { $ref: '#/components/parameters/repo' }
+      - { $ref: '#/components/parameters/ref' }
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitRef'
+  "/repos/{owner}/{repo}/git/refs/{ref}":
+    patch:
+      summary: Update a reference
+      operationId: git/update-ref
+      parameters:
+      - { $ref: '#/components/parameters/owner' }
+      - { $ref: '#/components/parameters/repo' }
+      - { $ref: '#/components/parameters/ref' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sha:
+                  type: string
+                force:
+                  type: boolean
+              required:
+              - sha
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitRef'
+    delete:
+      summary: Delete a reference
+      operationId: git/delete-ref
+      parameters:
+      - { $ref: '#/components/parameters/owner' }
+      - { $ref: '#/components/parameters/repo' }
+      - { $ref: '#/components/parameters/ref' }
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    ref:
+      name: ref
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    GitRef:
+      type: object
+      properties:
+        ref:
+          type: string
+        node_id:
+          type: string
+        url:
+          type: string
+        object:
+          type: object
+          properties:
+            type:
+              type: string
+            sha:
+              type: string
+            url:
+              type: string
+security:
+- accessToken: []

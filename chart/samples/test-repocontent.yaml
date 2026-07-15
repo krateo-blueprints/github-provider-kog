@@ -1,0 +1,18 @@
+# Create a file on the builder branch. `content` is base64-encoded file bytes.
+# (Omit `sha` when creating a NEW file; supply it only to update an existing one.)
+apiVersion: github.krateo.io/v1alpha1
+kind: RepoContent
+metadata:
+  name: test-chart-yaml
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  authenticationRefs:
+    bearerAuthRef: github-blueprints-token
+  owner: braghettos
+  repo: krateo-blueprints
+  path: charts/demo/Chart.yaml
+  branch: builder/demo-branch
+  message: "chore(demo): add Chart.yaml via Krateo"
+  content: YXBpVmVyc2lvbjogdjIKbmFtZTogZGVtbwp2ZXJzaW9uOiAwLjEuMAo=

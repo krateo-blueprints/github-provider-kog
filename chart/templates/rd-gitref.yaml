@@ -1,0 +1,31 @@
+{{- if .Values.restdefinitions.gitref.enabled }}
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-gitref
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-gitref/gitref.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: GitRef
+    identifiers:
+      - ref
+    additionalStatusFields:
+      - node_id
+      - url
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/git/refs
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/git/ref/{ref}
+      - action: update
+        method: PATCH
+        path: /repos/{owner}/{repo}/git/refs/{ref}
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/git/refs/{ref}
+{{- end }}

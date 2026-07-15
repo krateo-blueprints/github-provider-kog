@@ -1,0 +1,17 @@
+# The PAT wiring the resource CRs reference. Provision out-of-band (never via the
+# portal write-path). First create the token Secret:
+#
+#   kubectl create secret generic gh-token -n krateo-system \
+#     --from-literal=token=<YOUR_GITHUB_PAT>
+#
+# Then this BearerAuth CR (oasgen generates the BearerAuth CRD from the OAS securityScheme):
+apiVersion: github.krateo.io/v1alpha1
+kind: BearerAuth
+metadata:
+  name: github-blueprints-token
+  namespace: krateo-system
+spec:
+  tokenRef:
+    name: gh-token
+    namespace: krateo-system
+    key: token

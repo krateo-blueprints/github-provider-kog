@@ -1,0 +1,17 @@
+# Open a PR from the builder branch into main.
+apiVersion: github.krateo.io/v1alpha1
+kind: PullRequest
+metadata:
+  name: test-demo-pr
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  authenticationRefs:
+    bearerAuthRef: github-blueprints-token
+  owner: braghettos
+  repo: krateo-blueprints
+  head: builder/demo-branch
+  base: main
+  title: "Add demo blueprint (authored via Krateo)"
+  body: "This blueprint chart was authored in the Krateo portal Autopilot rail."

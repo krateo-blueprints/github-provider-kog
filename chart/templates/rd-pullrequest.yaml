@@ -1,0 +1,35 @@
+{{- if .Values.restdefinitions.pullrequest.enabled }}
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-pullrequest
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-pullrequest/pullrequest.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: PullRequest
+    identifiers:
+      - number
+    additionalStatusFields:
+      - number
+      - html_url
+      - state
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/pulls
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/pulls/{pull_number}
+        requestFieldMapping:
+          - inPath: pull_number
+            inCustomResource: status.number
+      - action: update
+        method: PATCH
+        path: /repos/{owner}/{repo}/pulls/{pull_number}
+        requestFieldMapping:
+          - inPath: pull_number
+            inCustomResource: status.number
+{{- end }}

@@ -1,0 +1,211 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Repository Contents
+servers:
+  - url: https://api.github.com
+security:
+  - accessToken: []
+paths:
+  "/repos/{owner}/{repo}/contents/{path}":
+    put:
+      summary: Create or update file contents
+      operationId: repos/create-or-update-file-contents
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/path'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                content:
+                  type: string
+                sha:
+                  type: string
+                branch:
+                  type: string
+                committer:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    email:
+                      type: string
+                author:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    email:
+                      type: string
+              required:
+                - message
+                - content
+      responses:
+        '201':
+          description: Response when a new file is created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileCommit'
+        '200':
+          description: Response when an existing file is updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileCommit'
+    get:
+      summary: Get repository content
+      operationId: repos/get-content
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/path'
+        - name: ref
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                  type:
+                    type: string
+                  encoding:
+                    type: string
+                  size:
+                    type: integer
+                  name:
+                    type: string
+                  content:
+                    type: string
+                  sha:
+                    type: string
+                  html_url:
+                    type: string
+    delete:
+      summary: Delete a file
+      operationId: repos/delete-file
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/path'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                sha:
+                  type: string
+                branch:
+                  type: string
+              required:
+                - message
+                - sha
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                  sha:
+                    type: string
+                  html_url:
+                    type: string
+                  content:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      path:
+                        type: string
+                      sha:
+                        type: string
+                  commit:
+                    type: object
+                    properties:
+                      sha:
+                        type: string
+                      html_url:
+                        type: string
+                      message:
+                        type: string
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    path:
+      name: path
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    FileCommit:
+      type: object
+      properties:
+        path:
+          type: string
+        sha:
+          type: string
+        html_url:
+          type: string
+        content:
+          type: object
+          properties:
+            name:
+              type: string
+            path:
+              type: string
+            sha:
+              type: string
+            size:
+              type: integer
+            html_url:
+              type: string
+            type:
+              type: string
+        commit:
+          type: object
+          properties:
+            sha:
+              type: string
+            html_url:
+              type: string
+            message:
+              type: string
