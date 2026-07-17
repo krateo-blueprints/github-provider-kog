@@ -70,8 +70,9 @@ paths:
                   type: string
                 force:
                   type: boolean
-              required:
-              - sha
+              # sha intentionally NOT required: oasgen unions requiredFields across all verbs
+              # into the single CRD spec.required, so a required sha here would force it back onto
+              # the CREATE path (which auto-resolves it). An actual update still passes sha through.
       responses:
         '200':
           description: Response
