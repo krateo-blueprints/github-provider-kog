@@ -33,6 +33,9 @@ func main() {
 	// PullRequest observe (get-after-create) — flattens GitHub's head/base OBJECTS to their
 	// ref STRINGS so the controller's spec(string)-vs-response(object) compare stops looping.
 	mux.HandleFunc("GET /repos/{owner}/{repo}/pulls/{number}", logReq(getPullRequest))
+	// GitRef create — resolves the base branch HEAD sha when the CR's sha is empty, so an
+	// author/Autopilot creating a builder/* branch never has to supply a commit sha.
+	mux.HandleFunc("POST /repos/{owner}/{repo}/git/refs", logReq(createGitRef))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -113,6 +116,73 @@ func getGitRef(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, status, body)
+}
+
+// createGitRef proxies the create-ref POST to GitHub, but first RESOLVES the base commit sha
+// when the CR did not supply one. GitHub's create-ref API requires `sha` (the commit the new ref
+// points at); a blueprint/portal author (or Autopilot) creating a builder/* branch has no way to
+// know the base branch HEAD sha, so the CR omits it — which makes the create 422 "sha ... Required"
+// and the whole publish set abort. When `sha` is empty here, we resolve the repo's DEFAULT branch
+// HEAD sha and inject it, so a GitRef that only names the new `ref` just works (branch off the
+// default branch) and the author never touches a sha. A CR that DOES carry a sha is passed through
+// unchanged (an explicit base still wins). Mirrors putRepoContent's auto-sha idempotency.
+func createGitRef(w http.ResponseWriter, r *http.Request) {
+	owner := r.PathValue("owner")
+	repo := r.PathValue("repo")
+	reqBody, _ := io.ReadAll(r.Body)
+	if jsonStringField(reqBody, "sha") == "" {
+		if sha := defaultBranchHeadSha(r, owner, repo); sha != "" {
+			reqBody = withJSONField(reqBody, "sha", sha)
+		}
+	}
+	status, body, ok := proxy(w, r, http.MethodPost, "https://api.github.com/repos/"+owner+"/"+repo+"/git/refs", reqBody)
+	if !ok {
+		return
+	}
+	writeJSON(w, status, body)
+}
+
+// defaultBranchHeadSha best-effort resolves the repo's default branch (e.g. "main") HEAD commit
+// sha, forwarding the caller's Authorization. Returns "" on any failure, so createGitRef leaves the
+// request sha-less and GitHub returns its normal validation error (never worse than before).
+func defaultBranchHeadSha(r *http.Request, owner, repo string) string {
+	branch := jsonStringField(githubGet(r, "https://api.github.com/repos/"+owner+"/"+repo), "default_branch")
+	if branch == "" {
+		branch = "main"
+	}
+	var m map[string]any
+	if json.Unmarshal(githubGet(r, "https://api.github.com/repos/"+owner+"/"+repo+"/git/ref/heads/"+branch), &m) != nil {
+		return ""
+	}
+	if obj, ok := m["object"].(map[string]any); ok {
+		if sha, ok := obj["sha"].(string); ok {
+			return sha
+		}
+	}
+	return ""
+}
+
+// githubGet performs an authenticated GitHub GET (forwarding the caller's Authorization) and
+// returns the response body, or nil on any transport error / non-2xx status.
+func githubGet(r *http.Request, target string) []byte {
+	req, err := http.NewRequest(http.MethodGet, target, nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	if auth := r.Header.Get("Authorization"); auth != "" {
+		req.Header.Set("Authorization", auth)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil
+	}
+	b, _ := io.ReadAll(resp.Body)
+	return b
 }
 
 // flattenPRRefs lifts a GitHub PR's head/base branch names up to the response ROOT as strings.

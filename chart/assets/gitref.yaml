@@ -7,7 +7,9 @@ servers:
 paths:
   "/repos/{owner}/{repo}/git/refs":
     post:
-      summary: Create a reference
+      servers:
+      - url: {{ include "webServiceUrl" . }}
+      summary: Create a reference (via the plugin — RESOLVES the base branch HEAD sha when the CR's sha is empty, so an author/Autopilot creating a builder/* branch never needs to supply a commit sha)
       operationId: git/create-ref
       parameters:
       - { $ref: '#/components/parameters/owner' }
@@ -25,7 +27,6 @@ paths:
                   type: string
               required:
               - ref
-              - sha
       responses:
         '201':
           description: Response
