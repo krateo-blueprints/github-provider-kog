@@ -11,7 +11,7 @@ metadata:
 spec:
   configurationRef:
     name: github-blueprints-config
-  owner: braghettos
+  owner: krateo
   repo: krateo-blueprints
   ref: refs/heads/builder/demo-branch
   # sha: <optional — omit to branch off the default branch HEAD>

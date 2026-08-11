@@ -27,7 +27,7 @@ spec:
         fsGroup: 65532
       containers:
         - name: plugin
-          image: "ghcr.io/braghettos/krateo-github-provider-kog-plugin:{{ .Chart.Version }}"
+          image: "ghcr.io/krateo-blueprints/krateo-github-provider-kog-plugin:{{ .Chart.Version }}"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
