@@ -10,7 +10,7 @@ metadata:
 spec:
   configurationRef:
     name: github-blueprints-config
-  owner: braghettos
+  owner: krateo
   repo: krateo-blueprints
   path: charts/demo/Chart.yaml
   branch: builder/demo-branch

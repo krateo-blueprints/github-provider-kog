@@ -9,7 +9,7 @@ metadata:
 spec:
   configurationRef:
     name: github-blueprints-config
-  owner: braghettos
+  owner: krateo
   repo: krateo-blueprints
   head: builder/demo-branch
   base: main
