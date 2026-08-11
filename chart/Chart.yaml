@@ -19,6 +19,6 @@ keywords:
   - oasgen-provider
   - github
   - blueprint-authoring
-home: https://github.com/braghettos/krateo-github-provider-kog
+home: https://github.com/krateo-blueprints/krateo-github-provider-kog
 sources:
-  - https://github.com/braghettos/krateo-github-provider-kog
+  - https://github.com/krateo-blueprints/krateo-github-provider-kog
