@@ -153,8 +153,8 @@ The repository and the Helm chart are both now `github-provider-kog`; they were
 **nothing pins it yet** — the installer's `component-pins.yaml` has no entry for it — rather than
 after, when a rename would mean re-pinning and a stale package.
 
-The name was not free until now: a forked alternative (`github-provider-kog-chart`, a copy of
-`krateoplatformops/github-provider-kog-chart`) already published `charts/github-provider-kog`.
+The name was not free until now: a forked alternative (`github-provider-kog-chart`, a copy of an
+older upstream chart) already published `charts/github-provider-kog`.
 That fork has been deleted along with its package, and this — the from-scratch provider — takes
 the name.
 

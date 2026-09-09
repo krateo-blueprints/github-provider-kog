@@ -4,7 +4,7 @@ title: github-provider-kog — configuration
 description: The whole config surface — the single chart value resourceGroup, the 31 RestDefinition mappings grouped by area, the compareScope tally and the reasoning behind each non-default choice, the native normalizations that replace a plugin hop, the OpenAPI ConfigMaps and plugin servers overrides, the plugin routes and env, and the invariants that must hold.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, values, restdefinition, oasgen-provider, plugin]
-timestamp: 2026-08-11T00:00:00Z
+timestamp: 2026-09-09T00:00:00Z
 ---
 
 # Configuration

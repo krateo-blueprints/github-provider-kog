@@ -4,7 +4,7 @@ title: github-provider-kog — examples
 description: Index of the runnable examples — the end-to-end blueprint-authoring flow (GitRef then RepoContent then PullRequest) against a scratch repo, the Repository CR that creates the destination repo that flow writes into, and the sample CR per kind under chart/samples/, grouped by area with the order each group must be applied in.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [examples, github, blueprint-authoring, samples]
-timestamp: 2026-08-11T00:00:00Z
+timestamp: 2026-09-09T00:00:00Z
 ---
 
 # Examples

@@ -4,7 +4,7 @@ title: github-provider-kog — API
 description: The CRDs this component brings into the cluster — the 31 resource kinds under github.krateo.io, grouped by area, with their paths, identifiers, status fields and compareScope, the oasgen-generated <Kind>Configuration kind each one gets, and the CompositionDefinition the core-provider CDC derives from values.schema.json.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, crd, compositiondefinition, github, oasgen-provider]
-timestamp: 2026-08-11T00:00:00Z
+timestamp: 2026-09-09T00:00:00Z
 ---
 
 # API

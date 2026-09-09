@@ -4,7 +4,7 @@ title: github-provider-kog — usage
 description: How to run the provider — install it as a Krateo component, provision the GitHub token Secret and one Configuration CR per kind (all 31 may share a single name), create the destination repository with Repository, author a chart tree with GitRef then RepoContent then PullRequest, drive the other 27 kinds group by group (access, repository configuration, CI/CD, work tracking, governance), and verify the generated CRDs and controllers.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, install, oasgen-provider, github, blueprint-authoring]
-timestamp: 2026-08-11T00:00:00Z
+timestamp: 2026-09-09T00:00:00Z
 ---
 
 # Usage
