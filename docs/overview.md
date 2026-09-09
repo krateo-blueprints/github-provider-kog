@@ -1,15 +1,15 @@
 ---
 type: Architecture
-title: krateo-github-provider-kog — overview
+title: github-provider-kog — overview
 description: What the chart ships and how it works — RestDefinitions plus trimmed OpenAPI specs that oasgen-provider turns into github.krateo.io CRDs and a controller per kind (Repository, RepoContent, GitRef, PullRequest), and the companion plugin that normalizes GitHub's REST inconsistencies on the three git-write kinds so the CRs settle to Ready.
-resource: oci://ghcr.io/krateo-blueprints/charts/krateo-github-provider-kog
+resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, kog, oasgen-provider, rest-dynamic-controller, github]
 timestamp: 2026-08-11T00:00:00Z
 ---
 
 # Overview
 
-krateo-github-provider-kog exposes GitHub's repository and git-write API as
+github-provider-kog exposes GitHub's repository and git-write API as
 `github.krateo.io` Kubernetes kinds. It ships **no controller of its own** for any of
 its four kinds — it declares the API mapping and lets `oasgen-provider` generate the
 CRDs and spawn a `rest-dynamic-controller` per kind. One companion plugin fills the

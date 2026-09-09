@@ -3,7 +3,7 @@ The plugin Deployment/Service name (used by both the workload and the webService
 gitref OAS get-operation points its `servers` override at, so the rest-dynamic-controller
 routes the GET to the plugin instead of GitHub).
 */}}
-{{- define "krateo-github-provider-kog.pluginName" -}}
+{{- define "github-provider-kog.pluginName" -}}
 {{- printf "%s-plugin" .Release.Name -}}
 {{- end -}}
 

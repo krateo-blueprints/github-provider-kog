@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "krateo-github-provider-kog.pluginName" . }}
+  name: {{ include "github-provider-kog.pluginName" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: {{ include "krateo-github-provider-kog.pluginName" . }}
+    app.kubernetes.io/name: {{ include "github-provider-kog.pluginName" . }}
     app.kubernetes.io/component: rest-dynamic-controller-plugin
-    app.kubernetes.io/part-of: krateo-github-provider-kog
+    app.kubernetes.io/part-of: github-provider-kog
     app.kubernetes.io/managed-by: krateo
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "krateo-github-provider-kog.pluginName" . }}
+      app.kubernetes.io/name: {{ include "github-provider-kog.pluginName" . }}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: {{ include "krateo-github-provider-kog.pluginName" . }}
+        app.kubernetes.io/name: {{ include "github-provider-kog.pluginName" . }}
     spec:
       securityContext:
         runAsNonRoot: true
@@ -27,6 +27,12 @@ spec:
         fsGroup: 65532
       containers:
         - name: plugin
+          # NOTE the name: this image deliberately keeps the pre-rename
+          # `krateo-github-provider-kog-plugin` while the chart is now `github-provider-kog`.
+          # The plugin is on its way out (every kind it serves is being moved to native
+          # RestDefinition features), so renaming it would publish a second package only to delete
+          # it again, and orphan the versions already pushed under the old name. When the plugin
+          # goes, this Deployment, its Service and the image all go with it.
           image: "ghcr.io/krateo-blueprints/krateo-github-provider-kog-plugin:{{ .Chart.Version }}"
           imagePullPolicy: IfNotPresent
           ports:

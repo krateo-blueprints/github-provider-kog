@@ -1,5 +1,5 @@
 apiVersion: v2
-name: krateo-github-provider-kog
+name: github-provider-kog
 description: >-
   Krateo KOG provider (oasgen-provider) exposing GitHub's repository and git-write
   API — Repository, RepoContent, GitRef, PullRequest — as github.krateo.io Kubernetes

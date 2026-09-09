@@ -2,7 +2,7 @@
 type: Example
 title: blueprint-authoring — the git-write flow end to end
 description: The end-to-end blueprint-authoring write-path as three github.krateo.io CRs applied in order — a GitRef creates the builder branch, a RepoContent writes a file onto it, and a PullRequest opens the PR into main — with the one-time token and Configuration wiring they reference.
-resource: oci://ghcr.io/krateo-blueprints/charts/krateo-github-provider-kog
+resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [example, github, blueprint-authoring, gitref, repocontent, pullrequest]
 timestamp: 2026-08-11T00:00:00Z
 ---

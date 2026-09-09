@@ -1,4 +1,4 @@
-# krateo-github-provider-kog — LLM doc index
+# github-provider-kog — LLM doc index
 # One line per file. A Krateo KOG provider (oasgen-provider 0.9.x) exposing GitHub's
 # repository + git-write API — Repository, RepoContent, GitRef, PullRequest — as
 # github.krateo.io Kubernetes kinds. The chart ships RestDefinitions + trimmed OpenAPI

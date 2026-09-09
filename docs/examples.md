@@ -1,8 +1,8 @@
 ---
 type: ExampleIndex
-title: krateo-github-provider-kog — examples
+title: github-provider-kog — examples
 description: Index of the runnable examples under examples/ — the end-to-end blueprint-authoring flow (GitRef then RepoContent then PullRequest) against a scratch repo, plus the Repository CR that creates the destination repo that flow writes into.
-resource: oci://ghcr.io/krateo-blueprints/charts/krateo-github-provider-kog
+resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [examples, github, blueprint-authoring]
 timestamp: 2026-08-11T00:00:00Z
 ---

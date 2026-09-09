@@ -1,8 +1,8 @@
 ---
 type: API
-title: krateo-github-provider-kog — API
+title: github-provider-kog — API
 description: The CRDs this component brings into the cluster — the four resource kinds Repository/RepoContent/GitRef/PullRequest and their oasgen-generated <Kind>Configuration kinds under github.krateo.io, plus the CompositionDefinition the core-provider CDC derives from values.schema.json.
-resource: oci://ghcr.io/krateo-blueprints/charts/krateo-github-provider-kog
+resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, crd, compositiondefinition, github, oasgen-provider]
 timestamp: 2026-08-11T00:00:00Z
 ---
@@ -23,11 +23,11 @@ CRD from `chart/values.schema.json`. The registration points at the published ch
 apiVersion: core.krateo.io/v1alpha1
 kind: CompositionDefinition
 metadata:
-  name: krateo-github-provider-kog
+  name: github-provider-kog
   namespace: krateo-system
 spec:
   chart:
-    url: oci://ghcr.io/krateo-blueprints/charts/krateo-github-provider-kog
+    url: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
     version: <released version>
 ```
 

@@ -46,7 +46,7 @@ Per the Krateo "everything is a Composition" rule, this chart is installed as a
 For local development against a kind cluster only:
 
 ```console
-$ helm upgrade --install krateo-github-provider-kog ./chart --namespace krateo-system
+$ helm upgrade --install github-provider-kog ./chart --namespace krateo-system
 ```
 
 ## Configure

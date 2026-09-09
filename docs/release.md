@@ -1,8 +1,8 @@
 ---
 type: Runbook
-title: krateo-github-provider-kog — release
+title: github-provider-kog — release
 description: How a release ships — one plain-semver tag drives both the canonical release-oci workflow (the chart to GHCR) and release-image (the plugin image on the same tag), so the chart's plugin Deployment always lines up with a published image.
-resource: oci://ghcr.io/krateo-blueprints/charts/krateo-github-provider-kog
+resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [release, oci, ghcr, plugin-image]
 timestamp: 2026-08-11T00:00:00Z
 ---
@@ -37,7 +37,7 @@ $ git tag X.Y.Z && git push origin X.Y.Z
 Then verify both workflows went green and the artifacts exist:
 
 ```console
-$ helm show chart oci://ghcr.io/krateo-blueprints/charts/krateo-github-provider-kog --version X.Y.Z | head -3
+$ helm show chart oci://ghcr.io/krateo-blueprints/charts/github-provider-kog --version X.Y.Z | head -3
 $ docker manifest inspect ghcr.io/krateo-blueprints/krateo-github-provider-kog-plugin:X.Y.Z >/dev/null && echo image ok
 ```
 

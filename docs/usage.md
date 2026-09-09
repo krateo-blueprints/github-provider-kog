@@ -1,8 +1,8 @@
 ---
 type: Usage
-title: krateo-github-provider-kog — usage
+title: github-provider-kog — usage
 description: How to run the provider — install it as a Krateo component, provision the GitHub token Secret and one Configuration CR per kind, create the destination repository with Repository, author a chart tree with GitRef then RepoContent then PullRequest, and verify the generated CRDs and controllers.
-resource: oci://ghcr.io/krateo-blueprints/charts/krateo-github-provider-kog
+resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, install, oasgen-provider, github, blueprint-authoring]
 timestamp: 2026-08-11T00:00:00Z
 ---
@@ -24,7 +24,7 @@ generates this chart's CompositionDefinition CRD from `values.schema.json`
 
 ```yaml
 # Installer CR — component-pins entry (illustrative)
-- chart: krateo-github-provider-kog
+- chart: github-provider-kog
   version: <released version>
   repository: oci://ghcr.io/krateo-blueprints/charts
 ```
@@ -32,7 +32,7 @@ generates this chart's CompositionDefinition CRD from `values.schema.json`
 For local development against a kind cluster only:
 
 ```console
-$ helm upgrade --install krateo-github-provider-kog ./chart --namespace krateo-system
+$ helm upgrade --install github-provider-kog ./chart --namespace krateo-system
 ```
 
 ## Provision the token and the Configuration CRs

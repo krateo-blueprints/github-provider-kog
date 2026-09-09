@@ -1,8 +1,8 @@
 ---
 type: Log
-title: krateo-github-provider-kog — log
-description: Curated chronological history of krateo-github-provider-kog — notable changes and decisions, not a generated changelog.
-resource: oci://ghcr.io/krateo-blueprints/charts/krateo-github-provider-kog
+title: github-provider-kog — log
+description: Curated chronological history of github-provider-kog — notable changes and decisions, not a generated changelog.
+resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [log, history]
 timestamp: 2026-09-09T00:00:00Z
 ---
@@ -10,6 +10,35 @@ timestamp: 2026-09-09T00:00:00Z
 # Log
 
 Curated history; release notes live in GitHub Releases.
+
+## 2026-09-09 — renamed to `github-provider-kog`, chart included
+
+The repository and the Helm chart are both now `github-provider-kog`; they were
+`krateo-github-provider-kog`. The chart name is what consumers pin, so it was renamed while
+**nothing pins it yet** — the installer's `component-pins.yaml` has no entry for it — rather than
+after, when a rename would mean re-pinning and a stale package.
+
+The name was not free until now: a forked alternative (`github-provider-kog-chart`, a copy of
+`krateoplatformops/github-provider-kog-chart`) already published `charts/github-provider-kog`.
+That fork has been deleted along with its package, and this — the from-scratch provider — takes
+the name.
+
+Consequences worth knowing:
+
+- New releases publish to `oci://ghcr.io/krateo-blueprints/charts/github-provider-kog`. The old
+  `charts/krateo-github-provider-kog` package (one version, `0.1.11`) is now stale. Nothing
+  references it; it can be deleted whenever someone wants to.
+- **The plugin image deliberately keeps its old name**, `krateo-github-provider-kog-plugin`. The
+  plugin is on its way out — every kind it serves is being moved to native RestDefinition features
+  — so renaming it would publish a second package only to delete it again, and orphan the versions
+  already pushed. When the plugin goes, its Deployment, Service and image go together.
+- Rendered values are unchanged except the `app.kubernetes.io/part-of` label. The `pluginName`
+  helper builds its name from `.Release.Name`, not the chart name, so
+  `spec.selector.matchLabels` — which Kubernetes treats as immutable on a Deployment — is
+  byte-identical. The rename is safe to roll onto an existing install.
+- The Go module path moved with the repo
+  (`github.com/krateo-blueprints/github-provider-kog/plugin`). Nothing imports it; the plugin is a
+  single `main` package.
 
 ## 2026-09-09 — `Repository`: create the destination repo, not just write into it
 
@@ -62,7 +91,7 @@ live end-to-end run of `Repository` against GitHub yet.
 
 Unrelated to the kind, and recorded here because this is the change set it landed in: the
 GitHub repo is now `krateo-blueprints/github-provider-kog`. The Helm chart is still named
-`krateo-github-provider-kog` and still publishes to `charts/krateo-github-provider-kog`;
+`github-provider-kog` and still publishes to `charts/github-provider-kog`;
 that rename is deferred because the shorter name is currently held by another published
 package.
 

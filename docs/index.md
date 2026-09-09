@@ -1,15 +1,15 @@
 ---
 type: Component
-title: krateo-github-provider-kog — index
-description: The map of the krateo-github-provider-kog doc bundle — a Krateo KOG provider that exposes GitHub's repository and git-write API (Repository, RepoContent, GitRef, PullRequest) as github.krateo.io Kubernetes kinds via oasgen-provider.
-resource: oci://ghcr.io/krateo-blueprints/charts/krateo-github-provider-kog
+title: github-provider-kog — index
+description: The map of the github-provider-kog doc bundle — a Krateo KOG provider that exposes GitHub's repository and git-write API (Repository, RepoContent, GitRef, PullRequest) as github.krateo.io Kubernetes kinds via oasgen-provider.
+resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, kog, oasgen-provider, github, blueprint-authoring]
 timestamp: 2026-08-11T00:00:00Z
 ---
 
-# krateo-github-provider-kog
+# github-provider-kog
 
-krateo-github-provider-kog is a Krateo **KOG** (Krateo OpenAPI Generation) provider,
+github-provider-kog is a Krateo **KOG** (Krateo OpenAPI Generation) provider,
 built on [`oasgen-provider`](https://github.com/krateo-platformops/oasgen-provider)
 0.9.x, that exposes GitHub's **repository and git-write** REST API as Kubernetes kinds
 under the `github.krateo.io` group:
