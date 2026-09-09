@@ -5,7 +5,7 @@
 # ignored. Editing name/body/draft/prerelease on this CR IS reconciled — the RestDefinition
 # uses compareScope `updatable`, so those fields are compared against GitHub and PATCHed
 # back. `generate_release_notes` is create-only and is not compared.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: Release
 metadata:
   name: test-demo-release

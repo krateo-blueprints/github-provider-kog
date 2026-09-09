@@ -6,7 +6,7 @@
 # `org` and `owner` hold the same value here and are still two fields: `org` scopes the TEAM, `owner`
 # the REPOSITORY. GitHub allows a team to be granted access to a direct fork owned outside the org,
 # and the endpoint's path carries both, so they cannot be collapsed into one.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: TeamRepo
 metadata:
   name: test-platform-engineering-demo-destination

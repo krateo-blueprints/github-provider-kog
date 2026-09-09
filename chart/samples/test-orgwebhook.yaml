@@ -3,7 +3,7 @@
 #
 # `config.secret` is the HMAC key GitHub signs deliveries with, and it sits here in clear text
 # (see assets/orgwebhook.yaml) — treat the CR itself as sensitive.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: OrgWebhook
 metadata:
   name: test-krateo-blueprints-hook

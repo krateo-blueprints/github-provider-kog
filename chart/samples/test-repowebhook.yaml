@@ -5,7 +5,7 @@
 # `config.secret` is the HMAC key GitHub signs deliveries with. It sits here in clear text —
 # there is no Secret-backed field on this kind (see assets/repowebhook.yaml) — so treat the CR
 # itself as sensitive, or leave the secret out and verify deliveries another way.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: RepoWebhook
 metadata:
   name: test-demo-destination-hook

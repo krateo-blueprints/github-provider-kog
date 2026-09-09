@@ -10,7 +10,7 @@
 #
 # `restrictions` is org-only, and both it and `contexts` must be written SORTED — the drift
 # comparison is order-sensitive and the observed lists come back sorted.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: BranchProtection
 metadata:
   name: test-demo-destination-main

@@ -6,7 +6,7 @@
 # Changing the selected set after creation goes through
 # /orgs/{org}/actions/variables/{name}/repositories, which this kind does not model; watch
 # `status.selected_repositories_url` to see where that set lives.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: ActionsVariableOrg
 metadata:
   name: test-org-registry-var

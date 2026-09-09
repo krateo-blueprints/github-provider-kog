@@ -6,7 +6,7 @@
 # slug-shaped form when other CRs will reference it, as here — a TeamRepo or TeamMembership CR
 # points at the team by SLUG, and reading that slug off `kubectl get team ... -o jsonpath=
 # '{.status.slug}'` is the only way to be certain of it for a name that is not.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: Team
 metadata:
   name: test-platform-engineering

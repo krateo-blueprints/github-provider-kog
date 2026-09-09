@@ -13,7 +13,7 @@
 # its own, so observe keeps reporting the higher role and the controller re-issues the PUT every
 # reconcile. Ask for a permission at or above what the user already holds through the organization or
 # a team — do not use this kind to grant an org owner less than owner.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: Collaborator
 metadata:
   name: test-demo-collaborator

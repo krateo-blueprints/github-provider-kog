@@ -14,7 +14,7 @@
 #   kubectl get milestone test-demo-milestone -n krateo-system -o jsonpath='{.status.due_on}'
 # (an Europe/Rome token writing 2026-12-31 will show 2026-12-30T23:00:00Z — the right day, in
 # its own timezone). To move a due date, change it on GitHub or recreate the CR.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: Milestone
 metadata:
   name: test-demo-milestone

@@ -11,7 +11,7 @@
 # There is no delete: GitHub's REST API cannot delete an issue. Deleting this CR just stops
 # Krateo tracking it. To close the issue, set `state: closed` (with an optional `state_reason`)
 # and let the update run.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: Issue
 metadata:
   name: test-demo-issue

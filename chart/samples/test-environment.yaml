@@ -8,7 +8,7 @@
 # `reviewers` takes NUMERIC user/team ids, not logins; leave it out unless you have them. It is
 # also write-only: GitHub returns it nested under `protection_rules`, which this OAS does not
 # model, so a reviewer removed in the GitHub UI is not reconciled back (see rd-environment.yaml).
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: Environment
 metadata:
   name: test-demo-production

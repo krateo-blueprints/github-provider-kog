@@ -4,7 +4,7 @@
 #
 # A deploy key is immutable: to rotate it, delete this CR and create a new one. read_only
 # defaults to true — set it to false only when the consumer genuinely has to push.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: DeployKey
 metadata:
   name: test-demo-destination-ci-key

@@ -6,7 +6,7 @@
 #
 # Status carries what GitHub reports back: `enabled`, and `paused` — Dependabot's own back-off on a
 # repository whose security PRs nobody merges, which this kind reports but never fights.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: AutomatedSecurityFixes
 metadata:
   name: test-demo-destination-dependabot

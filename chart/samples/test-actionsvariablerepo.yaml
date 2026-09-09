@@ -5,7 +5,7 @@
 # `name` doubles as the create-body field and the {name} path segment of get/update/delete,
 # so editing it does not rename the variable — it points the CR at a different one, and the
 # controller creates that one instead. Delete and recreate the CR if you really mean to rename.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: ActionsVariableRepo
 metadata:
   name: test-demo-registry-var

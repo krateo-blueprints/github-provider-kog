@@ -11,7 +11,7 @@
 #
 # There is no ruleset_id field: GitHub assigns it on create and the provider carries it in
 # status.id, from where get/update/delete bind the path.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: OrgRuleset
 metadata:
   name: test-demo-org-protect-main

@@ -6,7 +6,7 @@
 # the invitation if it is still pending.
 #
 # The token in the referenced Configuration needs organization owner rights (classic PAT: `admin:org`).
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: OrgMembership
 metadata:
   name: test-demo-orgmembership

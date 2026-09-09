@@ -4,7 +4,7 @@
 # aimed at it can succeed. `auto_init` defaults to true in the OAS precisely so the new repo
 # has a first commit and therefore a default branch — without one, GitRef has no base sha to
 # branch from and RepoContent has nothing to commit against.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: Repository
 metadata:
   name: test-demo-destination

@@ -4,7 +4,7 @@
 # .github/workflows/release.yaml), and `workflow_id` names that file. What the CR owns is the
 # workflow's enabled state — create switches it on, deleting the CR switches it back off, and a
 # workflow somebody disables in the UI is switched on again on the next reconcile.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: Workflow
 metadata:
   name: test-demo-destination-release

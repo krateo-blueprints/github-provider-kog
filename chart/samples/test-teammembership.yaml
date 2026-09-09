@@ -4,7 +4,7 @@
 # a membership: the CR still reconciles, and status.state reads `pending` until they accept it.
 # Check it with `kubectl get teammembership ... -o jsonpath='{.status.state}'` before assuming the
 # access is live.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: TeamMembership
 metadata:
   name: test-platform-engineering-octocat

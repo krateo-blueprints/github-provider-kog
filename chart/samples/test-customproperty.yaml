@@ -3,7 +3,7 @@
 # PUT is an upsert, so create and update are the same call: editing `allowed_values`,
 # `required` or `default_value` on this CR is reconciled straight back onto the definition.
 # Removing the CR removes the definition AND the values set on every repository in the org.
-apiVersion: github.krateo.io/v1alpha1
+apiVersion: github.krateo.io/v2022-11-28
 kind: CustomProperty
 metadata:
   name: test-demo-tier
