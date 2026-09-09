@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: github-provider-kog — overview
-description: What the chart ships and how it works — 31 RestDefinitions plus trimmed OpenAPI specs that oasgen-provider turns into github.krateo.io CRDs and a controller per kind, how each kind decides drift via compareScope, what keeps 28 kinds native, and the companion plugin that normalizes GitHub's REST inconsistencies on the three git-write kinds so the CRs settle to Ready.
+description: What the chart ships and how it works — 28 RestDefinitions plus trimmed OpenAPI specs that oasgen-provider turns into github.krateo.io CRDs and a controller per kind, how each kind decides drift via compareScope, what keeps every one of the 28 native, and why the chart ships no runtime component of its own.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, kog, oasgen-provider, rest-dynamic-controller, github]
 timestamp: 2026-09-09T00:00:00Z
@@ -9,12 +9,12 @@ timestamp: 2026-09-09T00:00:00Z
 
 # Overview
 
-github-provider-kog exposes 31 GitHub REST resources as `github.krateo.io` Kubernetes
+github-provider-kog exposes 28 GitHub REST resources as `github.krateo.io` Kubernetes
 kinds. It ships **no controller of its own** for any of them — it declares the API
 mapping and lets `oasgen-provider` generate the CRDs and spawn a
-`rest-dynamic-controller` per kind. One companion plugin fills the gaps the OpenAPI
-mapping cannot express, for the three git-write kinds that need it; the other 28 kinds
-call `api.github.com` directly.
+`rest-dynamic-controller` per kind. Every one of the 28 calls `api.github.com` directly:
+there is no proxy, no plugin, no image. The chart is RestDefinitions and OpenAPI
+documents, and nothing else.
 
 ## What the chart covers
 
@@ -22,14 +22,14 @@ Six groups. Each row is one kind, its primary endpoint, and what a CR of it expr
 the per-verb tables live in [configuration](./configuration.md) and the generated fields
 in [api](./api.md).
 
-### Repository and git write
+### Repository
 
 | Kind | GitHub API | What a CR expresses |
 |------|-----------|---------------------|
 | `Repository` | `POST /orgs/{org}/repos` | the destination repository (org-owned) |
-| `RepoContent` | `PUT /repos/{owner}/{repo}/contents/{path}` | a file in a repo, created or updated in place |
-| `GitRef` | `POST /repos/{owner}/{repo}/git/refs` | a branch / ref |
-| `PullRequest` | `POST /repos/{owner}/{repo}/pulls` | an open pull request |
+
+`RepoContent`, `GitRef` and `PullRequest` were here and are gone — see
+[what the git-write kinds were, and where their design lives](#what-the-git-write-kinds-were-and-where-their-design-lives).
 
 ### Access
 
@@ -97,26 +97,22 @@ The chart (`chart/`) renders, per kind, two manifests:
 | `rd-<kind>.yaml` | `RestDefinition` (ogen.krateo.io/v1alpha1) | the API mapping: `resource.kind`, identifiers, additional status fields, `compareScope`, the per-verb method/path table, request-field mappings |
 | `configmap-<kind>.yaml` | `ConfigMap` | the trimmed OpenAPI 3.0 spec the RestDefinition references via `oasPath: configmap://...` |
 
-Three of those ConfigMaps — `repocontent`, `gitref`, `pullrequest` — are `tpl`-rendered,
-because their spec carries a per-operation `servers` override that has to resolve to the
-plugin's in-cluster URL. The other 28 are a plain `.Files.Get`: those kinds are fully
-native, so their assets are copied verbatim and contain no template action.
+All 28 ConfigMaps are a plain `.Files.Get`: every kind is native, so its asset is copied
+into the ConfigMap verbatim and contains no template action.
 
-Plus one shared plugin workload:
-
-| manifest | kind | role |
-|---|---|---|
-| `deployment-plugin.yaml` | `Deployment` | the `rest-dynamic-controller` plugin (`ghcr.io/krateo-blueprints/krateo-github-provider-kog-plugin:<chart version>`) |
-| `service-plugin.yaml` | `Service` (ClusterIP) | fronts the plugin at `http://<release>-plugin.<namespace>.svc:8080` |
+That is the whole render — 28 ConfigMaps and 28 RestDefinitions. **The chart ships no
+runtime component**: no `Deployment`, no `Service`, no image, nothing that has to be
+built or pulled. The only workloads in play are the `rest-dynamic-controller`s
+oasgen-provider deploys per kind, which are not this chart's.
 
 Every generated CRD lands under `resourceGroup` (default `github.krateo.io`), the
 chart's single value ([configuration](./configuration.md)). There is no per-kind toggle:
-all 31 RestDefinitions are always installed, because a RestDefinition costs nothing
+all 28 RestDefinitions are always installed, because a RestDefinition costs nothing
 until a CR of its kind exists.
 
 ## How oasgen-provider turns this into live kinds
 
-`oasgen-provider` (installed cluster-wide) watches the 31 `RestDefinition`s. For each it:
+`oasgen-provider` (installed cluster-wide) watches the 28 `RestDefinition`s. For each it:
 
 1. reads the referenced OpenAPI ConfigMap (`configmap://<ns>/<name>/<file>`),
 2. generates the CRD under `github.krateo.io`, unioning the request fields across the
@@ -124,12 +120,12 @@ until a CR of its kind exists.
 3. **auto-deploys a `rest-dynamic-controller` Deployment per kind**, which reconciles
    each CR by calling the mapped HTTP verbs (create/get/update/delete).
 
-The required version is **≥ 0.23.0**: 23 of the 31 RestDefinitions declare
+The required version is **≥ 0.23.0**: 23 of the 28 RestDefinitions declare
 `compareScope: updatable`, which older oasgen-provider does not accept (that field is
 what 0.23.0 added). 0.23.0 is also the version the whole set was validated against.
 
 Because every RestDefinition's OpenAPI declares a bearer `securityScheme`,
-oasgen-provider also generates a per-kind **`<Kind>Configuration`** CRD — 31 of them,
+oasgen-provider also generates a per-kind **`<Kind>Configuration`** CRD — 28 of them,
 `RepositoryConfiguration` through `AutomatedSecurityFixesConfiguration` — and adds a
 `spec.configurationRef` field to every resource CR. That is where the GitHub token
 wiring lives ([usage](./usage.md), [api](./api.md)).
@@ -148,7 +144,7 @@ in [configuration](./configuration.md).
 | scope | kinds | why |
 |---|---|---|
 | `updatable` | the other 23 | compares exactly what the update body can express, derived from the OAS. **Load-bearing** where the response carries a key the update cannot fix — `TeamRepo`'s `owner`, `Issue`'s `labels`, `Milestone`'s `due_on`, the webhooks' `config.secret`, `Collaborator`'s effective `role_name`. **Defensive** on the rest, whose only surplus `fullSpec` keys are create-only fields or path parameters: the response omits those, the comparison skips them, and the two scopes agree today. Requires an update verb, and oasgen-provider ≥ 0.23.0. |
-| `fullSpec` (left unset, 5) | `RepoContent`, `GitRef`, `PullRequest`, `Workflow`, `AutomatedSecurityFixes` | the three git-write kinds have their response shapes normalized by the plugin instead. `Workflow` and `AutomatedSecurityFixes` have no update verb at all, so `updatable` is unavailable — but their specs hold nothing except path parameters, which the response does not carry, and the comparison skips a spec key absent from the response, so fullSpec compares nothing and cannot report false drift. |
+| `fullSpec` (left unset, 2) | `Workflow`, `AutomatedSecurityFixes` | neither has an update verb at all, so `updatable` is unavailable — but their specs hold nothing except path parameters, which the response does not carry, and the comparison skips a spec key absent from the response, so fullSpec compares nothing and cannot report false drift. The drift that matters is caught by a `notFoundBody` predicate instead. |
 | `fullSpec` (set explicitly, 1) | `Autolink` | also has no update verb, and here fullSpec is the point rather than a fallback: the GET returns the whole resource, so a synced autolink never drifts, and an edited CR *should* report drift — an autolink is immutable, and the operator has to delete and recreate it. `identifiersAndStatus` would report Ready while the spec and the repository disagreed. |
 | `identifiersAndStatus` (2) | `DeployKey`, `Deployment` | no update verb either, so `updatable` is unavailable — but unlike `Autolink` these carry spec fields fullSpec would compare and nothing could fix: a multi-line SSH public key whose byte-identical echo cannot be verified read-only; a deployment's `environment`, which a CI job posting a deployment status can rewrite. (Their create-only fields — `auto_merge`, `required_contexts` — are absent from the response and skipped either way.) The status list is chosen so the compared set contains no spec field at all: the resource exists, therefore it is up to date — the honest model of an immutable record, and a deleted one is still detected, because the GET 404s and the controller recreates it. |
 
@@ -157,22 +153,18 @@ The reasoning for each setting is written in the RestDefinition that carries it
 
 ## Where Repository sits
 
-`Repository` creates the destination itself, so the authoring chain now starts one
-step earlier:
-
-`Repository` → `GitRef` → `RepoContent` (per file) → `PullRequest`.
-
-Before it, the three git-write kinds could only write into a repository someone had
-already created by hand — a brand-new blueprint had a manual step in front of it that
-no CR expressed. With `Repository` the whole chain is `github.krateo.io` CRs, and
-order matters: the repo must exist and be initialised before a `GitRef` or
-`RepoContent` aimed at it can succeed.
+`Repository` is the one kind in the chart that brings a resource into being rather than
+configuring one that already exists: every other kind addresses a repository, an
+environment or an organization that is already there. It is also what makes the rest of
+the set self-sufficient — a composition can declare the repository and then its webhooks,
+environments, rulesets, branch protection and team grants as CRs in the same apply, with
+no hand-created destination in front of them.
 
 Four things about the mapping are worth stating plainly:
 
 - **Every verb is native.** create `POST /orgs/{org}/repos`; get, update and delete
   `GET` / `PATCH` / `DELETE /repos/{org}/{name}`. All four go straight to
-  `api.github.com` — `Repository` never touches the plugin.
+  `api.github.com`, as every verb of every kind here does.
 - **`compareScope: updatable`, not the default `fullSpec` — defensively.** It compares
   exactly the fields the PATCH body can express. The three create-only fields
   (`auto_init`, `gitignore_template`, `license_template`) are never echoed on GET, so the
@@ -182,9 +174,10 @@ Four things about the mapping are worth stating plainly:
   added later. It requires an update verb, which this resource has, and needs
   oasgen-provider **0.23.0** or newer ([configuration](./configuration.md)).
 - **`auto_init` defaults to true, and it is load-bearing.** A repository created with
-  `auto_init=false` has no commit and therefore no default branch, so a `GitRef` aimed
-  at it has no base sha to branch from and a `RepoContent` has nothing to commit
-  against.
+  `auto_init=false` has no commit and therefore no default branch, so anything that
+  addresses a branch of it fails until someone pushes by hand — a `BranchProtection` CR
+  naming `main`, an `Environment` branch policy, or a git write arriving over
+  `git-provider`.
 - **The path parameters are `org` and `name`, not GitHub's `owner`/`repo`.**
   Deliberate: the same two CR fields then serve the create path
   (`/orgs/{org}/repos`), the create body (`name`) and the get/update/delete path
@@ -196,17 +189,16 @@ user-owned repositories. A RestDefinition has a single create verb and cannot ch
 between two paths, so only the org-scoped create is modelled; Krateo destinations are
 org-owned.
 
-## What keeps 28 kinds native
+## What keeps all 28 kinds native
 
-Every one of the 27 kinds added around the original four is native — no plugin hop, no
-proxy. That is possible because a RestDefinition expresses more than a path table, and
-the quirks that would otherwise need a proxy are handled at the mapping layer:
+Not one of them has a hop in front of `api.github.com`. That is possible because a
+RestDefinition expresses more than a path table, and the quirks that would otherwise
+need a proxy are handled at the mapping layer:
 
 - **Server-assigned identifiers.** `excludedSpecFields` keeps an id the author cannot
   know out of the CR spec, and `requestFieldMapping` sources it from status instead —
   `hook_id`, `ruleset_id`, `release_id`, `runner_group_id`, `branch_policy_id`,
-  `milestone_number`, `issue_number`, `team_slug`. It is the same pattern
-  `PullRequest` uses for `pull_number`.
+  `milestone_number`, `issue_number`, `team_slug`.
 - **Static per-verb headers and queries.** `TeamRepo`'s observe sends
   `Accept: application/vnd.github.v3.repository+json`; without it GitHub answers 204 and
   there is nothing to observe. `Collaborator`'s observe pins `affiliation=direct`, the
@@ -230,41 +222,42 @@ the quirks that would otherwise need a proxy are handled at the mapping layer:
   endpoints return either no body (204/404) or the user's *effective* permission, which
   would make any org member read back as an up-to-date collaborator.
 
-## Why the git-write kinds need a plugin
+## What the git-write kinds were, and where their design lives
 
-GitHub's git-write endpoints have quirks a pure OpenAPI-to-HTTP mapping cannot express;
-left alone, a `rest-dynamic-controller` observes the wrong thing, sees spurious drift,
-and re-issues create/update forever — the CR never reaches Ready. The RestDefinitions
-point the affected verbs at the plugin's in-cluster URL (a per-operation OpenAPI
-`servers` override, resolved through `tpl` in the ConfigMaps — see
-`chart/templates/_helpers.tpl`), so the controller calls the plugin for exactly those
-verbs; **every other verb still goes straight to GitHub**. The plugin serves three kinds
-and three only — `GitRef`, `RepoContent`, `PullRequest` — so 28 of the 31 kinds never
-touch it. The plugin (`plugin/main.go`) fixes:
+`RepoContent`, `GitRef` and `PullRequest` served the legacy blueprint-publish path: the
+Autopilot builder wrote a chart tree into a repository as `github.krateo.io` CRs
+(`Repository` → `GitRef` → `RepoContent` per file → `PullRequest`). The frontend now
+defaults to an SCM-agnostic route instead — `AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults
+to `"true"` in the frontend chart's `values.yaml` **and** its `values.schema.json`, so a
+fresh install publishes through a `BuilderPublish` claim over `git-provider`, and the
+`github.krateo.io` route is explicitly the `"false"` fallback.
 
-- **GitRef create** — GitHub requires the base commit `sha`, which a portal/Autopilot
-  author has no way to know. When the CR omits `sha`, the plugin resolves the repo's
-  default-branch HEAD sha and injects it, so naming only the new `ref` just works.
-- **GitRef observe** — GitHub's get uses `git/ref/{ref}` (no `refs/` prefix) while
-  create/update use `git/refs`. The plugin exposes a `/gitref/...` route that maps
-  onto the correct get path, so a just-created ref is FOUND instead of 404-looping into
-  "422 Reference already exists".
-- **RepoContent write** — makes the PUT idempotent create-or-update: on a 422 for an
-  existing file with no `sha`, it fetches the file's current sha on the target branch
-  and retries once, so `RepoContent` can update a file in place, not only create it.
-  It also flattens GitHub's nested `content{}` response to the root so the controller's
-  same-level field compare succeeds.
-- **RepoContent observe** — reads from the CR's `branch` (forwarded to GitHub as
-  `?ref`, with multi-level percent-decoding for `builder/x`-style refs so a file on a
-  builder branch is found), and canonicalizes GitHub's newline-wrapped base64 `content`
-  so real drift is detected without false-looping on encoding.
-- **PullRequest observe** — flattens GitHub's `head`/`base` objects to their `ref`
-  strings so the controller's string-vs-object compare stops looping "update" and
-  422-ing on a closed PR.
+They were also the only three kinds that needed the companion proxy plugin. GitHub's
+git-write endpoints have quirks a pure OpenAPI-to-HTTP mapping could not express at the
+time, and the plugin normalized them: resolving the default-branch HEAD sha for a
+sha-less `GitRef` create, bridging GitHub's `git/ref` (read) vs `git/refs` (write) path
+asymmetry, making `RepoContent`'s PUT an idempotent create-or-update and canonicalizing
+its base64, and flattening `PullRequest`'s `head`/`base` objects to their `ref` strings.
+Removing the three kinds and the plugin together is what leaves the chart with no
+runtime component at all.
 
-The plugin is a tiny stdlib-only Go service on a distroless `nonroot` base
-(`plugin/Dockerfile`); it forwards the caller's `Authorization` header verbatim and
-holds no credentials of its own.
+The knowledge did not go with the code. One design document per kind records what the
+plugin handler did, why, and exactly what it would take to bring that kind back
+**natively** at oasgen-provider 0.23.0:
+
+- [design-repocontent](./design-repocontent.md) — **returnable today.** `status.sha`
+  auto-populates the update body (proven by the delete verb, which was always native), so
+  the 422-then-retry is not needed; the rest is a `responseTransform` on get/create/update
+  plus a `fieldMapping` for `branch` → `?ref`. The `%252F` double-escape that broke observe
+  on a `builder/x` branch is fixed upstream in 0.23.0.
+- [design-pullrequest](./design-pullrequest.md) — **returnable today.** One whole-document
+  `responseTransform` on the get verb replaces the head/base flattening, with
+  `compareScope: updatable` alongside it to drop the create-only fields from the compared
+  set.
+- [design-gitref](./design-gitref.md) — **returnable except for one thing.** Resolving the
+  base HEAD sha when the CR omits `sha` is a pre-call dependent read, which a
+  RestDefinition cannot express — tracked as oasgen-provider **#120**. The kind is native
+  if `spec.sha` becomes required; the caller then performs one GitHub GET first.
 
 ## Where the coverage stops
 
@@ -284,12 +277,15 @@ holds no credentials of its own.
   reason: its GET does return a body (`enabled`, `paused`). The difference is the body,
   not the feature.
 - **`POST /user/repos`** is not modelled — see [Where Repository sits](#where-repository-sits).
-- **`Issue` and `PullRequest` have no delete verb.** GitHub's REST API has no endpoint
-  that deletes either (only the GraphQL `deleteIssue` mutation, which a RestDefinition
-  cannot reach). Deleting such a CR stops Krateo managing the object; the issue or PR
-  stays on GitHub. To close an issue, set `spec.state: closed` (optionally with
-  `spec.state_reason`) and let the update verb run, then delete the CR if you no longer
-  want it tracked.
+- **Git writes are not in this chart.** Committing a file, creating a branch and opening a
+  pull request left with `RepoContent`, `GitRef` and `PullRequest`; the portal publishes
+  over `git-provider` instead. What it would take to model them natively again is written
+  down per kind ([above](#what-the-git-write-kinds-were-and-where-their-design-lives)).
+- **`Issue` has no delete verb.** GitHub's REST API has no endpoint that deletes an issue
+  (only the GraphQL `deleteIssue` mutation, which a RestDefinition cannot reach).
+  Deleting such a CR stops Krateo managing the object; the issue stays on GitHub. To
+  close an issue, set `spec.state: closed` (optionally with `spec.state_reason`) and let
+  the update verb run, then delete the CR if you no longer want it tracked.
 
 ## Limitations worth knowing
 
@@ -317,14 +313,11 @@ Configuration via `spec.configurationRef.name`. The Krateo portal write-path onl
 **references** these Configuration CRs — it never creates them or the Secret, and the
 token is never handled by the browser or snowplow ([usage](./usage.md)).
 
-One PAT can drive the whole chart. Each of the 31 kinds gets its own
+One PAT can drive the whole chart. Each of the 28 kinds gets its own
 `<Kind>Configuration`, but they may all carry the same name — `chart/samples/`
-ships all 31 as `github-blueprints-config` — so a single token Secret backs every kind
-in use. What that token must be allowed to do differs by kind, and the union is wider
-than it used to be:
+ships all 28 as `github-blueprints-config` — so a single token Secret backs every kind
+in use. What that token must be allowed to do differs by kind:
 
-- the git-write kinds (`RepoContent`, `GitRef`, `PullRequest`) need only
-  contents/refs/pulls write;
 - `Repository` needs repo creation in the org — classic `repo`, or the fine-grained org
   permission **Administration: read & write**;
 - the org-scoped kinds — everything addressing `/orgs/{org}/…`: `Team`, `TeamRepo`,
@@ -339,10 +332,11 @@ the chart requires one token for everything ([usage](./usage.md)).
 
 Stated plainly, because the difference matters:
 
-- `helm lint` is clean and all 31 kinds render.
+- `helm lint` is clean and all 28 kinds render — 28 ConfigMaps + 28 RestDefinitions and
+  nothing else, with zero plugin references anywhere in the rendered output.
 - Every RestDefinition path + method was cross-checked against the operations declared
   in its own OpenAPI asset — zero mismatches.
-- All 31 RestDefinitions were accepted by the **deployed**
+- All 28 RestDefinitions were accepted by the **deployed**
   `restdefinitions.ogen.krateo.io` CRD at oasgen-provider 0.23.0, via
   `kubectl apply --dry-run=server` under throwaway names, confirmed absent afterwards.
 - **There has been no end-to-end run against GitHub for any kind.** Where a behaviour

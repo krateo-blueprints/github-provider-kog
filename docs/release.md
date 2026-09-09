@@ -1,16 +1,16 @@
 ---
 type: Runbook
 title: github-provider-kog — release
-description: How a release ships — one plain-semver tag drives both the canonical release-oci workflow (the chart to GHCR) and release-image (the plugin image on the same tag), so the chart's plugin Deployment always lines up with a published image.
+description: How a release ships — one plain-semver tag drives the canonical release-oci workflow, which packages the chart to GHCR. The chart is the only artifact this repo publishes: there is no image and nothing to co-version with it.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
-tags: [release, oci, ghcr, plugin-image]
+tags: [release, oci, ghcr, chart]
 timestamp: 2026-09-09T00:00:00Z
 ---
 
 # Release
 
 One plain-semver tag (`X.Y.Z`, **no** `v` prefix) releases everything. The tag push
-triggers two workflows in parallel.
+triggers one workflow.
 
 ## What a tag ships
 
@@ -19,14 +19,14 @@ triggers two workflows in parallel.
    discovers `chart/` as the single first-class chart, packages it, and pushes to
    `oci://ghcr.io/krateo-blueprints/charts`. A collision guard refuses to push to a
    bare registry root, so the chart cannot collide with a same-named image.
-2. **`release-image.yaml`** — builds and pushes the plugin image
-   `ghcr.io/krateo-blueprints/krateo-github-provider-kog-plugin:X.Y.Z` (linux/amd64,
-   from `plugin/`) on the **same** bare-semver tag. The chart's plugin Deployment pins
-   `:{{ .Chart.Version }}`, so every tag must publish the image or the chart would ask
-   for one that was never built.
 
-That co-versioning is the release invariant: chart X.Y.Z and plugin image X.Y.Z from
-one ref ([configuration](./configuration.md)).
+That is the whole release. The chart renders 28 ConfigMaps + 28 RestDefinitions and
+nothing else — no Deployment, no Service, no image reference — so there is no second
+artifact and no co-versioning invariant to keep. The companion plugin, its image and
+`release-image.yaml` were deleted with the three kinds that needed them — the reason and
+the restoration path are in the [log](./log.md) and in
+[design-gitref](./design-gitref.md) / [design-repocontent](./design-repocontent.md) /
+[design-pullrequest](./design-pullrequest.md).
 
 ## Steps
 
@@ -34,11 +34,10 @@ one ref ([configuration](./configuration.md)).
 $ git tag X.Y.Z && git push origin X.Y.Z
 ```
 
-Then verify both workflows went green and the artifacts exist:
+Then verify the workflow went green and the chart exists:
 
 ```console
 $ helm show chart oci://ghcr.io/krateo-blueprints/charts/github-provider-kog --version X.Y.Z | head -3
-$ docker manifest inspect ghcr.io/krateo-blueprints/krateo-github-provider-kog-plugin:X.Y.Z >/dev/null && echo image ok
 ```
 
 ## PR-time checks
@@ -49,11 +48,10 @@ $ docker manifest inspect ghcr.io/krateo-blueprints/krateo-github-provider-kog-p
   enforces this bundle: the core files, per-file frontmatter, resolvable links, and the
   README's six sections.
 
-`release-oci.yaml` and `release-image.yaml` only fire on a bare-semver tag, never on a
-PR, so `Chart.yaml`'s `CHART_VERSION` placeholder stays intact until a real release.
+`release-oci.yaml` only fires on a bare-semver tag, never on a PR, so `Chart.yaml`'s
+`CHART_VERSION` placeholder stays intact until a real release.
 
 ## Version pinning downstream
 
 Consumers pin the chart by explicit `version` in the Installer component-pins
-([usage](./usage.md)); nothing tracks `latest`. Both the chart version and the plugin
-image tag are immutable per release.
+([usage](./usage.md)); nothing tracks `latest`. Each released chart version is immutable.

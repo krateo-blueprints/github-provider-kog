@@ -10,7 +10,7 @@
 # values.schema.json — which declares ONLY this single top-level scalar (a scalar
 # default materializes cleanly in the component CR; nested-object toggles would not).
 
-# The API group every generated CRD lands under — 31 resource kinds plus a
+# The API group every generated CRD lands under — 28 resource kinds plus a
 # <Kind>Configuration auth kind for each. All of them are always installed; the chart has
 # no per-kind toggle, because a RestDefinition costs nothing until a CR exists.
 resourceGroup: github.krateo.io
