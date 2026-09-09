@@ -152,6 +152,36 @@ afterwards. There is **no** live end-to-end run against GitHub for any kind — 
 behaviours recorded above come from the API's own documents and from read-only
 measurement, not from a round trip through a controller.
 
+## 2026-09-10 — `Repository` no longer reconciles a rename
+
+`name` is out of the PATCH body, so it leaves the `updatable` compare set. Renaming a repository is
+no longer something drift reconciliation can decide to do.
+
+Found in production on krateo-057, the first day this chart ran real traffic. `builder-publish`
+1.8.0 created six `Repository` CRs from live BuilderPublish claims; two failed, and one of them was
+this:
+
+`publish-tk-petstore-repo` targets `krateo-platformops/krateo-oas`, which **has been renamed to
+`krateo-platformops/oas`**. GitHub redirects a renamed repo, so the observe GET follows it and
+reports `name: oas` while the spec still says `krateo-oas`. With `name` compared, that read as
+drift and the controller issued a PATCH — which GitHub answered **307**, surfacing as
+`update failed: unexpected status: 307`.
+
+The error was the good outcome. Had that redirect been followed, the reconcile would have RENAMED a
+live repository back to a stale name nobody asked for. A kind that quietly renames real
+repositories to satisfy its own drift check is worse than one that errors.
+
+`name` remains a path parameter and a create-body field, so creating and addressing a repository are
+unchanged. Only rename-reconciliation is gone.
+
+**The other failure is NOT fixed here and is not a bug in this chart.** `publish-cnpg-cluster-repo`
+targets `EdmondDantes21/cnpg-cluster` — and `EdmondDantes21` is a **User**, not an Organization. This
+kind models only `POST /orgs/{org}/repos`; GitHub's user-owned create is `POST /user/repos`, and a
+RestDefinition has one create verb and cannot choose between two paths (recorded when the kind was
+written). The observed 404 on PATCH is GitHub declining to confirm a repository the token cannot
+write. The fix belongs upstream of here: either the publish destination should be org-owned, or
+per-verb path selection has to exist. See oasgen-provider #120 for the shape of that gap.
+
 ## 2026-09-09 — oasgen-provider 0.23.0: `Repository` moves to `compareScope: updatable`
 
 krateo-057 was upgraded to oasgen-provider **0.23.0**, which adds a third `compareScope`

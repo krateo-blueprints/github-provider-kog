@@ -89,8 +89,23 @@ paths:
             schema:
               type: object
               properties:
-                name:
-                  type: string
+                # `name` IS accepted by GitHub's PATCH — and is DELIBERATELY NOT MODELLED HERE.
+                #
+                # Including it put `name` in the `updatable` compare set, which made renaming a
+                # repository something drift reconciliation would do on its own. Two ways that bit
+                # in production on krateo-057 (2026-09-10):
+                #
+                #   GitHub REDIRECTS a renamed repo. `krateo-platformops/krateo-oas` is now
+                #   `krateo-platformops/oas`; the observe GET follows the redirect and reports
+                #   name=oas, the spec still says krateo-oas, so the comparison saw drift and
+                #   issued a PATCH — which GitHub answered 307, and the controller surfaced as
+                #   `update failed: unexpected status: 307`. The error was the good outcome: had
+                #   the redirect been followed, the reconcile would have RENAMED a live repository
+                #   back to a stale name nobody asked for.
+                #
+                # `name` remains a path parameter and a create-body field, so creating and
+                # addressing a repository are unaffected. Only reconciling a rename is gone, and
+                # it should be: renaming is a deliberate act, not drift.
                 description:
                   type: string
                 homepage:
