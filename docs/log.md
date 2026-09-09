@@ -152,6 +152,33 @@ afterwards. There is **no** live end-to-end run against GitHub for any kind — 
 behaviours recorded above come from the API's own documents and from read-only
 measurement, not from a round trip through a controller.
 
+## 2026-09-10 — `Repository` has no delete verb, so a cascade cannot destroy repositories
+
+Removing the CR now ORPHANS the GitHub repository instead of deleting it. `Repository` has
+`create`, `get` and `update`, and no `delete`.
+
+This is a safety change, not a tidy-up. oasgen-provider deletes a RestDefinition's CRD
+**unconditionally** (`SkipCRD: false`), which cascade-deletes every CR of that kind, which runs
+every finalizer. With a delete verb, that chain ended in `DELETE /repos/{org}/{name}`. So deleting
+the RestDefinition, uninstalling the chart, or any CRD-version migration would have **destroyed
+every repository this kind ever created, and the code in them.** That is oasgen-provider **#125**,
+found on krateo-057 where a duplicate `github-provider-kog` install could not be hand-cleaned for
+exactly this reason — the safe move was to leave the duplicate running.
+
+Verified before making the change, because the obvious risk was reintroducing a finalizer wedge
+like the one that killed GitRef: rest-dynamic-controller handles an absent delete verb by logging
+"API action delete not found" and **returning nil** (`restResources.go` `Delete`, `apiCall == nil`
+branch at 0.23.0). The finalizer is released, the CR goes, the external resource is left alone.
+Nothing wedges.
+
+The trade is deliberate and asymmetric. A leaked repository is an inconvenience someone can delete
+in GitHub. A destroyed one is not recoverable from here, and for a blueprint DESTINATION repo
+"removing the CR should never remove the code" is plainly the right default. Restore the verb only
+once the #125 guard exists upstream, and then only behind a per-CR opt-in.
+
+Docs corrected everywhere they claimed the opposite — `api.md`, `overview.md`, `usage.md` and
+`examples.md` all said deleting the CR deletes the repository, which was true when written.
+
 ## 2026-09-10 — `Repository` no longer reconciles a rename
 
 `name` is out of the PATCH body, so it leaves the `updatable` compare set. Renaming a repository is

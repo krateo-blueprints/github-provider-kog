@@ -122,7 +122,7 @@ is created and stored by an operator, never handled by the browser or snowplow.
 
 `Repository` creates the repo every other repository-scoped kind then configures, so it
 comes **first**. Like all 28 kinds it is fully native: create (`POST /orgs/{org}/repos`)
-and get/update/delete (`GET`/`PATCH`/`DELETE /repos/{org}/{name}`) all go straight to
+and get/update (`GET`/`PATCH /repos/{org}/{name}`) go straight to
 `api.github.com`. See `chart/samples/test-repository.yaml`:
 
 ```yaml
@@ -171,7 +171,7 @@ Four things to know before you apply it:
   org-owned. Create the repo under an organization, or create it outside Krateo and
   point the repository-scoped kinds at it.
 
-`delete` maps to `DELETE /repos/{org}/{name}`, so deleting the CR deletes the repository
+`Repository` has **no delete verb**, so deleting the CR orphans the repository
 on GitHub. The full spec/status field list is in [api](./api.md).
 
 The status fields carry what the kinds that follow need: `full_name`, `clone_url`,

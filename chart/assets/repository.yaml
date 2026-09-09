@@ -131,15 +131,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Repository'
-    delete:
-      summary: Delete a repository
-      operationId: repos/delete
-      parameters:
-        - $ref: '#/components/parameters/org'
-        - $ref: '#/components/parameters/name'
-      responses:
-        '204':
-          description: Response
 components:
   securitySchemes:
     accessToken:

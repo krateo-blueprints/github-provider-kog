@@ -163,7 +163,9 @@ no hand-created destination in front of them.
 Four things about the mapping are worth stating plainly:
 
 - **Every verb is native.** create `POST /orgs/{org}/repos`; get, update and delete
-  `GET` / `PATCH` / `DELETE /repos/{org}/{name}`. All four go straight to
+  `GET` / `PATCH /repos/{org}/{name}`. There is deliberately **no delete verb**: removing the CR
+  orphans the repository rather than destroying it, because oasgen deletes a RestDefinition's CRD
+  unconditionally and every finalizer would then run (oasgen-provider #125). All go straight to
   `api.github.com`, as every verb of every kind here does.
 - **`compareScope: updatable`, not the default `fullSpec` — defensively.** It compares
   exactly the fields the PATCH body can express. The three create-only fields

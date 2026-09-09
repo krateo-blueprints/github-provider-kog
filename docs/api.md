@@ -131,7 +131,7 @@ authoring one are written out in full below the tables.
 
 | kind | verbs | identifiers | `compareScope` | status |
 |---|---|---|---|---|
-| `Repository` | create `POST /orgs/{org}/repos`; get/update/delete `GET`/`PATCH`/`DELETE /repos/{org}/{name}` | `name` | `updatable` | `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
+| `Repository` | create `POST /orgs/{org}/repos`; get/update `GET`/`PATCH /repos/{org}/{name}`. **No delete verb** — deleting the CR orphans the repository, it does not destroy it (see below) | `name` | `updatable` | `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
 
 ### `Repository` — create the destination repository
 
