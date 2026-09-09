@@ -1,0 +1,162 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Deployment Environments
+servers:
+  - url: https://api.github.com
+paths:
+  # ONE path, four verbs. GitHub models an environment as a PUT-addressed singleton: the
+  # environment's NAME is a path parameter on every operation and never appears in a request
+  # body, so `owner`/`repo`/`environment_name` are the only fields the CR needs and no verb
+  # can disagree with another about which environment it is addressing.
+  #
+  # PUT is create-OR-update — the same operation, byte for byte. It is declared twice in
+  # rd-environment.yaml (action: create and action: update) because a RestDefinition addresses
+  # verbs by action, not by method; there is no second endpoint and no asymmetry between the
+  # create body and the update body.
+  "/repos/{owner}/{repo}/environments/{environment_name}":
+    put:
+      summary: Create or update an environment
+      operationId: repos/create-or-update-environment
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/environment_name'
+      # Optional: an environment with no body at all is legal and simply has no protection
+      # rules. Every property below is a protection rule.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                # Minutes to delay a job after it is triggered (0..43200).
+                wait_timer:
+                  type: integer
+                prevent_self_review:
+                  type: boolean
+                # NUMERIC ids, not logins. GitHub identifies a reviewer by its user id or team
+                # id; there is no by-name form of this endpoint. Up to six entries.
+                reviewers:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        enum:
+                          - User
+                          - Team
+                      id:
+                        type: integer
+                # Exactly one of the two booleans is true; GitHub 422s if they agree. Omit the
+                # whole object to allow every branch to deploy. `custom_branch_policies: true`
+                # is the precondition for a DeploymentBranchPolicy against this environment —
+                # without it that kind's create POST returns 404.
+                deployment_branch_policy:
+                  type: object
+                  properties:
+                    protected_branches:
+                      type: boolean
+                    custom_branch_policies:
+                      type: boolean
+                  required:
+                    - protected_branches
+                    - custom_branch_policies
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Environment'
+    get:
+      summary: Get an environment
+      operationId: repos/get-environment
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/environment_name'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Environment'
+    delete:
+      summary: Delete an environment
+      operationId: repos/delete-an-environment
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/environment_name'
+      responses:
+        '204':
+          description: Default response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    environment_name:
+      name: environment_name
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Environment:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        node_id:
+          type: string
+        # The environment name as GitHub stored it. This is the response-side counterpart of
+        # the `environment_name` path parameter and the resource's identifier.
+        name:
+          type: string
+        url:
+          type: string
+        html_url:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        # DELIBERATELY the only protection rule surfaced on the response side.
+        #
+        # GitHub does NOT echo wait_timer / prevent_self_review / reviewers as top-level keys.
+        # It returns them nested inside `protection_rules`, an array whose items are an anyOf
+        # of three differently-shaped objects (a wait_timer rule, a required_reviewers rule
+        # carrying a Simple User OR a Team, and a bare branch-policy rule). oasgen-provider has
+        # no anyOf/oneOf handling — only allOf is merged — so modelling that array would
+        # produce a property with no usable schema in the generated CRD. It is omitted, and
+        # the three fields it would carry are therefore write-only: settable, not observable.
+        # See the compareScope note in rd-environment.yaml for why that is safe rather than
+        # merely tolerated.
+        deployment_branch_policy:
+          type: object
+          properties:
+            protected_branches:
+              type: boolean
+            custom_branch_policies:
+              type: boolean
+security:
+  - accessToken: []

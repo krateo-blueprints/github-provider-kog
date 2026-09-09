@@ -1,0 +1,21 @@
+# Add a user to an organization as a plain member.
+#
+# Unlike Collaborator, the invited state is observable: GitHub models a pending invitation as this
+# same membership with state "pending", so the CR reaches Ready immediately and status.state flips
+# from pending to active when the user accepts. Deleting the CR removes the membership, or cancels
+# the invitation if it is still pending.
+#
+# The token in the referenced Configuration needs organization owner rights (classic PAT: `admin:org`).
+apiVersion: github.krateo.io/v1alpha1
+kind: OrgMembership
+metadata:
+  name: test-demo-orgmembership
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  org: krateo-blueprints
+  username: octocat
+  role: member

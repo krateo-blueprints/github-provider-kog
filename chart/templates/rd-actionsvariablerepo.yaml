@@ -1,0 +1,53 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-actionsvariablerepo
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-actionsvariablerepo/actionsvariablerepo.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: ActionsVariableRepo
+    # The variable name distinguishes the resource within a repository; owner/repo scope it and
+    # are path params on every verb. Same split Repository uses with org/name. `name` is a
+    # property of the GET response, so status populates.
+    identifiers:
+      - name
+    # Read-only server facts only — the spec already carries name and value, and mirroring them
+    # into status would say nothing new. The timestamps are the observable evidence that an
+    # update actually landed.
+    additionalStatusFields:
+      - created_at
+      - updated_at
+    # Compare only what the PATCH body can express.
+    #
+    # NOTE, correcting an earlier version of this comment: owner and repo are NOT the reason.
+    # They are path params, absent from the GET payload, and the comparison SKIPS any spec key
+    # the response does not carry — `rmValue, ok := rm[key]; if !ok { continue }` in
+    # rest-dynamic-controller's internal/tools/comparison. An absent key cannot drift under any
+    # scope, fullSpec included.
+    #
+    # What genuinely loops here is `name`. The GET DOES echo it, GitHub normalises variable names
+    # (create `my_var`, read back `MY_VAR`), and `name` is trimmed from the PATCH body (see the
+    # asset: the item is ADDRESSED by {name}, so a rename could never converge). Echoed, unequal
+    # and unfixable by the update verb is precisely the permanent-PATCH case, so under fullSpec
+    # this variable would reconcile forever against a 5000 req/hr budget.
+    #
+    # `updatable` narrows the compare set to the PATCH body — here just `value`, which the GET
+    # does echo, so drift on it stays detectable AND fixable — and leaves `name` out. It requires
+    # an update verb; this resource has PATCH.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/actions/variables
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/actions/variables/{name}
+      - action: update
+        method: PATCH
+        path: /repos/{owner}/{repo}/actions/variables/{name}
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/actions/variables/{name}

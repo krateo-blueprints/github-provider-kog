@@ -1,0 +1,114 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Team memberships
+servers:
+  - url: https://api.github.com
+paths:
+  # The cleanest of the three team kinds: one endpoint, all four verbs, and every path parameter
+  # (org, team_slug, username) is a plain value the author sets — nothing is server-assigned, so no
+  # spec field has to be excluded and no path value has to be sourced from status.
+  "/orgs/{org}/teams/{team_slug}/memberships/{username}":
+    put:
+      # Create-or-update, like TeamRepo's PUT: adding a user who is already a member just changes
+      # their role. Unlike TeamRepo's PUT this one RETURNS the membership, so status is populated
+      # straight from the create response instead of waiting for the first observe.
+      summary: Add or update team membership for a user
+      operationId: teams/add-or-update-membership-for-user-in-org
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/team_slug'
+        - $ref: '#/components/parameters/username'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                # Defaulted to GitHub's own default so the field is always present in spec and
+                # therefore always compared: an absent spec key is skipped by the drift comparison,
+                # which would leave the role unmanaged.
+                role:
+                  type: string
+                  enum:
+                    - member
+                    - maintainer
+                  default: member
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMembership'
+    get:
+      # 404 means "this user has no membership with this team" — the reconciler's ordinary not-found
+      # path, so no notFoundCodes remapping is needed.
+      summary: Get team membership for a user
+      operationId: teams/get-membership-for-user-in-org
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/team_slug'
+        - $ref: '#/components/parameters/username'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMembership'
+    delete:
+      # Removes the membership. It does NOT remove the user from the organization.
+      summary: Remove team membership for a user
+      operationId: teams/remove-membership-for-user-in-org
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/team_slug'
+        - $ref: '#/components/parameters/username'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    org:
+      name: org
+      in: path
+      required: true
+      schema:
+        type: string
+    team_slug:
+      name: team_slug
+      in: path
+      required: true
+      schema:
+        type: string
+    username:
+      name: username
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    # The whole response — GitHub returns exactly these three fields (verified live). Note what is
+    # NOT here: `username` never comes back, so it cannot be an identifier or a status field; `url`
+    # is the only response property that identifies the membership.
+    TeamMembership:
+      type: object
+      properties:
+        url:
+          type: string
+        role:
+          type: string
+        # `active` or `pending`. Adding a user who is not yet an organization member creates a
+        # PENDING invitation, and this stays "pending" until they accept it — indefinitely. It is
+        # surfaced on status so that wait is visible, and it is never compared (it is not something
+        # the PUT body can set), so a pending invitation cannot turn into an update loop.
+        state:
+          type: string
+security:
+  - accessToken: []

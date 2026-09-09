@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-collaborator
+  namespace: {{ .Release.Namespace }}
+data:
+  # NOT tpl-rendered, like configmap-repository. Collaborator is fully native — create, update,
+  # findby and delete all go straight to api.github.com — so the asset is copied verbatim and
+  # contains no template action. Only the plugin-backed kinds need `tpl`.
+  collaborator.yaml: |
+{{ .Files.Get "assets/collaborator.yaml" | indent 4 }}

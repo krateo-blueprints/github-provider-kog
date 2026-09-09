@@ -1,0 +1,20 @@
+# A plaintext Actions variable scoped to one deployment environment of one repository.
+#
+# The environment must ALREADY EXIST — GitHub 404s the create otherwise, and this kind does not
+# create environments. Create it in the repository's Settings → Environments (or with a kind
+# that models /repos/{owner}/{repo}/environments/{environment_name}) first.
+apiVersion: github.krateo.io/v1alpha1
+kind: EnvironmentVariable
+metadata:
+  name: test-demo-prod-cluster
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  environment_name: production
+  name: TARGET_CLUSTER
+  value: krateo-prod-eu

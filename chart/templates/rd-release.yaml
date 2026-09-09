@@ -1,0 +1,69 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-release
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-release/release.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: Release
+    # GitHub assigns the release id on create, exactly like PullRequest's number: the
+    # identifier is read from the create/get response into status.id, and get/update/delete
+    # source their path parameter from there.
+    identifiers:
+      - id
+    additionalStatusFields:
+      - node_id
+      - html_url
+      - upload_url
+      - created_at
+    # release_id is server-assigned, so it must not be a (required) spec field the author has
+    # to fill in; the requestFieldMapping entries below supply it from status.id instead.
+    excludedSpecFields:
+      - release_id
+    # `updatable` compares exactly the fields the PATCH body can express — tag_name,
+    # target_commitish, name, body, draft, prerelease — all of which GET echoes, so an edit
+    # to any of them is detected AND fixable.
+    #
+    # It is NOT rescuing the create-only `generate_release_notes` from a drift loop, whatever
+    # an earlier version of this comment said. GET never echoes that field, and the comparison
+    # SKIPS any spec key the response does not carry (`rmValue, ok := rm[key]; if !ok
+    # { continue }` in the controller's comparison), under `fullSpec` exactly as here. An
+    # absent key contributes nothing, so `updatable` is defensive rather than load-bearing:
+    # it and fullSpec should agree today. It is kept because it states the intent explicitly
+    # and stays correct if a field the PATCH cannot express is added to the create body later.
+    #
+    # What DOES loop is a field the response carries in a value the update cannot correct.
+    # The one to watch here is `target_commitish`: GitHub substitutes the default branch when
+    # it is omitted and ignores it once the tag exists, so a spec value that is neither can
+    # read as drift a PATCH will not settle. It is in the PATCH body, so no scope filters it
+    # out — set it to the ref the release actually points at.
+    #
+    # `identifiersAndStatus` would go too far the other way: it stops comparing name, body,
+    # draft and prerelease, which ARE fixable, so editing a release CR would silently do
+    # nothing. Requires an update verb, which this resource has.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/releases
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/releases/{release_id}
+        requestFieldMapping:
+          - inPath: release_id
+            inCustomResource: status.id
+      - action: update
+        method: PATCH
+        path: /repos/{owner}/{repo}/releases/{release_id}
+        requestFieldMapping:
+          - inPath: release_id
+            inCustomResource: status.id
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/releases/{release_id}
+        requestFieldMapping:
+          - inPath: release_id
+            inCustomResource: status.id

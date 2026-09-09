@@ -1,0 +1,22 @@
+# Put a user on the team.
+#
+# If the user is not yet a member of the organization this creates a pending INVITATION rather than
+# a membership: the CR still reconciles, and status.state reads `pending` until they accept it.
+# Check it with `kubectl get teammembership ... -o jsonpath='{.status.state}'` before assuming the
+# access is live.
+apiVersion: github.krateo.io/v1alpha1
+kind: TeamMembership
+metadata:
+  name: test-platform-engineering-octocat
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  org: krateo-blueprints
+  # The team's SLUG, not its display name — see status.slug on the Team CR.
+  team_slug: platform-engineering
+  username: octocat
+  # `member` (the default) or `maintainer` — a maintainer can manage the team's members and settings.
+  role: maintainer

@@ -1,0 +1,24 @@
+# A repository label, so a blueprint can ship the triage taxonomy its issues are filed under.
+#
+# `name` is the label's identity: it is the create-body field, the item-path parameter and the
+# identifier at once. Changing it on an existing CR is NOT a rename (GitHub renames via a second
+# `new_name` body field the CR cannot carry) — it creates a SECOND label and orphans the first.
+# To rename, delete this CR and create a new one.
+#
+# `color` is the hex code WITHOUT the leading '#', lower-case: GitHub echoes it back lower-cased,
+# so "D73A4A" would read as permanent drift.
+apiVersion: github.krateo.io/v1alpha1
+kind: Label
+metadata:
+  name: test-demo-label
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  name: krateo/blueprint
+  color: "0e8a16"
+  description: "Filed by a Krateo blueprint"

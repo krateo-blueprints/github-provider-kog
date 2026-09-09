@@ -1,0 +1,150 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Actions Variables (organization)
+servers:
+  - url: https://api.github.com
+paths:
+  # The org-scoped twin of ActionsVariableRepo. Same plaintext {name, value} shape, plus
+  # `visibility` — which repositories in the org may read the variable.
+  "/orgs/{org}/actions/variables":
+    post:
+      summary: Create an organization variable
+      operationId: actions/create-org-variable
+      parameters:
+        - $ref: '#/components/parameters/org'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - value
+                - visibility
+              properties:
+                # `name` is BOTH the create-body field and the {name} path parameter of the item
+                # endpoints below, so one CR field serves every verb.
+                name:
+                  type: string
+                value:
+                  type: string
+                visibility:
+                  type: string
+                  enum:
+                    - all
+                    - private
+                    - selected
+                # CREATE-ONLY, and the one asymmetry against the repo/environment twins.
+                # GitHub accepts selected_repository_ids on POST and PATCH, but GET never echoes
+                # it back — the read side exposes only `selected_repositories_url`, a link to a
+                # sub-collection. It is trimmed out of the PATCH body below and lives here only
+                # because a field the observe cannot see can never be reconciled — not because
+                # comparing it would loop (the comparison skips a spec key the response does not
+                # carry). Same standing as Repository's auto_init. Changing the selected set after
+                # creation is a job for /orgs/{org}/actions/variables/{name}/repositories, a
+                # PUT-the-whole-set sub-resource that is NOT modelled by this kind.
+                selected_repository_ids:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                # Empty object — GitHub echoes nothing on create. Fine: the identifier (`name`)
+                # is a caller-supplied spec field, so the first Observe can address the item.
+                type: object
+  "/orgs/{org}/actions/variables/{name}":
+    get:
+      summary: Get an organization variable
+      operationId: actions/get-org-variable
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationActionsVariable'
+    patch:
+      summary: Update an organization variable
+      operationId: actions/update-org-variable
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/name'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                # `value` and `visibility` only — both are echoed by the GET above, so both are
+                # safely comparable and genuinely fixable. `name` is trimmed for the same reason
+                # as in actionsvariablerepo.yaml (the item is ADDRESSED by {name}; a rename could
+                # never be observed), and selected_repository_ids because GET never returns it.
+                value:
+                  type: string
+                visibility:
+                  type: string
+                  enum:
+                    - all
+                    - private
+                    - selected
+      responses:
+        '204':
+          description: Response
+    delete:
+      summary: Delete an organization variable
+      operationId: actions/delete-org-variable
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    org:
+      name: org
+      in: path
+      required: true
+      schema:
+        type: string
+    name:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    OrganizationActionsVariable:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+        visibility:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        # Present only when visibility is `selected`. Surfaced on status so a caller can see
+        # WHICH repositories were granted access without this kind having to model the
+        # sub-collection itself.
+        selected_repositories_url:
+          type: string
+security:
+  - accessToken: []

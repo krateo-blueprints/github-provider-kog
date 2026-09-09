@@ -1,0 +1,238 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Organization Code Security Configurations
+servers:
+  - url: https://api.github.com
+paths:
+  # CREATE is collection-scoped; the other verbs address the configuration by the id GitHub
+  # assigns on create. Both paths share `org`, so one CR field serves every verb (the id is
+  # sourced from status — see rd-codesecurityconfig.yaml).
+  #
+  # SCOPE: this models the org-level configuration DEFINITION only. Attaching it to
+  # repositories (POST .../{configuration_id}/attach) and making it the org default
+  # (PUT .../{configuration_id}/defaults) are separate actions on an existing configuration,
+  # not fields of it — a RestDefinition has one create verb, so they would each need their
+  # own kind rather than a field here.
+  "/orgs/{org}/code-security/configurations":
+    post:
+      summary: Create a code security configuration
+      operationId: code-security/create-configuration
+      parameters:
+        - $ref: '#/components/parameters/org'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                advanced_security:
+                  $ref: '#/components/schemas/AdvancedSecurityStatus'
+                dependency_graph:
+                  $ref: '#/components/schemas/FeatureStatus'
+                dependency_graph_autosubmit_action:
+                  $ref: '#/components/schemas/FeatureStatus'
+                dependabot_alerts:
+                  $ref: '#/components/schemas/FeatureStatus'
+                dependabot_security_updates:
+                  $ref: '#/components/schemas/FeatureStatus'
+                code_scanning_default_setup:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_push_protection:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_validity_checks:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_non_provider_patterns:
+                  $ref: '#/components/schemas/FeatureStatus'
+                private_vulnerability_reporting:
+                  $ref: '#/components/schemas/FeatureStatus'
+                enforcement:
+                  type: string
+                  enum:
+                    - enforced
+                    - unenforced
+                # DELIBERATELY NOT MODELLED:
+                #  - `code_security` and `secret_protection`: GitHub accepts them on
+                #    create/update but the configuration object does NOT carry them, so under
+                #    any spec-comparing scope they are drift the observe can never confirm.
+                #    `advanced_security` covers the same ground and IS echoed back.
+                #  - the *_options objects (dependency_graph_autosubmit_action_options,
+                #    code_scanning_options, code_scanning_default_setup_options,
+                #    secret_scanning_delegated_bypass_options): nested feature-option blocks
+                #    GitHub normalizes server-side, so the value read back is not the value
+                #    sent. They belong to a later, hand-verified pass, not to a first cut.
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodeSecurityConfig'
+  "/orgs/{org}/code-security/configurations/{configuration_id}":
+    get:
+      summary: Get a code security configuration
+      operationId: code-security/get-configuration
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/configuration_id'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodeSecurityConfig'
+    patch:
+      summary: Update a code security configuration
+      operationId: code-security/update-configuration
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/configuration_id'
+      # Identical to the create body by design: GitHub's PATCH accepts every field POST
+      # accepts, so with compareScope `updatable` the whole modelled surface stays compared
+      # AND stays fixable — there is no create-only field in this kind.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                advanced_security:
+                  $ref: '#/components/schemas/AdvancedSecurityStatus'
+                dependency_graph:
+                  $ref: '#/components/schemas/FeatureStatus'
+                dependency_graph_autosubmit_action:
+                  $ref: '#/components/schemas/FeatureStatus'
+                dependabot_alerts:
+                  $ref: '#/components/schemas/FeatureStatus'
+                dependabot_security_updates:
+                  $ref: '#/components/schemas/FeatureStatus'
+                code_scanning_default_setup:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_push_protection:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_validity_checks:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_non_provider_patterns:
+                  $ref: '#/components/schemas/FeatureStatus'
+                private_vulnerability_reporting:
+                  $ref: '#/components/schemas/FeatureStatus'
+                enforcement:
+                  type: string
+                  enum:
+                    - enforced
+                    - unenforced
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodeSecurityConfig'
+    delete:
+      # GitHub answers 409 while the configuration is still attached to repositories.
+      summary: Delete a code security configuration
+      operationId: code-security/delete-configuration
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/configuration_id'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    org:
+      name: org
+      in: path
+      required: true
+      schema:
+        type: string
+    # Integer upstream; declared a string here because it is sourced from status.id, which
+    # the controller writes as a string. Same reasoning as release.yaml's release_id.
+    configuration_id:
+      name: configuration_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    # Every feature toggle GitHub exposes takes the same three-valued enum: `not_set` leaves
+    # the repository's own setting alone, which is what makes a configuration composable.
+    FeatureStatus:
+      type: string
+      enum:
+        - enabled
+        - disabled
+        - not_set
+    # advanced_security has a different (and partly deprecated) value set of its own.
+    AdvancedSecurityStatus:
+      type: string
+      enum:
+        - enabled
+        - disabled
+        - code_security
+        - secret_protection
+    CodeSecurityConfig:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        advanced_security:
+          $ref: '#/components/schemas/AdvancedSecurityStatus'
+        dependency_graph:
+          $ref: '#/components/schemas/FeatureStatus'
+        dependency_graph_autosubmit_action:
+          $ref: '#/components/schemas/FeatureStatus'
+        dependabot_alerts:
+          $ref: '#/components/schemas/FeatureStatus'
+        dependabot_security_updates:
+          $ref: '#/components/schemas/FeatureStatus'
+        code_scanning_default_setup:
+          $ref: '#/components/schemas/FeatureStatus'
+        secret_scanning:
+          $ref: '#/components/schemas/FeatureStatus'
+        secret_scanning_push_protection:
+          $ref: '#/components/schemas/FeatureStatus'
+        secret_scanning_validity_checks:
+          $ref: '#/components/schemas/FeatureStatus'
+        secret_scanning_non_provider_patterns:
+          $ref: '#/components/schemas/FeatureStatus'
+        private_vulnerability_reporting:
+          $ref: '#/components/schemas/FeatureStatus'
+        enforcement:
+          type: string
+        # global | organization | enterprise — a configuration inherited from the enterprise
+        # cannot be edited at org level, so it is worth surfacing on status.
+        target_type:
+          type: string
+        html_url:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+security:
+  - accessToken: []

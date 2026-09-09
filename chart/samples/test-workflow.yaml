@@ -1,0 +1,21 @@
+# Keep a workflow enabled.
+#
+# This CR does NOT create the workflow: the file has to be committed first (a RepoContent writing
+# .github/workflows/release.yaml), and `workflow_id` names that file. What the CR owns is the
+# workflow's enabled state — create switches it on, deleting the CR switches it back off, and a
+# workflow somebody disables in the UI is switched on again on the next reconcile.
+apiVersion: github.krateo.io/v1alpha1
+kind: Workflow
+metadata:
+  name: test-demo-destination-release
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  # The workflow FILE NAME, as committed under .github/workflows/. GitHub also accepts the numeric
+  # workflow id here.
+  workflow_id: release.yaml

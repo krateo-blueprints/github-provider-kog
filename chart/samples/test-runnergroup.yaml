@@ -1,0 +1,23 @@
+# An organization self-hosted runner group. Unlike the variable kinds, this resource is keyed
+# by the id GitHub assigns on create, so `name` IS renamable in place: edit it and the
+# controller PATCHes the group it already knows through `status.id`.
+#
+# `selected_repository_ids` and `runners` are CREATE-ONLY (GitHub never echoes them on read, so
+# they are not compared and editing them later does nothing). Adjust membership afterwards
+# through the .../repositories and .../runners sub-resources — `status.runners_url` and
+# `status.selected_repositories_url` point at them.
+apiVersion: github.krateo.io/v1alpha1
+kind: RunnerGroup
+metadata:
+  name: test-demo-runners
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  org: krateo-blueprints
+  name: krateo-build-runners
+  visibility: private
+  allows_public_repositories: false
+  restricted_to_workflows: false

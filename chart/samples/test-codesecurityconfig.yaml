@@ -1,0 +1,45 @@
+# An org-level code security baseline.
+#
+# This CR defines the configuration only. Attaching it to repositories and making it the
+# org default are separate GitHub actions on an existing configuration, not fields of it —
+# see the scope note in assets/codesecurityconfig.yaml.
+#
+# `not_set` means "leave the repository's own setting alone", which is what makes several
+# baselines composable; `enforcement: enforced` stops repository admins from overriding the
+# values this configuration does set.
+#
+# KEEP THE TOGGLES CONSISTENT WITH advanced_security. The RestDefinition uses compareScope
+# `updatable`, and every toggle below is in the PATCH body, so every one of them is compared
+# against what GET reads back: a value GitHub does not store exactly as sent is permanent
+# drift and a PATCH on every reconcile. Secret scanning, push protection and code scanning
+# default setup are GitHub Advanced Security features, so this sample enables
+# advanced_security alongside them — the same shape as GitHub's own built-in "GitHub
+# recommended" configuration, which is the one combination observed to round-trip unchanged.
+# For an org without GHAS licences, set advanced_security: disabled and leave the
+# GHAS-gated toggles at not_set (dependency graph, Dependabot alerts/security updates and
+# private vulnerability reporting are free and can stay enabled).
+apiVersion: github.krateo.io/v1alpha1
+kind: CodeSecurityConfig
+metadata:
+  name: test-demo-security-baseline
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  org: krateo-blueprints
+  name: krateo-baseline
+  description: "Baseline applied to Krateo-provisioned repositories"
+  advanced_security: enabled
+  dependency_graph: enabled
+  dependency_graph_autosubmit_action: not_set
+  dependabot_alerts: enabled
+  dependabot_security_updates: enabled
+  code_scanning_default_setup: not_set
+  secret_scanning: enabled
+  secret_scanning_push_protection: enabled
+  secret_scanning_validity_checks: not_set
+  secret_scanning_non_provider_patterns: not_set
+  private_vulnerability_reporting: enabled
+  enforcement: enforced

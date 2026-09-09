@@ -1,0 +1,177 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Team repository permissions
+servers:
+  - url: https://api.github.com
+paths:
+  # One endpoint serves all four verbs, so there is no create-path/item-path split to reconcile and
+  # every path parameter is a plain spec field the author sets.
+  #
+  # `org` (the TEAM's organization) and `owner` (the REPOSITORY's owner) stay separate fields even
+  # though they hold the same value for an org-owned repo. They cannot be collapsed: the controller
+  # substitutes each {placeholder} exactly once, so a path written as
+  # /orgs/{org}/teams/{team_slug}/repos/{org}/{repo} would leave a literal "{org}" in the URL. They
+  # are also genuinely distinct in GitHub's model — a team may be granted access to a direct fork
+  # that is not owned by the org.
+  "/orgs/{org}/teams/{team_slug}/repos/{owner}/{repo}":
+    put:
+      # Create-or-update of the grant: the same call adds the repository to the team and changes the
+      # permission level, which is why rd-teamrepo.yaml points both create and update at it.
+      summary: Add or update team repository permissions
+      operationId: teams/add-or-update-repo-permissions-in-org
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/team_slug'
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                # Constrained to GitHub's five BASE permission levels on purpose. The endpoint also
+                # accepts a custom organization repository-role name, but the observe response only
+                # reports the base levels (see the `permissions` block below), so a custom role in
+                # spec could never equal the observed value: the controller would read drift and PUT
+                # on every reconcile, forever, against a 5000 req/hr budget. The enum turns that into
+                # an admission-time rejection on the generated CRD instead of a silent request loop.
+                #
+                # Defaulted so the field is always present in spec and therefore always compared;
+                # omitting it would make GitHub fall back to the team's own `permission` attribute
+                # and leave the grant level unmanaged by the CR.
+                permission:
+                  type: string
+                  enum:
+                    - pull
+                    - triage
+                    - push
+                    - maintain
+                    - admin
+                  default: pull
+      responses:
+        '204':
+          description: Response
+    get:
+      # THE reason this kind is native rather than a proxy plugin.
+      #
+      # Under the default Accept this endpoint answers 204 NO CONTENT — nothing to compare, nothing
+      # to populate status from, so it could not be an observe verb at all. Passing GitHub's
+      # repository media type turns the SAME endpoint into a 200 carrying the repository object plus
+      # the team's `permissions` block. rd-teamrepo.yaml injects that header on this verb
+      # (verbsDescription[get].headers), so no plugin has to sit in front of GitHub to do it.
+      # Verified live: default Accept -> 204 No Content; media type -> 200 + JSON body.
+      #
+      # Only '200' is declared, deliberately. If the header ever stopped being sent, the 204 would be
+      # an UNDECLARED status code and the reconcile would fail loudly — far better than a declared
+      # 204 that succeeds with an empty body and silently observes nothing.
+      #
+      # 404 is GitHub's "this team has no permission on this repository", i.e. the resource does not
+      # exist — the reconciler's ordinary not-found path. Caveat worth knowing: permissions inherited
+      # from a PARENT team also answer 200 here, so a team that inherits access reads as already
+      # granted. This chart does not model team nesting, so that case cannot arise from CRs it owns.
+      summary: Check team permissions for a repository
+      operationId: teams/check-permissions-for-repo-in-org
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/team_slug'
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      responses:
+        '200':
+          description: Alternative response with repository permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamRepository'
+    delete:
+      # Removes the repository from the team. It does NOT delete the repository.
+      summary: Remove a repository from a team
+      operationId: teams/remove-repo-in-org
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/team_slug'
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    org:
+      name: org
+      in: path
+      required: true
+      schema:
+        type: string
+    team_slug:
+      name: team_slug
+      in: path
+      required: true
+      schema:
+        type: string
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    # The observe response is the REPOSITORY, not a membership object: the team's grant appears only
+    # as the `permissions` booleans (and `role_name`). Trimmed to the fields worth reading back;
+    # note in particular that `owner` is left out — it is a user OBJECT upstream, and comparing it
+    # against the spec's `owner` STRING is exactly the shape mismatch compareScope: updatable exists
+    # to avoid (see rd-teamrepo.yaml).
+    TeamRepository:
+      type: object
+      properties:
+        id:
+          type: integer
+        node_id:
+          type: string
+        name:
+          type: string
+        full_name:
+          type: string
+        html_url:
+          type: string
+        private:
+          type: boolean
+        default_branch:
+          type: string
+        # GitHub's own name for the granted role. Its vocabulary is NOT the PUT body's: a `pull`
+        # grant reads back as role_name "read", a `push` grant as "write" (verified live), and a
+        # custom organization role reads back under its own name. It is surfaced on status as the
+        # honest report of what GitHub granted, and is NOT what the drift comparison uses.
+        role_name:
+          type: string
+        # The comparable half. These booleans are cumulative — an `admin` grant sets all five — so
+        # the highest true flag is the effective level, and it maps 1:1 onto the PUT body's
+        # vocabulary. rd-teamrepo.yaml's get-verb responseTransform derives `permission` from them.
+        permissions:
+          type: object
+          properties:
+            admin:
+              type: boolean
+            maintain:
+              type: boolean
+            push:
+              type: boolean
+            triage:
+              type: boolean
+            pull:
+              type: boolean
+security:
+  - accessToken: []

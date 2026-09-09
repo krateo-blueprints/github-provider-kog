@@ -1,0 +1,20 @@
+# Turn Dependabot security updates on for a repository, and keep them on.
+#
+# The CR has no settings — its existence IS the desired state. Deleting it switches the feature
+# back off, and switching it off in the GitHub UI is reverted on the next reconcile (the get verb's
+# notFoundBody predicate reads `enabled: false` as "not there").
+#
+# Status carries what GitHub reports back: `enabled`, and `paused` — Dependabot's own back-off on a
+# repository whose security PRs nobody merges, which this kind reports but never fights.
+apiVersion: github.krateo.io/v1alpha1
+kind: AutomatedSecurityFixes
+metadata:
+  name: test-demo-destination-dependabot
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination

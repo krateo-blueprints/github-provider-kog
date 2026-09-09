@@ -1,0 +1,169 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Deployments
+servers:
+  - url: https://api.github.com
+paths:
+  # A GitHub deployment is an IMMUTABLE record: the API offers create, read and delete and
+  # no update at all. That single fact drives every other choice in this file and in
+  # rd-deployment.yaml — see the compareScope comment there.
+  "/repos/{owner}/{repo}/deployments":
+    post:
+      summary: Create a deployment
+      operationId: repos/create-deployment
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ref
+              properties:
+                # Branch, tag or SHA to deploy.
+                ref:
+                  type: string
+                # e.g. `deploy` or `deploy:migrations`.
+                task:
+                  type: string
+                # Load-bearing, and DEFAULTED here rather than left to GitHub. GitHub's own
+                # document declares `auto_merge` default TRUE and a second success response —
+                # 202 "Merged branch response", body {"message": ...} — for the case where
+                # `ref` is behind the default branch: GitHub merges instead of deploying, so
+                # there is no deployment, no id, nothing for populateStatusFields to write to
+                # status.id, and the get verb (which sources {deployment_id} from status.id)
+                # can never address anything. The CR would sit unobservable with a green
+                # create. A CR that simply omits the field must not fall into that, so the
+                # default is pinned FALSE — the same reason repository.yaml pins auto_init.
+                # Set it true deliberately if you do want the merge-instead-of-deploy behaviour.
+                auto_merge:
+                  type: boolean
+                  default: false
+                # Commit-status contexts to verify first. An empty array bypasses checking;
+                # omitted entirely, GitHub verifies ALL unique contexts and answers 409 when
+                # any is failing or pending.
+                required_contexts:
+                  type: array
+                  items:
+                    type: string
+                environment:
+                  type: string
+                description:
+                  type: string
+                # `true` when the environment goes away after the deployment (a review app).
+                transient_environment:
+                  type: boolean
+                # `true` when end users reach this environment directly.
+                production_environment:
+                  type: boolean
+                # GitHub also accepts a free-form `payload` (oneOf object|string) that is
+                # echoed back verbatim. It is omitted: an untyped oneOf does not survive CRD
+                # generation as a usable field, and the object/string ambiguity makes the
+                # spec-vs-response compare type-unstable.
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+  "/repos/{owner}/{repo}/deployments/{deployment_id}":
+    get:
+      summary: Get a deployment
+      operationId: repos/get-deployment
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/deployment_id'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+    delete:
+      # GitHub refuses to delete an ACTIVE deployment when the repository has more than one,
+      # so a delete can 422 until a newer deployment supersedes this one. That is GitHub's
+      # invariant, not something this spec can express; the CR simply stays terminating.
+      summary: Delete a deployment
+      operationId: repos/delete-deployment
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/deployment_id'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    # Integer upstream; declared a string here because it is sourced from status.id, which
+    # the controller writes as a string. Same reasoning as release.yaml's release_id.
+    deployment_id:
+      name: deployment_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Deployment:
+      type: object
+      properties:
+        id:
+          type: integer
+        node_id:
+          type: string
+        # The commit the ref resolved to at deploy time — the thing a downstream job needs
+        # to know exactly what was deployed.
+        sha:
+          type: string
+        ref:
+          type: string
+        task:
+          type: string
+        environment:
+          type: string
+        # The environment as originally requested. This — NOT `environment` — is what
+        # rd-deployment.yaml surfaces on status, because `environment` is mutable
+        # server-side: GitHub's create-deployment-status body documents its `environment`
+        # as "Name for the target deployment environment, WHICH CAN BE CHANGED when setting
+        # a deploy status". original_environment is fixed at create time and, being absent
+        # from the spec, can never enter the drift comparison. See rd-deployment.yaml.
+        original_environment:
+          type: string
+        description:
+          type: string
+        transient_environment:
+          type: boolean
+        production_environment:
+          type: boolean
+        url:
+          type: string
+        # Where deployment statuses are posted; the handle a CI job uses to report progress.
+        statuses_url:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+security:
+  - accessToken: []

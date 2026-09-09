@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Milestones
+servers:
+  - url: https://api.github.com
+paths:
+  "/repos/{owner}/{repo}/milestones":
+    post:
+      summary: Create a milestone
+      operationId: issues/create-milestone
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                state:
+                  type: string
+                  enum:
+                    - open
+                    - closed
+                  default: open
+                description:
+                  type: string
+                # CREATE-ONLY, and deliberately absent from the update body below. The reason
+                # is a property of the API: `due_on` is the one field here whose echoed value
+                # is NOT a function of what the CR sent, so it can be WRITTEN but never
+                # COMPARED.
+                #
+                # GitHub treats a due date as a DAY, not an instant. It discards the submitted
+                # time-of-day and stores midnight of that day IN THE TIMEZONE OF THE ACCOUNT
+                # THAT OWNS THE TOKEN, then echoes the result back in UTC — so what GET returns
+                # depends on who called, not on what was written. Measured against the live API
+                # over ~120 dated milestones on public repositories, the echoed time-of-day is
+                # 00:00:00Z, 07:00:00Z, 08:00:00Z, 22:00:00Z, 03:00:00Z, ... and only about half
+                # are midnight UTC. The giveaway is that within a SINGLE repository the offset
+                # flips exactly at the US daylight-saving boundaries — rust-lang/rust has
+                # 2012-01-31T08:00:00Z (midnight PST) next to 2012-03-23T07:00:00Z (midnight
+                # PDT); angular/angular has 2014-10-31T07:00:00Z next to 2014-11-11T08:00:00Z,
+                # either side of the 2014-11-02 changeover. A client sending literal ISO
+                # timestamps cannot produce a DST-tracking pattern; a server converting a date
+                # to midnight in a fixed timezone is exactly what does.
+                #
+                # So there is no value a CR can carry that reliably equals what GET returns.
+                # For a token on any non-UTC account the echoed instant differs, and for a
+                # POSITIVE UTC offset even the DATE differs — an Europe/Rome token writing
+                # 2026-12-31 gets back 2026-12-30T23:00:00Z. Were `due_on` in the update body it
+                # would be a compared field (compareScope: updatable) and that mismatch would be
+                # permanent drift: a PATCH on every single reconcile, forever, against a
+                # 5000 req/hr budget — and one that "succeeds" every time, since GitHub does
+                # store the right day. Exactly the loop compareScope exists to prevent.
+                #
+                # Keeping it create-only is what makes the kind converge. The cost is stated
+                # rather than hidden: the due date is set once, at creation, and editing
+                # `spec.due_on` afterwards does nothing. That is a deterministic contract (the
+                # field can never be sent by an update), not a knob that fires by coincidence —
+                # the same contract Issue's labels/assignees/milestone already ship with here.
+                # Whatever GitHub actually stored is readable on `status.due_on`; to change a
+                # due date, edit it on GitHub or recreate the CR.
+                #
+                # Write it as "YYYY-MM-DDT00:00:00Z"; only the date part is honoured.
+                due_on:
+                  type: string
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Milestone'
+  # milestone_number is assigned by GitHub on create — the same server-assigned-id shape as
+  # PullRequest's pull_number. It is excluded from the spec and sourced from status.number by
+  # the requestFieldMapping in rd-milestone.yaml; declared as a string because that is the form
+  # a path parameter is substituted in (and the shape PullRequest already proves in production).
+  "/repos/{owner}/{repo}/milestones/{milestone_number}":
+    get:
+      summary: Get a milestone
+      operationId: issues/get-milestone
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/milestone_number'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Milestone'
+    patch:
+      summary: Update a milestone
+      operationId: issues/update-milestone
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/milestone_number'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              # DELIBERATELY title/state/description and NOT due_on, even though GitHub's PATCH
+              # accepts due_on too. This body is what compareScope: updatable derives the
+              # compared set from, so a field listed here is a field the controller will keep
+              # PATCHing until the response matches it — and `due_on` is the one field whose
+              # response value GitHub decides for itself (see the create body above). Listing it
+              # would buy an update path that already works server-side at the price of a drift
+              # comparison that can never come out equal.
+              #
+              # The three that remain are echoed back verbatim, so each is both detectable and
+              # fixable, and all three are properties of the GET response — which is what makes
+              # the reconcile converge.
+              properties:
+                title:
+                  type: string
+                state:
+                  type: string
+                  enum:
+                    - open
+                    - closed
+                  default: open
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Milestone'
+    delete:
+      summary: Delete a milestone
+      operationId: issues/delete-milestone
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/milestone_number'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    milestone_number:
+      name: milestone_number
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Milestone:
+      type: object
+      properties:
+        # `number` is the per-repository handle: it is what the item path needs, and what an
+        # Issue's `milestone` field references. Surfaced on status for both reasons.
+        number:
+          type: integer
+        id:
+          type: integer
+        node_id:
+          type: string
+        html_url:
+          type: string
+        state:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        # Surfaced on status precisely BECAUSE it does not round-trip: this is the instant
+        # GitHub actually stored, which for a non-UTC token is not the one `spec.due_on` asked
+        # for. Reading it back is how an operator sees what the due date really is.
+        due_on:
+          type: string
+        # Progress counters, the reason to look at a Milestone CR's status at all.
+        open_issues:
+          type: integer
+        closed_issues:
+          type: integer
+security:
+  - accessToken: []

@@ -1,0 +1,192 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Actions Runner Groups
+servers:
+  - url: https://api.github.com
+paths:
+  "/orgs/{org}/actions/runner-groups":
+    post:
+      summary: Create a self-hosted runner group for an organization
+      operationId: actions/create-self-hosted-runner-group-for-org
+      parameters:
+        - $ref: '#/components/parameters/org'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                visibility:
+                  type: string
+                  enum:
+                    - all
+                    - private
+                    - selected
+                  default: all
+                allows_public_repositories:
+                  type: boolean
+                  default: false
+                restricted_to_workflows:
+                  type: boolean
+                  default: false
+                selected_workflows:
+                  type: array
+                  items:
+                    type: string
+                # CREATE-ONLY, both of them, and deliberately absent from the PATCH body below.
+                # GitHub accepts them on POST but never echoes them on GET — the read side gives
+                # only `selected_repositories_url` and `runners_url`, links to sub-collections.
+                # They are confined to create because a field the observe cannot see can never
+                # be reconciled — not because comparing it would loop (the comparison skips a
+                # spec key the response does not carry). Same standing as Repository's
+                # auto_init. Changing the membership later is a job for the .../repositories and .../runners
+                # PUT-the-whole-set sub-resources, which this kind does NOT model.
+                selected_repository_ids:
+                  type: array
+                  items:
+                    type: integer
+                runners:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                # The create DOES echo the whole group, including the server-assigned `id` the
+                # item endpoints below are keyed by. That is what makes the PullRequest-style
+                # excludedSpecFields + requestFieldMapping pattern work here, and why this kind
+                # needs no `findby` over the list endpoint to recover its own identity.
+                $ref: '#/components/schemas/RunnerGroup'
+  # Addressed by the server-assigned id, NOT by name — so unlike the three variable kinds, a
+  # rename here is a real, observable, convergent update and `name` stays in the PATCH body.
+  "/orgs/{org}/actions/runner-groups/{runner_group_id}":
+    get:
+      summary: Get a self-hosted runner group for an organization
+      operationId: actions/get-self-hosted-runner-group-for-org
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/runner_group_id'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunnerGroup'
+    patch:
+      summary: Update a self-hosted runner group for an organization
+      operationId: actions/update-self-hosted-runner-group-for-org
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/runner_group_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                # Every field here is also a property of the GET response, which is precisely the
+                # set `compareScope: updatable` will compare. Keep that true when editing.
+                name:
+                  type: string
+                visibility:
+                  type: string
+                  enum:
+                    - all
+                    - private
+                    - selected
+                allows_public_repositories:
+                  type: boolean
+                  default: false
+                restricted_to_workflows:
+                  type: boolean
+                  default: false
+                selected_workflows:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunnerGroup'
+    delete:
+      summary: Delete a self-hosted runner group from an organization
+      operationId: actions/delete-self-hosted-runner-group-from-org
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/runner_group_id'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    org:
+      name: org
+      in: path
+      required: true
+      schema:
+        type: string
+    # Server-assigned, so it is excluded from the generated spec and supplied from status.id by
+    # the requestFieldMapping in rd-runnergroup.yaml. Typed `string` rather than GitHub's
+    # `integer` to mirror pullrequest.yaml's pull_number, the proven precedent in this chart for
+    # a status-sourced path parameter.
+    runner_group_id:
+      name: runner_group_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    RunnerGroup:
+      type: object
+      properties:
+        # `integer`, not GitHub's `number`: this value is substituted into a URL path, and a
+        # float-typed status field would render as 1 vs 1.0 at the mercy of the JSON decoder.
+        id:
+          type: integer
+        name:
+          type: string
+        visibility:
+          type: string
+        allows_public_repositories:
+          type: boolean
+        restricted_to_workflows:
+          type: boolean
+        selected_workflows:
+          type: array
+          items:
+            type: string
+        # Server-managed, read-only facts: whether this is the org's Default group, whether it
+        # is inherited from an enterprise, and the sub-collection links a caller needs to
+        # inspect or manage membership out of band.
+        default:
+          type: boolean
+        inherited:
+          type: boolean
+        runners_url:
+          type: string
+        hosted_runners_url:
+          type: string
+        selected_repositories_url:
+          type: string
+security:
+  - accessToken: []

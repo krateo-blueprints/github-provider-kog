@@ -1,0 +1,147 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Organization Custom Properties
+servers:
+  - url: https://api.github.com
+paths:
+  # ONE path serves all four verbs: GitHub models a custom property definition as an
+  # addressable document, so PUT is an upsert (create AND update), and GET/DELETE hang off
+  # the same URL. There is no collection-create endpoint to reconcile against, which makes
+  # this the simplest kind in the chart.
+  #
+  # The path parameter is named `property_name`, NOT GitHub's `custom_property_name`, on
+  # purpose: the GET response calls the same value `property_name`, so with this name one CR
+  # field is simultaneously the path segment on every verb and the identifier read back from
+  # the response. Under GitHub's spelling the CR would carry `custom_property_name` in spec
+  # and `property_name` in status — two names for one value. Renaming a parameter is invisible
+  # to GitHub, which only ever sees the substituted URL.
+  "/orgs/{org}/properties/schema/{property_name}":
+    put:
+      summary: Create or update a custom property for an organization
+      operationId: orgs/custom-properties-for-repos-create-or-update-organization-definition
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/property_name'
+      # This body is BOTH the create and the update body, so under compareScope `updatable`
+      # it is exactly the drift-compared set. Every field below is echoed by GET.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - value_type
+              properties:
+                value_type:
+                  type: string
+                  enum:
+                    - string
+                    - single_select
+                    - multi_select
+                    - true_false
+                    - url
+                # Whether every repository in the org must carry a value for this property.
+                required:
+                  type: boolean
+                # GitHub accepts a string here for string/single_select/true_false/url
+                # properties and an ARRAY for multi_select. Only the string form is modelled:
+                # an untyped oneOf does not survive CRD generation as a usable field, and a
+                # spec-vs-response compare that can be either shape is type-unstable. A
+                # multi_select property is still fully expressible — it just cannot carry a
+                # default here.
+                default_value:
+                  type: string
+                description:
+                  type: string
+                # The ordered choice list for single_select / multi_select (up to 200).
+                allowed_values:
+                  type: array
+                  items:
+                    type: string
+                values_editable_by:
+                  type: string
+                  enum:
+                    - org_actors
+                    - org_and_repo_actors
+                require_explicit_values:
+                  type: boolean
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomProperty'
+    get:
+      summary: Get a custom property for an organization
+      operationId: orgs/custom-properties-for-repos-get-organization-definition
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/property_name'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomProperty'
+    delete:
+      # Removing a definition also removes the values set on every repository in the org.
+      summary: Remove a custom property for an organization
+      operationId: orgs/custom-properties-for-repos-delete-organization-definition
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/property_name'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    org:
+      name: org
+      in: path
+      required: true
+      schema:
+        type: string
+    property_name:
+      name: property_name
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    CustomProperty:
+      type: object
+      properties:
+        property_name:
+          type: string
+        value_type:
+          type: string
+        required:
+          type: boolean
+        default_value:
+          type: string
+        description:
+          type: string
+        allowed_values:
+          type: array
+          items:
+            type: string
+        values_editable_by:
+          type: string
+        require_explicit_values:
+          type: boolean
+        # organization | enterprise — where the definition comes from. Worth surfacing on
+        # status: an enterprise-sourced property cannot be edited at org level.
+        source_type:
+          type: string
+        url:
+          type: string
+security:
+  - accessToken: []

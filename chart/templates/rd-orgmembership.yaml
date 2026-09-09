@@ -1,0 +1,57 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-orgmembership
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-orgmembership/orgmembership.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: OrgMembership
+    # `org` and `username` identify the membership, but neither is echoed in the GET response — they
+    # are path parameters only, and the user appears solely under the nested `user.login`. `url` is
+    # the one response property that names the membership itself
+    # (https://api.github.com/orgs/{org}/memberships/{username}), so it is what status can actually
+    # be populated from. Every identifier and status field below is a property of the GET response
+    # schema; a name that is not would simply never populate.
+    identifiers:
+      - url
+    # state is the point of this resource: pending until the invitation is accepted, then active.
+    # direct_membership distinguishes a membership held directly from one derived from an enterprise
+    # team. `role` is deliberately absent — it is a spec field, already compared, and echoing it in
+    # status would only restate the request.
+    #
+    # Both keys exist in the create (PUT) response as well as the GET response, and mean the same
+    # thing in both, so it does not matter which call last wrote them.
+    additionalStatusFields:
+      - state
+      - direct_membership
+    # The create and update bodies are the same single field, so there are no create-only fields and
+    # `fullSpec` would not loop here (org, username and configurationRef are absent from the response
+    # and a spec key missing from the response is ignored by the comparison). Note that `state` and
+    # `direct_membership` are not at risk under either scope: the comparison walks the SPEC, and they
+    # are status-only fields the spec never carries — no compareScope value can draw them in.
+    #
+    # `updatable` is the right declaration for a narrower reason: it derives the compared set from the
+    # UPDATE BODY — exactly `role` — so if the create body is ever widened with a field the PUT cannot
+    # express, that field becomes a spec field and would drift permanently under `fullSpec`, while
+    # `updatable` leaves it out. It requires an update verb, which this resource has.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      # CREATE and UPDATE are the same idempotent PUT: it sets the role whether or not the user is
+      # already a member, so there is no separate update endpoint.
+      - action: create
+        method: PUT
+        path: /orgs/{org}/memberships/{username}
+      - action: update
+        method: PUT
+        path: /orgs/{org}/memberships/{username}
+      # A real get, with a body to compare and a real 404 for a non-member (verified live), so this
+      # kind needs neither a notFoundBody predicate nor a findby over a list.
+      - action: get
+        method: GET
+        path: /orgs/{org}/memberships/{username}
+      - action: delete
+        method: DELETE
+        path: /orgs/{org}/memberships/{username}

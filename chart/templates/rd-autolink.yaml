@@ -1,0 +1,58 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-autolink
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-autolink/autolink.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: Autolink
+    # GitHub assigns the autolink id on create; owner/repo only scope it. `id` is a property of
+    # the GET response (schemas/Autolink), so status.id is populated on the first observe.
+    identifiers:
+      - id
+    # Nothing else worth surfacing: the response carries only id plus the three create-body
+    # fields (already on the spec) and a nullable updated_at, which assets/autolink.yaml
+    # deliberately does not declare.
+    additionalStatusFields: []
+    # autolink_id is a path parameter on get/delete but is not knowable at create time, so it
+    # must not become a (required) spec field; the requestFieldMapping entries below source it
+    # from status.id. Same pattern as PullRequest's pull_number.
+    excludedSpecFields:
+      - autolink_id
+    # DELIBERATE — and, unlike DeployKey, fullSpec is the right answer here even though this
+    # kind likewise has NO update verb (GitHub exposes only POST/GET/DELETE; an autolink is
+    # immutable). `updatable` is therefore unavailable, so the choice is fullSpec vs
+    # identifiersAndStatus, and it turns on whether fullSpec can produce FALSE drift.
+    #
+    # It cannot. The compared set is the spec keys that also appear in the GET response body,
+    # and the GET response IS the whole resource: key_prefix, url_template and is_alphanumeric,
+    # all three echoed verbatim, all three short scalars with no normalization to get wrong.
+    # is_alphanumeric carries GitHub's own default (true) in the OAS, so even an author who
+    # never sets it ends up comparing true against true. owner, repo and configurationRef are
+    # absent from the response body and are ignored by the comparison, not counted as drift.
+    #
+    # So a synced autolink never reports drift, and the only way to make it report drift is to
+    # edit one of those three fields on an existing CR — which is precisely the case where the
+    # operator SHOULD be told something is wrong, because GitHub cannot change an autolink in
+    # place and the CR must be deleted and recreated. identifiersAndStatus would report Ready
+    # while the spec said one thing and the repository did another.
+    compareScope: fullSpec
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/autolinks
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/autolinks/{autolink_id}
+        requestFieldMapping:
+          - inPath: autolink_id
+            inCustomResource: status.id
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/autolinks/{autolink_id}
+        requestFieldMapping:
+          - inPath: autolink_id
+            inCustomResource: status.id

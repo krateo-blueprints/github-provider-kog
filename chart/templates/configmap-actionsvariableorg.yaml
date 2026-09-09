@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-actionsvariableorg
+  namespace: {{ .Release.Namespace }}
+data:
+  # NOT tpl-rendered, like configmap-repository.yaml. Only the three plugin-backed kinds
+  # (repocontent / gitref / pullrequest) carry a per-operation `servers` override that has to
+  # resolve a template. This kind is fully native — every verb goes straight to api.github.com —
+  # so the asset is copied verbatim and contains no template action.
+  actionsvariableorg.yaml: |
+{{ .Files.Get "assets/actionsvariableorg.yaml" | indent 4 }}

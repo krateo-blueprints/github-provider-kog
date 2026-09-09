@@ -1,0 +1,59 @@
+# Protect the default branch of one repository: PRs only, one approval, review threads resolved,
+# no force-push, and the security pipeline green before merge.
+#
+# `parameters` is a UNION keyed by `type` (see assets/reporuleset.yaml): set only the keys that
+# belong to the rule type on the same list item — and, when a type has required keys, ALL of
+# them, since flattening the union drops GitHub's per-type `required` list and the CRD cannot
+# enforce it. Either mistake is a 422, not a silent ignore. Rules with no parameters at all
+# — creation, deletion, non_fast_forward, required_linear_history, required_signatures — are
+# written as a bare `- type:` entry.
+#
+# Keep `rules` and `bypass_actors` in a stable order: drift comparison walks arrays in order, so
+# reshuffling this list reads as a change.
+#
+# There is no ruleset_id field: GitHub assigns it on create and the provider carries it in
+# status.id, from where get/update/delete bind the path.
+apiVersion: github.krateo.io/v1alpha1
+kind: RepoRuleset
+metadata:
+  name: test-demo-protect-main
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  name: protect-default-branch
+  target: branch
+  enforcement: active
+  bypass_actors:
+    # OrganizationAdmin takes no actor_id.
+    - actor_type: OrganizationAdmin
+      bypass_mode: always
+  conditions:
+    ref_name:
+      include:
+        - "~DEFAULT_BRANCH"
+  rules:
+    - type: non_fast_forward
+    - type: deletion
+    # Once `parameters` is present on a pull_request rule, GitHub requires ALL FIVE of the
+    # booleans/counts below together and defaults none of them: a partial object is a 422.
+    # allowed_merge_methods is the only optional extra.
+    - type: pull_request
+      parameters:
+        required_approving_review_count: 1
+        dismiss_stale_reviews_on_push: true
+        require_code_owner_review: false
+        require_last_push_approval: false
+        required_review_thread_resolution: true
+        allowed_merge_methods:
+          - squash
+          - merge
+    - type: required_status_checks
+      parameters:
+        strict_required_status_checks_policy: false
+        required_status_checks:
+          - context: "security / sbom"

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-label
+  namespace: {{ .Release.Namespace }}
+data:
+  # NOT tpl-rendered, unlike configmap-repocontent / configmap-gitref / configmap-pullrequest.
+  # Those three carry a per-operation `servers` override pointing at the plugin, so their asset
+  # has to resolve a template. Label is fully native — every verb goes straight to
+  # api.github.com — so the asset is copied verbatim and contains no template action.
+  label.yaml: |
+{{ .Files.Get "assets/label.yaml" | indent 4 }}

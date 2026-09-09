@@ -1,0 +1,202 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Organization Webhooks
+servers:
+  - url: https://api.github.com
+paths:
+  # The org-scoped twin of assets/repowebhook.yaml: one hook fires for every repository in the
+  # organization. `org` is the single path parameter on both the collection and the item path.
+  "/orgs/{org}/hooks":
+    post:
+      summary: Create an organization webhook
+      operationId: orgs/create-webhook
+      parameters:
+        - $ref: '#/components/parameters/org'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - config
+              properties:
+                # Required by GitHub and only ever "web". Defaulted so the CR does not have to
+                # carry a constant; the update body below omits it, so compareScope=updatable
+                # keeps it out of the drift comparison.
+                name:
+                  type: string
+                  default: web
+                config:
+                  type: object
+                  required:
+                    - url
+                  properties:
+                    url:
+                      type: string
+                    # Defaults match GitHub's OWN defaults ("form" / "0"), so a defaulted CR
+                    # field equals what GitHub echoes on GET instead of reading as drift.
+                    content_type:
+                      type: string
+                      default: form
+                    # GitHub declares this oneOf[string, number]; oasgen does not support
+                    # oneOf, so it is typed as the string form the API returns ("0" / "1").
+                    insecure_ssl:
+                      type: string
+                      default: "0"
+                    # WRITE-ONLY IN PRACTICE — GET returns "********" (the org-hook schema's own
+                    # example). Kept OUT of the update body below so compareScope=updatable
+                    # never compares it; still forwarded on update, because the request body is
+                    # assembled by top-level key and the whole `config` map goes with it. See
+                    # assets/repowebhook.yaml for the full reasoning, which is identical here.
+                    secret:
+                      type: string
+                    # GitHub also accepts config.username / config.password (HTTP basic auth
+                    # against the delivery endpoint). Not modelled: they are legacy, they would
+                    # sit in the CR in clear text like `secret`, and — unlike `secret` — the
+                    # org-hook RESPONSE schema does not carry them at all, so they are write-only
+                    # values with no observable counterpart to reconcile against.
+                # Which events GitHub delivers; ["*"] means every event. NOTE FOR AUTHORS: this
+                # array is part of the update body, so it IS compared, positionally (order AND
+                # length) — keep the list in a stable order. GitHub echoes it as supplied: its
+                # own response examples come back ["push","pull_request"], submission order
+                # rather than sorted.
+                events:
+                  type: array
+                  default:
+                    - push
+                  items:
+                    type: string
+                active:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgWebhook'
+  "/orgs/{org}/hooks/{hook_id}":
+    get:
+      summary: Get an organization webhook
+      operationId: orgs/get-webhook
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/hook_id'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgWebhook'
+    patch:
+      summary: Update an organization webhook
+      operationId: orgs/update-webhook
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/hook_id'
+      # A SUBSET of the create body, as oasgen requires. GitHub's PATCH additionally accepts
+      # `name`; it is omitted so the drift comparison derived from this body covers only fields
+      # an author can meaningfully change.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                config:
+                  type: object
+                  properties:
+                    url:
+                      type: string
+                    content_type:
+                      type: string
+                    insecure_ssl:
+                      type: string
+                events:
+                  type: array
+                  items:
+                    type: string
+                active:
+                  type: boolean
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgWebhook'
+    delete:
+      summary: Delete an organization webhook
+      operationId: orgs/delete-webhook
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/hook_id'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    org:
+      name: org
+      in: path
+      required: true
+      schema:
+        type: string
+    # Server-assigned. Excluded from the spec in rd-orgwebhook.yaml and sourced from status.id,
+    # the same pattern PullRequest uses for pull_number.
+    hook_id:
+      name: hook_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    OrgWebhook:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        active:
+          type: boolean
+        events:
+          type: array
+          items:
+            type: string
+        # `secret` is left undeclared: GitHub masks it as "********", so surfacing it would
+        # promise a value the API never returns.
+        config:
+          type: object
+          properties:
+            url:
+              type: string
+            content_type:
+              type: string
+            insecure_ssl:
+              type: string
+        # The hook's own API URL plus the two operational endpoints: ping_url to re-send a
+        # ping, deliveries_url to inspect what GitHub actually delivered. Org hooks have no
+        # test_url (that is repository-only).
+        url:
+          type: string
+        ping_url:
+          type: string
+        deliveries_url:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+security:
+  - accessToken: []

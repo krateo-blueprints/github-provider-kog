@@ -1,0 +1,259 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Branch Protection
+servers:
+  - url: https://api.github.com
+paths:
+  # A SINGLETON sub-resource: branch protection has no id of its own — the (owner, repo, branch)
+  # triple IS the key. The same three CR fields therefore serve every verb unchanged, and none of
+  # them is duplicated in the request body, so there is no create/item pair to keep in sync.
+  #
+  # PUT is BOTH create and update: it replaces the whole protection document, exactly like
+  # RepoContent's PUT. That is not a workaround — it is how GitHub models this resource — and it
+  # is what makes `compareScope: updatable` available (see rd-branchprotection.yaml).
+  "/repos/{owner}/{repo}/branches/{branch}/protection":
+    put:
+      summary: Update branch protection
+      operationId: repos/update-branch-protection
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/branch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              # GitHub declares required_status_checks, enforce_admins,
+              # required_pull_request_reviews and restrictions as REQUIRED-BUT-NULLABLE: all four
+              # keys must be present in the body, and `null` is how you say "this control is off".
+              #
+              # They are deliberately NOT listed in a `required:` array here, for two reasons that
+              # both bite at the CRD layer:
+              #   1. oasgen-provider does not carry OAS `nullable` into the generated CRD, so a
+              #      CRD field typed `object` cannot hold an explicit `null` — a user could never
+              #      satisfy a required-nullable field by writing null into the CR.
+              #   2. Marking them required would force every author to spell out all four controls
+              #      even to protect a branch with one of them.
+              # The four nulls are injected instead by the create/update `requestTransform` in
+              # rd-branchprotection.yaml, which turns "omitted from the CR" into "explicitly off".
+              type: object
+              properties:
+                required_status_checks:
+                  type: object
+                  properties:
+                    strict:
+                      type: boolean
+                    # `contexts` is the check-name list. GitHub's newer `checks` form (context +
+                    # app_id) is deliberately NOT modelled: the API returns BOTH forms and keeps
+                    # them derived from each other, so exposing both would ask the author to keep
+                    # two representations of one list in sync.
+                    #
+                    # ORDER MATTERS. The drift comparison is order-sensitive on arrays, and the
+                    # get responseTransform sorts this list, so write the contexts SORTED —
+                    # otherwise every reconcile reports drift and re-PUTs the same document.
+                    contexts:
+                      type: array
+                      items:
+                        type: string
+                  required:
+                    - strict
+                    - contexts
+                # Defaulted so the assembled body is NEVER empty. rest-dynamic-controller skips a
+                # requestTransform on an empty body (fieldmapping.ApplyRequestTransform returns
+                # early), and an empty body would then reach GitHub without the four required
+                # members and be rejected 422. `false` is also GitHub's own default (admins are
+                # not subject to the rules unless you say so), so the default changes nothing but
+                # the presence of the key.
+                enforce_admins:
+                  type: boolean
+                  default: false
+                required_pull_request_reviews:
+                  type: object
+                  properties:
+                    dismiss_stale_reviews:
+                      type: boolean
+                    require_code_owner_reviews:
+                      type: boolean
+                    required_approving_review_count:
+                      type: integer
+                    require_last_push_approval:
+                      type: boolean
+                # Who may push to the branch. ORG-OWNED REPOSITORIES ONLY — GitHub rejects
+                # restrictions on a user-owned repo. Same ordering caveat as `contexts`: the
+                # responseTransform sorts these lists, so write them sorted.
+                #
+                # dismissal_restrictions / bypass_pull_request_allowances (the same users/teams/
+                # apps shape, nested under required_pull_request_reviews) are NOT modelled: each
+                # would need its own object-to-login normalization for a control a platform CR
+                # rarely sets. They can be added later without breaking this shape.
+                restrictions:
+                  type: object
+                  properties:
+                    users:
+                      type: array
+                      items:
+                        type: string
+                    teams:
+                      type: array
+                      items:
+                        type: string
+                    apps:
+                      type: array
+                      items:
+                        type: string
+                  required:
+                    - users
+                    - teams
+                required_linear_history:
+                  type: boolean
+                allow_force_pushes:
+                  type: boolean
+                allow_deletions:
+                  type: boolean
+                block_creations:
+                  type: boolean
+                required_conversation_resolution:
+                  type: boolean
+                lock_branch:
+                  type: boolean
+                allow_fork_syncing:
+                  type: boolean
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BranchProtection'
+    get:
+      summary: Get branch protection
+      operationId: repos/get-branch-protection
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/branch'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BranchProtection'
+        # An unprotected branch answers 404, which the controller reads as "does not exist" and
+        # turns into a create. Declared for documentation only: only 2xx codes are treated as
+        # success, so listing 404 here cannot make a 404 look like a successful response.
+        '404':
+          description: Branch not protected
+    delete:
+      summary: Delete branch protection
+      operationId: repos/delete-branch-protection
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/branch'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    # A multi-segment branch name (release/1.0) is fine: the controller percent-escapes every path
+    # parameter, and GitHub decodes %2F back into the branch name.
+    branch:
+      name: branch
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    # THIS IS THE NORMALIZED SHAPE, NOT GITHUB'S RAW ONE — read this before editing.
+    #
+    # GitHub's branch-protection response is shaped differently from the body that sets it: every
+    # boolean control comes back as an object ({"enabled": true}), the status-check list comes back
+    # wrapped with its own urls, and restrictions come back as arrays of user/team/app OBJECTS
+    # rather than the login/slug strings the PUT takes. Compared raw against the spec, every single
+    # one of those reads as permanent drift. That asymmetry is why the upstream blueprint needed a
+    # proxy plugin for this kind.
+    #
+    # It is closed here declaratively instead: the get verb in rd-branchprotection.yaml carries a
+    # whole-document `responseTransform` (rest-dynamic-controller's built-in form of exactly what
+    # that plugin did) which rewrites the response into the shape below BEFORE status population
+    # and drift comparison. This schema documents what the controller actually sees, so the
+    # generated status types match the values that reach it.
+    BranchProtection:
+      type: object
+      properties:
+        # The protection endpoint URL — the only stable identity this singleton has, and the one
+        # field that is identical in GitHub's raw response and in the normalized one.
+        url:
+          type: string
+        required_status_checks:
+          type: object
+          properties:
+            strict:
+              type: boolean
+            contexts:
+              type: array
+              items:
+                type: string
+        enforce_admins:
+          type: boolean
+        required_pull_request_reviews:
+          type: object
+          properties:
+            dismiss_stale_reviews:
+              type: boolean
+            require_code_owner_reviews:
+              type: boolean
+            required_approving_review_count:
+              type: integer
+            require_last_push_approval:
+              type: boolean
+        restrictions:
+          type: object
+          properties:
+            users:
+              type: array
+              items:
+                type: string
+            teams:
+              type: array
+              items:
+                type: string
+            apps:
+              type: array
+              items:
+                type: string
+        required_linear_history:
+          type: boolean
+        allow_force_pushes:
+          type: boolean
+        allow_deletions:
+          type: boolean
+        block_creations:
+          type: boolean
+        required_conversation_resolution:
+          type: boolean
+        lock_branch:
+          type: boolean
+        allow_fork_syncing:
+          type: boolean
+security:
+  - accessToken: []

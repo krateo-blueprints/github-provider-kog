@@ -10,7 +10,10 @@
 # Then one <Kind>Configuration per kind, each pointing at that Secret. oasgen 0.9.x
 # generates these Configuration CRDs from the OAS securityScheme and auto-adds a
 # spec.configurationRef field to every resource CR. All of them may share a name (the
-# kind is implied by the resource that references it).
+# kind is implied by the resource that references it) — which is why all 31 below carry
+# the same `github-blueprints-config`, and why one PAT can drive the whole chart.
+#
+# You only need the Configuration for the kinds you actually use; the rest are inert.
 ---
 apiVersion: github.krateo.io/v1alpha1
 kind: RepoContentConfiguration
@@ -53,6 +56,357 @@ spec:
 ---
 apiVersion: github.krateo.io/v1alpha1
 kind: RepositoryConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: ActionsVariableOrgConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: ActionsVariableRepoConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: AutolinkConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: AutomatedSecurityFixesConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: BranchProtectionConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: CodeSecurityConfigConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: CollaboratorConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: CustomPropertyConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: DeployKeyConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: DeploymentConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: DeploymentBranchPolicyConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: EnvironmentConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: EnvironmentVariableConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: IssueConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: LabelConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: MilestoneConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: OrgMembershipConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: OrgRulesetConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: OrgWebhookConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: ReleaseConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: RepoRulesetConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: RepoWebhookConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: RunnerGroupConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: TeamConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: TeamMembershipConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: TeamRepoConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: WorkflowConfiguration
 metadata:
   name: github-blueprints-config
   namespace: krateo-system

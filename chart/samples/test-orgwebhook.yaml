@@ -1,0 +1,26 @@
+# One webhook for the whole organization: it fires for every repository in it, so this is the
+# org-wide twin of test-repowebhook.yaml rather than something you attach per repo.
+#
+# `config.secret` is the HMAC key GitHub signs deliveries with, and it sits here in clear text
+# (see assets/orgwebhook.yaml) — treat the CR itself as sensitive.
+apiVersion: github.krateo.io/v1alpha1
+kind: OrgWebhook
+metadata:
+  name: test-krateo-blueprints-hook
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  org: krateo-blueprints
+  config:
+    url: https://events.example.com/github-org
+    content_type: json
+    secret: "change-me-before-using-this-for-real"
+  # Compared positionally against what GitHub echoes — keep this list in a stable order.
+  # ["*"] subscribes to every event GitHub emits.
+  events:
+    - repository
+    - push
+  active: true

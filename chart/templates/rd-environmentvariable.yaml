@@ -1,0 +1,47 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-environmentvariable
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-environmentvariable/environmentvariable.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: EnvironmentVariable
+    # The variable name distinguishes the resource within one environment;
+    # owner/repo/environment_name scope it and are path params on every verb. `name` is a
+    # property of the GET response, so status populates.
+    identifiers:
+      - name
+    additionalStatusFields:
+      - created_at
+      - updated_at
+    # Identical to rd-actionsvariablerepo — this is the same resource one scope deeper.
+    #
+    # NOTE, correcting an earlier version of this comment: owner, repo and environment_name are
+    # NOT the reason. They are path params, absent from the GET payload, and a spec key the
+    # response does not carry is SKIPPED by the comparison — `rmValue, ok := rm[key]; if !ok
+    # { continue }` in rest-dynamic-controller's internal/tools/comparison — under every scope.
+    #
+    # The looping field is `name`: the GET echoes it, GitHub returns it normalised (`my_var`
+    # created, `MY_VAR` read back), and it is trimmed from the update body because the item is
+    # ADDRESSED by {name} and a rename could never converge. Echoed but unfixable by the update
+    # verb is what would PATCH forever under fullSpec.
+    #
+    # `updatable` compares exactly what the PATCH body can express — here just `value`, which the
+    # GET does echo — and leaves `name` out. It requires an update verb; this resource has PATCH.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/environments/{environment_name}/variables
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}
+      - action: update
+        method: PATCH
+        path: /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}

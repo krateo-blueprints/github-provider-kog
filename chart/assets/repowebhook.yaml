@@ -1,0 +1,233 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Repository Webhooks
+servers:
+  - url: https://api.github.com
+paths:
+  # CREATE is collection-scoped, the other three verbs address the hook by the id GitHub
+  # assigns on create. owner/repo are the same two path parameters on both paths, so ONE pair
+  # of CR fields serves every verb (no rename needed here, unlike Repository).
+  "/repos/{owner}/{repo}/hooks":
+    post:
+      summary: Create a repository webhook
+      operationId: repos/create-webhook
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - config
+              properties:
+                # CREATE-ONLY: GitHub accepts exactly one value, "web", and the update endpoint
+                # has no `name` field at all. Defaulted rather than left to the author, so the
+                # CR never has to carry a constant.
+                name:
+                  type: string
+                  default: web
+                config:
+                  type: object
+                  required:
+                    - url
+                  properties:
+                    url:
+                      type: string
+                    # Defaults match GitHub's OWN defaults ("form" / "0"), so the defaulted CR
+                    # field and the value GitHub echoes on GET are the same and the drift
+                    # comparison converges instead of flagging a field the author never set.
+                    content_type:
+                      type: string
+                      default: form
+                    # GitHub declares this as oneOf[string, number]; oasgen does not support
+                    # oneOf, so it is typed as the string form GitHub actually returns ("0" /
+                    # "1"). The comparison is type-normalizing, so a numeric echo would still
+                    # match. "1" disables TLS verification of `url` — leave it at "0".
+                    insecure_ssl:
+                      type: string
+                      default: "0"
+                    # WRITE-ONLY IN PRACTICE. GitHub never echoes the secret: GET returns
+                    # config.secret as the literal "********" (see the API's own
+                    # webhook-config-secret example). It is therefore deliberately ABSENT from
+                    # the update body below, which is what keeps it out of the drift comparison
+                    # under compareScope=updatable — comparing it would flag permanent,
+                    # unfixable drift and PATCH the hook on every reconcile.
+                    #
+                    # It is still SENT on update: the request body is assembled by top-level
+                    # key, so the whole `config` map from the spec is forwarded, secret
+                    # included. Dropping it from the update body would remove the HMAC secret,
+                    # because GitHub replaces the config object wholesale.
+                    #
+                    # It sits in the CR spec in clear text, and that is a deliberate trade, not an
+                    # oversight. A `fieldMapping[].resolver.secretRef` COULD source it from a
+                    # Secret: its {name,key} pointer fields would be declared here, in the create
+                    # body, and `stripResolverSources` deletes them from the request body before
+                    # it is sent, so they never reach GitHub as unknown properties. What rules it
+                    # out is that the resolver is all-or-nothing — `ResolveRequestResolvers`
+                    # ERRORS when the pointer path is absent on the CR, and Create/Update
+                    # propagate that error — so declaring one would make the secret MANDATORY.
+                    # A GitHub webhook secret is optional and a hook without one must stay
+                    # expressible. Treat the CR itself as sensitive instead.
+                    secret:
+                      type: string
+                # Which events GitHub delivers. NOTE FOR AUTHORS: this array is part of the
+                # update body, so it IS compared, and the comparison is positional (element
+                # order AND length matter, see compareSlices). GitHub echoes the array as
+                # supplied — its own response examples come back ["push","pull_request"], i.e.
+                # submission order rather than sorted — so keep the list in a stable order in
+                # the CR. Sorting it response-side instead was considered and rejected: it would
+                # manufacture drift for any author whose list is not already sorted.
+                events:
+                  type: array
+                  default:
+                    - push
+                  items:
+                    type: string
+                active:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+  "/repos/{owner}/{repo}/hooks/{hook_id}":
+    get:
+      summary: Get a repository webhook
+      operationId: repos/get-webhook
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/hook_id'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+    patch:
+      summary: Update a repository webhook
+      operationId: repos/update-webhook
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/hook_id'
+      # A SUBSET of the create body, as oasgen requires (the CRD schema is generated from
+      # create). GitHub's own PATCH also accepts add_events/remove_events; they are omitted
+      # because they are not create-body fields and their incremental semantics cannot be
+      # expressed by a declarative spec that states the whole desired event list.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                config:
+                  type: object
+                  properties:
+                    url:
+                      type: string
+                    content_type:
+                      type: string
+                    insecure_ssl:
+                      type: string
+                events:
+                  type: array
+                  items:
+                    type: string
+                active:
+                  type: boolean
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+    delete:
+      summary: Delete a repository webhook
+      operationId: repos/delete-webhook
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/hook_id'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    # Server-assigned. Excluded from the spec in rd-repowebhook.yaml and sourced from
+    # status.id, the same pattern PullRequest uses for pull_number.
+    hook_id:
+      name: hook_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        active:
+          type: boolean
+        events:
+          type: array
+          items:
+            type: string
+        # config is echoed WITHOUT a faithful `secret`: GitHub masks it as "********". The
+        # property is left undeclared here so the surfaced shape does not promise a value the
+        # API never returns.
+        config:
+          type: object
+          properties:
+            url:
+              type: string
+            content_type:
+              type: string
+            insecure_ssl:
+              type: string
+        # The hook's own API URL plus the two operational endpoints an SRE reaches for:
+        # ping_url to re-send a ping, deliveries_url to inspect what GitHub actually delivered.
+        url:
+          type: string
+        ping_url:
+          type: string
+        deliveries_url:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        # last_response (the last delivery's code/status/message) is deliberately NOT surfaced:
+        # every one of its properties is nullable, oasgen drops `nullable`, and a null arriving
+        # for a freshly created hook would fail status validation on every reconcile.
+security:
+  - accessToken: []

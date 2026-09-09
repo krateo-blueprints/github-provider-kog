@@ -1,0 +1,134 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-collaborator
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-collaborator/collaborator.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: Collaborator
+    # `login` scopes the grant within owner/repo, and is the key the findby items carry — the path
+    # parameter is named `login` in the OAS for exactly that reason (see assets/collaborator.yaml).
+    identifiers:
+      - login
+    # Just role_name, and that is deliberate.
+    #
+    # populateStatusFields reads the RAW response of whichever call produced it, and this resource has
+    # TWO shapes: the findby item (a user) and the create 201 (an invitation). `id`, `node_id` and
+    # `html_url` exist in both and mean DIFFERENT things — user id vs invitation id, the user's
+    # profile URL vs the repository's invitations page. Listing any of them would let a status field
+    # silently change meaning depending on which call last wrote it. `role_name` appears only in the
+    # findby item (the invitation body has no such key), so it can never be written by the wrong one.
+    #
+    # It also carries information the spec does not: spec.permission is the grant we ASK for, while
+    # role_name is the EFFECTIVE role GitHub computes across repo + team + org + enterprise grants.
+    # When they differ, this field is what shows it.
+    additionalStatusFields:
+      - role_name
+    # affiliation and per_page are pinned by the findby verb's static `queries` below. Excluding them
+    # keeps them out of the generated CRD: every OAS parameter of every verb otherwise becomes a spec
+    # field, and a user-settable `affiliation: all` would silently break observe (see below).
+    excludedSpecFields:
+      - affiliation
+      - per_page
+    # The create and update bodies are the same single field, so nothing in the spec is create-only
+    # and `fullSpec` would not loop here either — drift comparison walks the SPEC and looks each field
+    # up in the response, so owner, repo and configurationRef (absent from the response) are ignored
+    # under both scopes. `updatable` is still the right declaration, for a narrower reason: it derives
+    # the compared set from the UPDATE BODY (exactly `permission`), so if the create body is ever
+    # widened with a field the PUT cannot express, that field becomes a spec field and would start a
+    # permanent-drift loop under `fullSpec`, while `updatable` leaves it out. It requires an update
+    # verb, which this resource has.
+    #
+    # RESIDUAL DRIFT LOOP, which no compareScope value fixes. role_name is the HIGHEST role across
+    # repo + team + org + enterprise grants (GitHub's own words, quoted in assets/collaborator.yaml),
+    # and GitHub states there is no way to read the repository-level grant on its own — not from this
+    # list and not from .../permission. So when a user's EFFECTIVE role EXCEEDS the one this CR asks
+    # for (they are an org owner, or a team grants more than `permission`), observe reports the higher
+    # role, the PUT re-sets the repository grant it already set, and the next observe reports the
+    # higher role again: one findby + one PUT every reconcile, indefinitely, against a 5000 req/hr
+    # budget. Simulated against rest-dynamic-controller — spec.permission "push" vs role_name "admin"
+    # never converges.
+    #
+    # It is documented rather than "fixed" because every alternative is worse.
+    # `identifiersAndStatus` projects the spec down to the identifier + status fields THAT EXIST IN
+    # SPEC, which here is just `login` (role_name is not a spec field, so it contributes nothing to
+    # the projection) — that always matches, so an edited spec.permission would never be pushed at
+    # all. Grant a collaborator at or above what they already hold through the organization or a
+    # team, or expect the loop.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      # CREATE and UPDATE are the same idempotent PUT — GitHub documents this endpoint as the way to
+      # change an existing collaborator's permission, so there is no second endpoint to model.
+      - action: create
+        method: PUT
+        path: /repos/{owner}/{repo}/collaborators/{login}
+      - action: update
+        method: PUT
+        path: /repos/{owner}/{repo}/collaborators/{login}
+      # OBSERVE is a findby over the collaborator list, NOT a get. Two endpoints were rejected:
+      # GET /collaborators/{username} returns 204/404 with no body (nothing to compare or populate),
+      # and GET /collaborators/{username}/permission returns the user's EFFECTIVE permission, so a
+      # non-collaborator on a public repo — or any org member on an org repo with a base permission —
+      # reads back as an existing, up-to-date collaborator and the PUT never fires. affiliation=direct
+      # is the only view that reports the repository-level grant this CR owns.
+      #
+      # KNOWN LIMITATION, stated rather than papered over: a PUT for a user who is not an
+      # organization member creates a repository INVITATION (201), and an invitee is not a
+      # collaborator — they do not appear in this list until they accept. Such a CR stays not-Ready
+      # and re-issues the PUT each reconcile until acceptance. GitHub caps outside-collaborator
+      # invitations at 50 per repository per 24h (org members are exempt and are added directly, 204,
+      # appearing here at once), so the org-member case — the platform-engineering one — converges on
+      # the first reconcile while the outside-collaborator case is best treated as pending. Merging
+      # the two states would need a second call against /repos/{owner}/{repo}/invitations, which one
+      # verb cannot make; that is what upstream's proxy plugin is for, and it is not native.
+      - action: findby
+        method: GET
+        path: /repos/{owner}/{repo}/collaborators
+        queries:
+          # WITHOUT THIS the endpoint defaults to affiliation=all, which also lists members holding
+          # access through the organization or a team — the false-exists bug this verb exists to avoid.
+          - name: affiliation
+            value: direct
+          # GitHub's maximum page size. No pagination strategy is configured, deliberately: the
+          # controller's only strategy, continuationToken, takes a response header's value verbatim
+          # and re-sends it as a query parameter, whereas GitHub's Link header is a list of bracketed
+          # URLs with rel labels, not a bare token. Declaring it would send that string as ?page=.
+          # So a repository with more than 100 DIRECT collaborators observes only the first 100 —
+          # far beyond any repository a Krateo blueprint provisions, but stated rather than hidden.
+          - name: per_page
+            value: "100"
+        fieldMapping:
+          # GitHub reports role_name in the DISPLAY vocabulary (read/triage/write/maintain/admin)
+          # while the PUT body takes pull/triage/push/maintain/admin. Three values coincide; `read`
+          # and `write` do not. Without this, spec.permission "push" compares against observed
+          # "write" forever: drift on every reconcile, a PUT that changes nothing, drift again.
+          #
+          # Relocating role_name onto `permission` puts the observed value where the comparison looks
+          # for it (compareScope: updatable compares exactly `permission`). A custom repository role
+          # has no alias pair and passes through unchanged, which is correct — a custom role is named
+          # the same on both sides.
+          #
+          # This fixes the VOCABULARY mismatch only. It does not, and cannot, fix the case where the
+          # observed role is a different role because GitHub is reporting an org or team grant instead
+          # of this CR's — see the residual drift loop noted at compareScope above.
+          - inResponse: role_name
+            inCustomResource: spec.permission
+            valueMapping:
+              type: alias
+              aliases:
+                - apiValue: read
+                  customResourceValue: pull
+                - apiValue: write
+                  customResourceValue: push
+          # REQUIRED, not redundant. A response fieldMapping REMOVES its source key from the body
+          # unless the mapping is in-place or another entry writes to that key. Without this identity
+          # entry the mapping above would consume role_name, and status.role_name would silently
+          # never populate.
+          - inResponse: role_name
+            inCustomResource: status.role_name
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/collaborators/{login}

@@ -1,0 +1,28 @@
+# Notify an external system whenever the destination repository changes.
+#
+# Order matters: the Repository must exist before a webhook can be attached to it.
+#
+# `config.secret` is the HMAC key GitHub signs deliveries with. It sits here in clear text —
+# there is no Secret-backed field on this kind (see assets/repowebhook.yaml) — so treat the CR
+# itself as sensitive, or leave the secret out and verify deliveries another way.
+apiVersion: github.krateo.io/v1alpha1
+kind: RepoWebhook
+metadata:
+  name: test-demo-destination-hook
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  config:
+    url: https://events.example.com/github
+    content_type: json
+    secret: "change-me-before-using-this-for-real"
+  # Compared positionally against what GitHub echoes — keep this list in a stable order.
+  events:
+    - push
+    - pull_request
+  active: true

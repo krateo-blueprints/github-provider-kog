@@ -1,0 +1,55 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-deploymentbranchpolicy
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-deploymentbranchpolicy/deploymentbranchpolicy.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: DeploymentBranchPolicy
+    identifiers:
+      - id
+    additionalStatusFields:
+      - node_id
+      - name
+      - type
+    # branch_policy_id is assigned by GitHub on create, so it must NOT be a (required) spec
+    # field; get/update/delete source it from status.id via the requestFieldMapping below.
+    excludedSpecFields:
+      - branch_policy_id
+    compareScope: updatable
+    # ^ NOT cosmetic here. The create body is {name, type}; the update body is {name} ALONE —
+    # GitHub has no way to move a policy between `branch` and `tag` after creation. Under the
+    # default fullSpec, spec.type IS present in the GET response, so editing it (or having it
+    # edited in the GitHub UI) reads as drift, the controller issues a PUT that cannot carry
+    # `type`, nothing changes, and the same drift is found on the next reconcile — a permanent
+    # PUT loop against a 5000 req/hr budget.
+    #
+    # `updatable` derives the compared set from the update body: exactly {name}. Renaming the
+    # pattern stays reconciled; `type` stops being compared, which is right because the
+    # controller could not fix it anyway. Its stored value remains visible as status.type.
+    # This resource has an update verb, which `updatable` requires.
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/environments/{environment_name}/deployment-branch-policies
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/environments/{environment_name}/deployment-branch-policies/{branch_policy_id}
+        requestFieldMapping:
+          - inPath: branch_policy_id
+            inCustomResource: status.id
+      - action: update
+        method: PUT
+        path: /repos/{owner}/{repo}/environments/{environment_name}/deployment-branch-policies/{branch_policy_id}
+        requestFieldMapping:
+          - inPath: branch_policy_id
+            inCustomResource: status.id
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/environments/{environment_name}/deployment-branch-policies/{branch_policy_id}
+        requestFieldMapping:
+          - inPath: branch_policy_id
+            inCustomResource: status.id

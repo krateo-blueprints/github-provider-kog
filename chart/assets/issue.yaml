@@ -1,0 +1,183 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Issues
+servers:
+  - url: https://api.github.com
+paths:
+  "/repos/{owner}/{repo}/issues":
+    post:
+      summary: Create an issue
+      operationId: issues/create
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                # GitHub declares title as oneOf string|integer. Trimmed to string on purpose:
+                # an int-or-string union does not survive CRD generation cleanly, and an issue
+                # title is a string in every practical sense.
+                title:
+                  type: string
+                body:
+                  type: string
+                # labels / assignees / milestone are CREATE-TIME ONLY here, and that is a
+                # modelling decision worth stating rather than a transcription gap.
+                #
+                # GitHub's PATCH accepts all three, but its RESPONSE returns them in a DIFFERENT
+                # SHAPE than the request takes (verified live on a real issue):
+                #   request  labels: ["bug"]              response  labels: [{id, name, color, ...}]
+                #   request  assignees: ["octocat"]       response  assignees: [{login, id, ...}]
+                #   request  milestone: 1                 response  milestone: {number, title, ...}
+                # Putting them in the update body would make them compared fields (compareScope
+                # updatable) and every comparison of a string against an object is drift, so the
+                # controller would PATCH on every reconcile, forever. Flattening the response
+                # (fieldMapping/responseTransform) would fix the milestone scalar but not the two
+                # arrays: GitHub returns labels and assignees in its own order, the request side
+                # cannot be normalized to match (request-direction jq is not executed by the
+                # controller — only `alias` is), and an order-sensitive array compare would loop
+                # just the same. So they are sent once, at creation, and not reconciled after.
+                # Editing them on an existing CR has no effect; change them in GitHub, or with a
+                # narrower kind if one is ever needed.
+                labels:
+                  type: array
+                  items:
+                    type: string
+                assignees:
+                  type: array
+                  items:
+                    type: string
+                # The milestone NUMBER (a Milestone CR's status.number), not its title.
+                milestone:
+                  type: integer
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Issue'
+  # issue_number is assigned by GitHub on create — the same server-assigned-id shape as
+  # PullRequest's pull_number: excluded from the spec, sourced from status.number by the
+  # requestFieldMapping in rd-issue.yaml, and declared a string because that is the form a path
+  # parameter is substituted in.
+  #
+  # There is NO DELETE. GitHub's REST API cannot delete an issue at all (only the GraphQL
+  # deleteIssue mutation can, and it needs admin rights) — the path below is the whole item
+  # surface, get and patch. See rd-issue.yaml for what deleting the CR therefore means.
+  "/repos/{owner}/{repo}/issues/{issue_number}":
+    get:
+      summary: Get an issue
+      operationId: issues/get
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/issue_number'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Issue'
+    patch:
+      summary: Update an issue
+      operationId: issues/update
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/issue_number'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              # Exactly the four fields GitHub returns in the same shape it takes them, so the
+              # compared set under `updatable` is title/body/state/state_reason and each one is
+              # a property of the GET response.
+              properties:
+                title:
+                  type: string
+                body:
+                  type: string
+                # POST cannot set state — an issue is always created open — so `state` reaches
+                # the spec through this update body alone. `spec.state: closed` is consequently
+                # how a Krateo-managed issue gets closed: the create opens it, the first observe
+                # sees the drift and PATCHes it shut. That is also the closest thing this kind
+                # has to a delete.
+                state:
+                  type: string
+                  enum:
+                    - open
+                    - closed
+                state_reason:
+                  type: string
+                  enum:
+                    - completed
+                    - not_planned
+                    - duplicate
+                    - reopened
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Issue'
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    issue_number:
+      name: issue_number
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Issue:
+      type: object
+      properties:
+        # The per-repository issue number — the identifier, and what the item path is keyed by.
+        number:
+          type: integer
+        id:
+          type: integer
+        node_id:
+          type: string
+        html_url:
+          type: string
+        state:
+          type: string
+        state_reason:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        comments:
+          type: integer
+security:
+  - accessToken: []

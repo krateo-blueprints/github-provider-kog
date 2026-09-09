@@ -1,0 +1,35 @@
+# Record a deployment of `main` to the staging environment.
+#
+# A deployment is an immutable record: GitHub has no update endpoint for one, so editing
+# this CR's spec will NOT change the deployment (the RestDefinition uses compareScope
+# `identifiersAndStatus` for exactly that reason). To deploy again, apply a new CR.
+#
+# `auto_merge: false` is spelled out here for readability, but it is also the CRD default
+# (assets/deployment.yaml pins it, deliberately against GitHub's own default of true):
+# left true, GitHub responds to a ref that is behind the default branch by merging instead
+# of deploying, answering 202 with a bare message and no deployment — so no id, so status
+# never populates and the resource is never observable.
+#
+# `required_contexts: []` is NOT defaulted and does matter: it bypasses commit-status
+# checking. Omit it and GitHub verifies every unique context and answers 409 while any is
+# failing or pending — a loud failure, which is the right default to leave alone.
+apiVersion: github.krateo.io/v1alpha1
+kind: Deployment
+metadata:
+  name: test-demo-deployment
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  ref: main
+  task: deploy
+  environment: staging
+  description: "Deployment recorded by Krateo"
+  auto_merge: false
+  required_contexts: []
+  transient_environment: false
+  production_environment: false

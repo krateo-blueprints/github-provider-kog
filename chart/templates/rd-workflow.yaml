@@ -1,0 +1,74 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-workflow
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-workflow/workflow.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: Workflow
+    # `id` is GitHub's own handle for the workflow record. It is response-only (the spec addresses
+    # the workflow by file name via workflow_id), which is fine: identifiers name response fields,
+    # exactly as PullRequest's `number` does.
+    identifiers:
+      - id
+    additionalStatusFields:
+      - name
+      - path
+      - state
+      - html_url
+      - badge_url
+    # compareScope is deliberately NOT set, so it stays the default fullSpec — and fullSpec is safe
+    # here for a reason worth writing down rather than assuming.
+    #
+    # `updatable` is not available: this resource has no update verb (enable/disable are not an
+    # update — they are the create and the delete), and the CRD rejects `updatable` without one.
+    #
+    # fullSpec compares every spec field against the observed response, and the spec holds exactly
+    # three fields — owner, repo, workflow_id — because the enable endpoint takes no request body,
+    # so the generated CRD spec is nothing but the path parameters. None of those three names is a
+    # property of the workflow response, and the comparison ignores a spec key the response does
+    # not carry, so fullSpec compares nothing and can never report false drift.
+    #
+    # The drift that DOES matter — somebody switching the workflow off in the UI — is not a body
+    # comparison at all. It is caught by the get verb's notFoundBody below.
+    configurationFields: []
+    verbsDescription:
+      # "Create" enables the workflow. It does not create the workflow: only a commit to
+      # .github/workflows can do that, so a CR pointing at a file that does not exist stays
+      # NotReady on the 404 from enable, which is the honest outcome.
+      - action: create
+        method: PUT
+        path: /repos/{owner}/{repo}/actions/workflows/{workflow_id}/enable
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/actions/workflows/{workflow_id}
+        # The workflow record exists in every state, so a workflow that is switched off — or gone —
+        # still answers 200 and would otherwise be reported healthy forever. This predicate reads
+        # the RAW GET body (notFoundBody is evaluated before any response normalization) and reports
+        # such a workflow as ABSENT, which makes the controller re-run create (PUT .../enable). That
+        # is the whole reconciliation loop of this kind.
+        #
+        # `deleted` is included, and that is the one entry worth justifying. A deleted workflow can
+        # never be enabled — only a RepoContent restoring the file can fix it — so create will fail
+        # and the CR will sit NotReady with that error. That is deliberate: it is EXACTLY what this
+        # kind already does for a workflow file that never existed (see the create verb above, where
+        # the 404 from enable is called "the honest outcome"), and the two cases are the same
+        # situation. Excluding `deleted` would make a CR whose workflow has been deleted report
+        # Available — the same silent lie the sibling AutomatedSecurityFixes kind adds a
+        # notFoundBody to prevent. A recurring, visible error beats a false healthy signal, and the
+        # retry is backed off rather than hot.
+        #
+        # `disabled_fork` IS excluded. It is not drift and not absence: GitHub disables a fork's
+        # workflows by repository policy, the record is genuinely present, and this endpoint is not
+        # the mechanism that clears that state — so treating it as absent would loop on something
+        # the CR cannot express.
+        notFoundBody:
+          inline: |
+            .state == "disabled_manually" or .state == "disabled_inactivity" or .state == "deleted"
+      # "Delete" disables the workflow, leaving the file in place. Deleting the CR therefore undoes
+      # exactly what creating it did, which is the property that makes this pair a lifecycle.
+      - action: delete
+        method: PUT
+        path: /repos/{owner}/{repo}/actions/workflows/{workflow_id}/disable

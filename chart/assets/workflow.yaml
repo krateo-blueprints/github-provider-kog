@@ -1,0 +1,117 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Actions Workflows
+servers:
+  - url: https://api.github.com
+paths:
+  # THERE IS NO CREATE OR DELETE FOR A WORKFLOW, and none is invented here.
+  #
+  # A workflow comes into existence when a .github/workflows/<file>.yaml is committed (that is a
+  # RepoContent, not this kind) and disappears when that file is removed. What the API does expose
+  # is its ENABLED STATE, as two dedicated endpoints. So this kind reconciles exactly that: the CR
+  # asserts "this workflow exists and is enabled", create enables it, delete disables it again,
+  # and the file itself is somebody else's resource.
+  "/repos/{owner}/{repo}/actions/workflows/{workflow_id}":
+    get:
+      summary: Get a workflow
+      operationId: actions/get-workflow
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/workflow_id'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        # A workflow file that does not exist (or was deleted) answers 404, which the controller
+        # reads as "does not exist". Declared for documentation only — only 2xx codes count as
+        # success, so listing it cannot make a 404 look like a successful response.
+        '404':
+          description: Resource not found
+  "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/enable":
+    put:
+      summary: Enable a workflow
+      operationId: actions/enable-workflow
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/workflow_id'
+      responses:
+        '204':
+          description: Response
+  "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/disable":
+    put:
+      summary: Disable a workflow
+      operationId: actions/disable-workflow
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/workflow_id'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    # Upstream declares this as oneOf[integer, string]. It is a plain string here: GitHub accepts
+    # the workflow FILE NAME ("release.yaml") as well as the numeric id, the file name is the
+    # stable, author-visible handle — the numeric id is only knowable after the fact — and a
+    # numeric id still works, since a path segment is a string either way. One type also keeps the
+    # generated CRD field simple.
+    #
+    # Note that neither form appears in the GET response, so no response field ever contradicts
+    # whichever form the author wrote.
+    workflow_id:
+      name: workflow_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Workflow:
+      type: object
+      properties:
+        id:
+          type: integer
+        node_id:
+          type: string
+        name:
+          type: string
+        # The workflow file this record belongs to, e.g. ".github/workflows/release.yaml" — the
+        # link back to the RepoContent that actually creates it.
+        path:
+          type: string
+        # active | disabled_manually | disabled_inactivity | disabled_fork | deleted.
+        #
+        # Left as a plain string rather than an enum ON PURPOSE: `state` is surfaced on status, and
+        # oasgen copies an enum straight into the generated status schema — so the day GitHub adds
+        # a sixth state, every status write would be rejected by CRD validation and the resource
+        # would wedge on an error it could not fix. The values are documented here instead, and the
+        # two the controller acts on are named in rd-workflow.yaml's notFoundBody.
+        state:
+          type: string
+        html_url:
+          type: string
+        badge_url:
+          type: string
+security:
+  - accessToken: []

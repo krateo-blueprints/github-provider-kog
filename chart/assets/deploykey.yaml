@@ -1,0 +1,129 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Deploy Keys
+servers:
+  - url: https://api.github.com
+paths:
+  # A deploy key is an SSH public key granting a single repository read (or read/write) access
+  # over git — what a CI job or an ArgoCD/Flux source uses instead of a personal token.
+  #
+  # THERE IS NO UPDATE VERB. GitHub exposes only POST on the collection and GET/DELETE on the
+  # item: a deploy key is immutable once created, and changing one means delete + recreate.
+  # That shapes compareScope in rd-deploykey.yaml — see the reasoning there.
+  "/repos/{owner}/{repo}/keys":
+    post:
+      summary: Create a deploy key
+      operationId: repos/create-deploy-key
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - key
+              properties:
+                # A PUBLIC key — safe to hold in a CR spec, unlike the matching private key,
+                # which never touches this resource (it belongs in the consumer's own Secret).
+                key:
+                  type: string
+                # Optional: GitHub derives the title from the key's trailing comment when it is
+                # omitted, so leaving it unset is fine and simply means the title is
+                # server-chosen (and therefore, being absent from the spec, never compared).
+                title:
+                  type: string
+                # Defaults to read-only ACCESS ON PURPOSE, inverting GitHub's own default of
+                # false. A write-capable deploy key can push to every branch of the repository
+                # (it does not administer it, but it can rewrite history wherever branch
+                # protection allows), and it authenticates as the key rather than as a person,
+                # so the audit trail is thinner; a Krateo blueprint that needs one should have
+                # to say so explicitly.
+                read_only:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeployKey'
+  "/repos/{owner}/{repo}/keys/{key_id}":
+    get:
+      summary: Get a deploy key
+      operationId: repos/get-deploy-key
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/key_id'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeployKey'
+    delete:
+      summary: Delete a deploy key
+      operationId: repos/delete-deploy-key
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/key_id'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    # Server-assigned. Excluded from the spec in rd-deploykey.yaml and sourced from status.id,
+    # the same pattern PullRequest uses for pull_number.
+    key_id:
+      name: key_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    DeployKey:
+      type: object
+      properties:
+        id:
+          type: integer
+        key:
+          type: string
+        title:
+          type: string
+        read_only:
+          type: boolean
+        url:
+          type: string
+        # GitHub's own verification verdict on the key material, and when it was registered.
+        verified:
+          type: boolean
+        created_at:
+          type: string
+        # added_by and last_used are NOT surfaced: both are nullable, oasgen drops `nullable`,
+        # and a null on a key that has never been used would fail status validation on every
+        # reconcile.
+security:
+  - accessToken: []

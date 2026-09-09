@@ -11,6 +11,96 @@ timestamp: 2026-09-09T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-09-09 — four kinds become 31
+
+The chart now ships 31 `RestDefinition`s. The 27 new ones are **native** — none of them
+touches the companion plugin, which still serves only `GitRef`, `RepoContent` and
+`PullRequest`. Coverage is now access (`Team`, `TeamRepo`, `TeamMembership`,
+`Collaborator`, `OrgMembership`), repository configuration (`RepoWebhook`, `OrgWebhook`,
+`DeployKey`, `Environment`, `RepoRuleset`, `OrgRuleset`, `Autolink`, `BranchProtection`),
+CI/CD (`ActionsVariableRepo`, `ActionsVariableOrg`, `EnvironmentVariable`, `RunnerGroup`,
+`DeploymentBranchPolicy`, `Workflow`), work tracking (`Label`, `Milestone`, `Issue`,
+`Release`, `Deployment`) and governance (`CustomProperty`, `CodeSecurityConfig`,
+`AutomatedSecurityFixes`), on top of the four git-transport kinds. Each new kind is a
+`RestDefinition` + a trimmed OpenAPI spec + the ConfigMap wrapping it, and a
+`<Kind>Configuration` in `chart/samples/configurations.yaml`, which now carries all 31.
+One PAT still drives the whole chart — the Configurations may all share one name — but
+what that PAT must be *allowed* to do now varies by kind: the git-write kinds need only
+contents/refs/pulls, `Repository` needs org repository creation, and the org-scoped kinds
+(`Team`, `OrgMembership`, the rulesets, the runner group) need org admin rights.
+
+**What is deliberately absent.** GitHub Actions, Dependabot and Codespaces *secrets* are
+not expressible as a `RestDefinition` and were not attempted: writing one requires an
+`encrypted_value` — a LibSodium sealed box — plus the `key_id` of a repository public key
+that has to be fetched first, which is client-side crypto and a dependent lookup, neither
+of which a RestDefinition can do. Variables are **not** secrets (GitHub stores and returns
+`value` verbatim), which is why all three variable kinds are here and no secret kind is.
+`VulnerabilityAlerts` was evaluated and dropped for an unrelated reason: `GET
+/repos/{owner}/{repo}/vulnerability-alerts` answers 404 when the feature is off and **204
+with no body** when it is on, so it never returns a body at all — nothing to derive a
+status schema from, nothing for a drift predicate to read. `AutomatedSecurityFixes` is the
+contrast that makes the rule concrete: its GET *does* return a body (`enabled`, `paused`),
+so it is expressible, and it is covered.
+
+**`compareScope`, split four ways.** 23 kinds declare `updatable` — compare exactly what
+the update body can express, which needs both oasgen ≥ 0.23.0 and an update verb. Five
+leave the default `fullSpec` (`GitRef`, `RepoContent`, `PullRequest`, `Workflow`,
+`AutomatedSecurityFixes`); for the last two that is a checked conclusion rather than an
+omission — their specs hold nothing but path parameters, so `fullSpec` compares nothing
+and cannot report false drift, and the drift that matters is caught by a `notFoundBody`
+predicate instead. `Autolink` sets `fullSpec` explicitly: it has no update verb, but its
+GET echoes the whole resource, so an edited CR *should* report drift, because the fix is
+delete-and-recreate and `identifiersAndStatus` would report Ready while the spec and the
+repository disagreed. `DeployKey` and `Deployment` use `identifiersAndStatus` — both also
+have no update verb, so `updatable` is unavailable to them, and for both the compared set
+under `fullSpec` would be a field nothing could ever fix. With 23 kinds on `updatable`,
+the chart's effective floor is now oasgen-provider **0.23.0**, not the 0.20.0 recorded
+below.
+
+**Four defects the verification pass caught**, each fixed in the file it belongs to:
+
+- **`Team`'s update answers 201, not 200.** GitHub returns 201 when the PATCH actually
+  changes something and 200 only "when the updated information already exists" — and the
+  controller issues an update *only* after observing drift, i.e. exactly in the 201 case.
+  rest-dynamic-controller accepts only the 2xx codes the operation declares, so a document
+  listing 200 alone would have turned every real team rename into `invalid status code:
+  201`, forever. Both codes are declared.
+- **`Deployment`'s `auto_merge` defaults to true at GitHub.** When `ref` is behind the
+  default branch, that default makes GitHub merge instead of deploying and answer 202 with
+  a message body: no deployment, no id, nothing for status to hold, and a get verb that
+  sources `{deployment_id}` from `status.id` can then never address anything — a green
+  create with a permanently unobservable CR. The asset pins the default to `false`, the
+  same call `repository.yaml` makes on `auto_init`.
+- **`Milestone`'s `due_on` can be written but never compared.** GitHub treats a due date
+  as a day: it discards the time and stores midnight *in the timezone of the account that
+  owns the token*, then echoes it back in UTC. Measured over ~120 dated milestones on
+  public repositories, only about half come back at midnight UTC, and within a single
+  repository the offset flips exactly at the US daylight-saving boundaries — a server
+  converting a date in a fixed timezone, not a client echo. For a positive UTC offset even
+  the date differs (an Europe/Rome token writing `2026-12-31` reads back
+  `2026-12-30T23:00:00Z`). Left in the update body it would have been a compared field and
+  therefore a PATCH on every reconcile forever, one that "succeeds" each time. It is
+  create-only; what GitHub stored is readable on `status.due_on`.
+- **`Collaborator` over-reports the role.** The obvious observe endpoints are both wrong:
+  `GET /collaborators/{username}` returns 204/404 with no body, and
+  `.../permission` returns the *effective* permission, so any org member on an org repo
+  reads back as an existing, up-to-date collaborator and the PUT never fires. Observe is a
+  `findby` over the collaborator list pinned to `affiliation=direct`, the one view that
+  reports the repository-level grant this CR owns, and a `fieldMapping` aliases GitHub's
+  display vocabulary (`read`/`write`) onto the request's (`pull`/`push`). What remains is
+  documented rather than papered over: when a user's effective role *exceeds* the grant
+  (an org owner, or a team granting more), observe reports the higher role and the pair
+  loops one findby + one PUT per reconcile — GitHub exposes no way to read the
+  repository-level grant on its own.
+
+Verified: `helm lint` clean; all 31 kinds render; every RestDefinition path and method
+cross-checked against its own OAS document, with zero mismatches; and all 31 rendered
+RestDefinitions accepted by the **deployed** `restdefinitions.ogen.krateo.io` CRD at
+0.23.0 via `kubectl apply --dry-run=server` under throwaway names, with absence confirmed
+afterwards. There is **no** live end-to-end run against GitHub for any kind — the
+behaviours recorded above come from the API's own documents and from read-only
+measurement, not from a round trip through a controller.
+
 ## 2026-09-09 — oasgen-provider 0.23.0: `Repository` moves to `compareScope: updatable`
 
 krateo-057 was upgraded to oasgen-provider **0.23.0**, which adds a third `compareScope`
@@ -38,6 +128,23 @@ throwaway names — including the CRD's own "requires an update verb" validation
 values (#113), a delete-finalizer arbiter (#103), 200-tombstone-is-absence (#111), and
 nested dotted identifier selectors (#106). The chart still requires **≥ 0.20.0** in general;
 `compareScope: updatable` specifically requires **≥ 0.23.0**.
+
+> **Corrected the same day** — the reason given above is wrong, and the wrong reasoning was
+> copied into other kinds and into the docs before it was caught. The three create-only
+> fields were never compared under `fullSpec` either: the drift comparison **skips** any
+> spec key the observe response does not carry — `rmValue, ok := rm[key]; if !ok
+> { continue }` in rest-dynamic-controller `internal/tools/comparison`, reached from
+> `isCRUpdated` (`internal/controllers/helpers.go`), which projects the spec onto
+> `scopeFields` only for `identifiersAndStatus` and `updatable`. An absent key therefore
+> contributes nothing under *every* scope, and the same goes for path parameters. What
+> genuinely loops is a key the response **does** carry, in a different shape or a
+> server-normalised value the update cannot fix — `TeamRepo`'s string `owner` against an
+> owner object, `PullRequest`'s `head`/`base`, `Milestone`'s re-timed `due_on`,
+> `Collaborator`'s effective `role_name`, `Issue`'s `labels`/`assignees` — which is why
+> *those* kinds genuinely need `updatable`. For `Repository` it is defensive rather than
+> load-bearing: it and `fullSpec` should agree today, and it is kept because it states the
+> intent explicitly and stays correct if a field the `PATCH` cannot send is ever added.
+> **No `compareScope` value changed** as a result — only the reasoning was wrong.
 
 ## 2026-09-09 — renamed to `github-provider-kog`, chart included
 
@@ -100,6 +207,13 @@ was not a narrower compare but dropping the three create-only fields from the cr
 > exactly what `PATCH` can send, which ends the loop *and* keeps mutable fields
 > reconciled, so the cost recorded above no longer applies.
 
+> **Corrected the same day** — there was no loop to end. The "permanent drift, `PATCH` on
+> every single reconcile forever" reasoning above is wrong: the comparison skips a spec key
+> the GET response does not carry, so the three create-only fields could not have drifted
+> under `fullSpec` at all. Full correction, with the controller code, under *oasgen-provider
+> 0.23.0*. The setting recorded here was already superseded, and no `compareScope` value
+> changed because of the correction.
+
 Two smaller decisions. The path parameters are named `org` and `name`, not GitHub's
 `owner`/`repo`: the same two CR fields then serve the create path (`/orgs/{org}/repos`),
 the create body (`name`) and the get/update/delete path (`/repos/{org}/{name}`), so the
@@ -137,10 +251,10 @@ krateo-platformops/installer#52.
 
 ## Design decisions worth keeping
 
-- **KOG, not a forked provider.** The three git-write kinds are pure OpenAPI mappings
-  (`RestDefinition` + trimmed spec); oasgen-provider (≥ 0.9.x) generates the CRDs and
-  auto-deploys a `rest-dynamic-controller` per kind. The chart ships no controller of
-  its own for those kinds.
+- **KOG, not a forked provider.** Every kind is a pure OpenAPI mapping
+  (`RestDefinition` + trimmed spec); oasgen-provider (≥ 0.23.0, for `compareScope:
+  updatable`) generates the CRDs and auto-deploys a `rest-dynamic-controller` per kind.
+  The chart ships no controller of its own.
 - **A companion plugin only for what OpenAPI cannot express.** The plugin
   (`plugin/main.go`) is reached solely via per-operation OpenAPI `servers` overrides,
   for exactly the verbs that need it — GitRef create (auto-resolve base sha) and observe

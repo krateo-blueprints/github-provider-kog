@@ -1,0 +1,22 @@
+# Give a CI job (or an Argo CD / Flux source) git access to ONE repository, without a personal
+# token. Only the PUBLIC half of the key pair goes here; the private half belongs in whatever
+# Secret the consumer reads.
+#
+# A deploy key is immutable: to rotate it, delete this CR and create a new one. read_only
+# defaults to true — set it to false only when the consumer genuinely has to push.
+apiVersion: github.krateo.io/v1alpha1
+kind: DeployKey
+metadata:
+  name: test-demo-destination-ci-key
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  title: krateo-ci-readonly
+  # Single line, no trailing newline: a `key: |` block scalar would append one.
+  key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEE krateo-ci"
+  read_only: true

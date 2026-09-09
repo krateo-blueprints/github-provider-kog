@@ -1,0 +1,136 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Actions Variables (repository)
+servers:
+  - url: https://api.github.com
+paths:
+  # Variables are PLAINTEXT configuration, not secrets: GitHub stores and returns `value`
+  # verbatim, so there is no LibSodium encryption step and no dependent public-key lookup.
+  # That is what makes this kind expressible natively where an Actions *secret* is not.
+  "/repos/{owner}/{repo}/actions/variables":
+    post:
+      summary: Create a repository variable
+      operationId: actions/create-repo-variable
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - value
+              properties:
+                # `name` is BOTH the create-body field and the {name} path parameter of the item
+                # endpoints below, so the generated CRD carries one field that serves every verb.
+                name:
+                  type: string
+                value:
+                  type: string
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                # GitHub answers the create with an EMPTY object — it echoes neither name nor
+                # value. Harmless here: the identifier (`name`) is a caller-supplied spec field,
+                # so the very first Observe can already address /variables/{name}. Contrast
+                # PullRequest, whose identifier is server-assigned and must arrive on create.
+                type: object
+  "/repos/{owner}/{repo}/actions/variables/{name}":
+    get:
+      summary: Get a repository variable
+      operationId: actions/get-repo-variable
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionsVariable'
+    patch:
+      summary: Update a repository variable
+      operationId: actions/update-repo-variable
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/name'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                # DELIBERATELY only `value`. GitHub's PATCH body also accepts `name` (a rename),
+                # and it is trimmed out on purpose — see the compareScope comment in
+                # rd-actionsvariablerepo.yaml. In short: this resource is ADDRESSED by {name}, so
+                # a rename can never be observed (the get would 404 at the new name and the
+                # controller would create a second variable instead of renaming the first).
+                # Leaving `name` out of the update body also keeps it out of the `updatable`
+                # compare set, which is what stops GitHub's case-insensitive variable naming
+                # (`my_var` created, `MY_VAR` returned) from reading as permanent drift.
+                value:
+                  type: string
+      responses:
+        '204':
+          description: Response
+    delete:
+      summary: Delete a repository variable
+      operationId: actions/delete-repo-variable
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    name:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    ActionsVariable:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+        # Server-managed timestamps. They are the only observable evidence that an update
+        # actually landed, which is why they are surfaced on status.
+        created_at:
+          type: string
+        updated_at:
+          type: string
+security:
+  - accessToken: []

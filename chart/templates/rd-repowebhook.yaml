@@ -1,0 +1,71 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-repowebhook
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-repowebhook/repowebhook.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: RepoWebhook
+    # GitHub assigns the hook id on create; owner/repo only scope it. `id` is a property of the
+    # GET response (schemas/Webhook), so status.id is populated on the first successful observe.
+    identifiers:
+      - id
+    additionalStatusFields:
+      - url
+      - ping_url
+      - deliveries_url
+      - created_at
+      - updated_at
+    # hook_id is a path parameter on get/update/delete but is NOT knowable at create time, so it
+    # must not become a (required) spec field; the requestFieldMapping entries below source it
+    # from status.id instead. Same pattern as PullRequest's pull_number.
+    excludedSpecFields:
+      - hook_id
+    # DELIBERATE.
+    #
+    # The problem field is config.secret. GitHub does not return it: a GET echoes
+    # config.secret as the literal "********" (the API's own webhook-config-secret example).
+    # Under the default `fullSpec` the spec's real secret would never equal that mask, so the
+    # hook would read as permanently drifted and the controller would PATCH it on every single
+    # reconcile, forever, against a 5000 req/hr budget — and the PATCH would never fix it.
+    #
+    # `updatable` compares exactly the fields the PATCH body can express, derived from the OAS.
+    # assets/repowebhook.yaml deliberately omits `secret` from that update body, so the
+    # comparison covers config.url, config.content_type, config.insecure_ssl, events and active
+    # — every field an author can change and the controller can actually fix — and nothing
+    # else. The create-only `name` ("web") drops out for the same reason.
+    #
+    # The secret is still SENT on update: the request body is assembled by TOP-LEVEL key, so the
+    # whole `config` map from the spec is forwarded, secret included. That matters, because
+    # GitHub replaces the config object wholesale — a PATCH omitting the secret would silently
+    # remove the webhook's HMAC signing.
+    #
+    # `identifiersAndStatus` was rejected: it would also stop comparing the delivery URL and the
+    # event list, which ARE fixable by the PATCH and are exactly what an operator expects a
+    # controller to hold in place.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/hooks
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/hooks/{hook_id}
+        requestFieldMapping:
+          - inPath: hook_id
+            inCustomResource: status.id
+      - action: update
+        method: PATCH
+        path: /repos/{owner}/{repo}/hooks/{hook_id}
+        requestFieldMapping:
+          - inPath: hook_id
+            inCustomResource: status.id
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/hooks/{hook_id}
+        requestFieldMapping:
+          - inPath: hook_id
+            inCustomResource: status.id

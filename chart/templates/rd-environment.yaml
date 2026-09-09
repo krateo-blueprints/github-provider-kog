@@ -1,0 +1,57 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-environment
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-environment/environment.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: Environment
+    # `name` is the environment name as GitHub returns it — the response-side counterpart of the
+    # `environment_name` path parameter, and a property of the GET response schema. There is no
+    # server-assigned key to carry in the path, so unlike PullRequest this kind needs no
+    # excludedSpecFields / requestFieldMapping: every verb addresses the environment by the same
+    # three spec fields.
+    identifiers:
+      - name
+    additionalStatusFields:
+      - id
+      - node_id
+      - html_url
+      - created_at
+      - updated_at
+    compareScope: updatable
+    # ^ The create verb and the update verb are the SAME PUT operation, so the updatable set is
+    # exactly the resource's desired-state body: wait_timer, prevent_self_review, reviewers and
+    # deployment_branch_policy.{protected_branches,custom_branch_policies}. There are no
+    # create-only fields to drop, which is why this is not the drift-loop rescue it is on
+    # DeploymentBranchPolicy — it is the by-construction correct scope.
+    #
+    # What it buys over the default fullSpec is that the three path parameters and
+    # configurationRef are excluded from the comparison BY CONSTRUCTION rather than by the
+    # accident of GitHub not happening to return keys with those names. `environment_name` in
+    # particular is one rename away from colliding with the response's `name`.
+    #
+    # Note the deliberate observability gap it does NOT hide: wait_timer, prevent_self_review
+    # and reviewers are in the updatable set but absent from the top-level GET response (GitHub
+    # nests them under the anyOf-typed `protection_rules` array — see assets/environment.yaml).
+    # The comparator ignores a spec key the response does not carry, so they cannot loop; they
+    # simply are not observed. Someone editing those three settings in the GitHub UI will not be
+    # reverted. deployment_branch_policy IS returned top-level, so it is genuinely reconciled.
+    configurationFields: []
+    verbsDescription:
+      # PUT is create-or-update upstream, so create and update are the same endpoint. Observe
+      # decides which one runs: GET 404 -> create, GET 200 + drift -> update.
+      - action: create
+        method: PUT
+        path: /repos/{owner}/{repo}/environments/{environment_name}
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/environments/{environment_name}
+      - action: update
+        method: PUT
+        path: /repos/{owner}/{repo}/environments/{environment_name}
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/environments/{environment_name}

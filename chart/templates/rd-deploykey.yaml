@@ -1,0 +1,67 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-deploykey
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-deploykey/deploykey.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: DeployKey
+    # GitHub assigns the key id on create; owner/repo only scope it. `id` is a property of the
+    # GET response (schemas/DeployKey), so status.id is populated on the first observe.
+    identifiers:
+      - id
+    # Server-side facts ONLY — deliberately not `key`, `title` or `read_only`. Those three are
+    # spec fields, and under compareScope=identifiersAndStatus the compared set is exactly
+    # identifiers + additionalStatusFields: listing a spec field here would drag it back into a
+    # drift comparison that, on this kind, nothing can act on (see below). Every entry is a
+    # property of the GET response schema.
+    additionalStatusFields:
+      - url
+      - verified
+      - created_at
+    # key_id is a path parameter on get/delete but is not knowable at create time, so it must
+    # not become a (required) spec field; the requestFieldMapping entries below source it from
+    # status.id. Same pattern as PullRequest's pull_number.
+    excludedSpecFields:
+      - key_id
+    # DELIBERATE, and the one non-obvious choice in this file.
+    #
+    # `updatable` is UNAVAILABLE here: it requires an update verb, and GitHub exposes none —
+    # /repos/{owner}/{repo}/keys/{key_id} has GET and DELETE and nothing else. A deploy key is
+    # immutable; changing one means delete + recreate.
+    #
+    # That leaves fullSpec or identifiersAndStatus, and it is what rules fullSpec out. With no
+    # update verb, ANY difference the comparison finds is unfixable: the controller marks the
+    # resource not-up-to-date, calls Update, finds no update action, and returns without doing
+    # anything — so the CR parks at Ready=False/Unavailable forever with no remedy but editing
+    # the CR back. Under fullSpec the field being compared would be `key`: a multi-hundred-
+    # character SSH public key pasted into YAML. Whether GitHub echoes it byte-identically
+    # (trailing newline from a `key: |` block scalar, the optional trailing comment) could not
+    # be verified read-only, and the cost of being wrong is every DeployKey in the fleet sitting
+    # permanently Unavailable while working perfectly.
+    #
+    # identifiersAndStatus therefore, and the status list above is chosen so the compared set
+    # contains no spec field at all: id/url/verified/created_at exist only in the response, the
+    # spec projection is empty, and a key that exists is a key that is up to date. That is the
+    # honest model of an immutable resource — existence IS the whole contract, and a deleted
+    # key is still detected (the GET 404s and the controller recreates it).
+    compareScope: identifiersAndStatus
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/keys
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/keys/{key_id}
+        requestFieldMapping:
+          - inPath: key_id
+            inCustomResource: status.id
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/keys/{key_id}
+        requestFieldMapping:
+          - inPath: key_id
+            inCustomResource: status.id

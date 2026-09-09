@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-codesecurityconfig
+  namespace: {{ .Release.Namespace }}
+data:
+  # NOT tpl-rendered, like configmap-repository.yaml: this kind is fully native, every verb
+  # goes straight to api.github.com, and the asset contains no template action. Only the
+  # plugin-backed kinds need a tpl pass to resolve their per-operation `servers` override.
+  codesecurityconfig.yaml: |
+{{ .Files.Get "assets/codesecurityconfig.yaml" | indent 4 }}

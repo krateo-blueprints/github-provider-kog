@@ -1,0 +1,27 @@
+# Allow only `release/*` branches to deploy to the `production` environment.
+#
+# Order matters: the Environment must exist AND carry
+# deployment_branch_policy.custom_branch_policies: true (see test-environment.yaml) — against an
+# environment without it this POST returns 404, not a validation error.
+#
+# `type` is create-only: GitHub's update endpoint accepts `name` alone, so a policy cannot be
+# switched between branch and tag afterwards. Delete and recreate the CR instead. What GitHub
+# actually stored is readable as status.type.
+#
+# There is no branch_policy_id field: GitHub assigns it on create and the provider carries it in
+# status.id, from where get/update/delete bind the path.
+apiVersion: github.krateo.io/v1alpha1
+kind: DeploymentBranchPolicy
+metadata:
+  name: test-demo-release-branches
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  environment_name: production
+  name: "release/*"
+  type: branch

@@ -1,0 +1,57 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-label
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-label/label.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: Label
+    # `name` is the label's identity AND the item-path parameter AND the create-body field —
+    # one CR field for all three, so there is no pair to keep in sync. It is a property of the
+    # GET response, so status populates.
+    identifiers:
+      - name
+    additionalStatusFields:
+      - id
+      - node_id
+      - url
+      - default
+    # `updatable` compares exactly what the PATCH body can send — color and description — and
+    # both are properties of the GET response, so a difference here is detectable AND fixable
+    # and the reconcile converges.
+    #
+    # `fullSpec` would widen that to the whole spec, i.e. also `owner`/`repo`. Harmless in
+    # itself (the comparison skips spec keys the response omits), but it ties drift to the shape
+    # of the spec rather than to what an update can actually repair — so a create-only field
+    # added later, of the kind Repository's `auto_init` is, would silently join the comparison.
+    # `updatable` states the invariant by construction instead of by luck.
+    compareScope: updatable
+    configurationFields: []
+    #
+    # RENAME IS NOT SUPPORTED, and this is a property of the API, not an omission.
+    # GitHub renames a label by PATCHing `new_name` while the path still addresses the CURRENT
+    # name, so a rename inherently needs TWO names — which no single CR field can carry, and
+    # which the controller (whose only request-side transform is `alias`) cannot derive. GET
+    # does not echo `new_name` either, so it could never even trigger the update that would
+    # perform it. assets/label.yaml has the full account, including why modelling it anyway
+    # corrupts the label's identity rather than merely failing.
+    #
+    # Consequence to know before editing a CR: changing `spec.name` on an existing Label is NOT
+    # a rename. The next observe looks up the NEW name, gets a 404, and creates a second label;
+    # the label under the old name is left behind on GitHub, untracked. To rename, delete the CR
+    # (which deletes the label, and with it its issue associations) and create a new one.
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/labels
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/labels/{name}
+      - action: update
+        method: PATCH
+        path: /repos/{owner}/{repo}/labels/{name}
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/labels/{name}

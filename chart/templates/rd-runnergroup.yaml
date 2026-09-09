@@ -1,0 +1,77 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-runnergroup
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-runnergroup/runnergroup.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: RunnerGroup
+    # A runner group is addressed by the id GitHub assigns on create, not by its name, so `id`
+    # is the identifier — the PullRequest model rather than the Repository one. It is a property
+    # of the GET response (and of the create response), so status populates on the first call.
+    identifiers:
+      - id
+    # Read-only server facts: whether this is the org's Default group, whether it is inherited
+    # from an enterprise, and the sub-collection links a caller needs to inspect or manage
+    # membership out of band (this kind sets that membership only at create time). Every entry
+    # is a property of the GET response schema.
+    additionalStatusFields:
+      - id
+      - default
+      - inherited
+      - runners_url
+      - hosted_runners_url
+      - selected_repositories_url
+    # runner_group_id is assigned by GitHub on create, so it must NOT be a (required) spec
+    # field; get/update/delete source it from status.id via the requestFieldMapping below.
+    # Same shape as rd-pullrequest.yaml's pull_number/status.number.
+    #
+    # This is deliberately NOT the upstream krateoplatformops-blueprints approach, which adds a
+    # `findby` verb over /orgs/{org}/actions/runner-groups to recover the id by name. It does not
+    # need to: GitHub's create already returns the whole group including `id`, so the cheaper
+    # excludedSpecFields + requestFieldMapping pattern already in this chart is enough, and it
+    # avoids paging a list endpoint on every reconcile.
+    excludedSpecFields:
+      - runner_group_id
+    # NOTE, correcting an earlier version of this comment: `org` (a path param) and the two
+    # create-only body fields — selected_repository_ids and runners — do NOT loop. None of them
+    # is a property of the GET response, and the comparison SKIPS any spec key the response does
+    # not carry (`rmValue, ok := rm[key]; if !ok { continue }` in rest-dynamic-controller's
+    # internal/tools/comparison), so under fullSpec they contribute nothing.
+    #
+    # `updatable` compares exactly what the PATCH body can express: name, visibility,
+    # allows_public_repositories, restricted_to_workflows and selected_workflows — every one of
+    # them a property of the GET response, so every one detectable AND fixable. Unlike the three
+    # variable kinds, `name` STAYS in the update body here: this resource is keyed by id, so a
+    # rename is a real, observable, convergent update rather than a change of identity.
+    #
+    # That makes `updatable` DEFENSIVE here rather than load-bearing: every spec field the GET
+    # echoes is also in the PATCH body, so it and fullSpec should agree today. It is kept because
+    # it states the intent explicitly and stays correct if a field the PATCH cannot fix is later
+    # added to the create body. It requires an update verb; this resource has PATCH.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /orgs/{org}/actions/runner-groups
+      - action: get
+        method: GET
+        path: /orgs/{org}/actions/runner-groups/{runner_group_id}
+        requestFieldMapping:
+          - inPath: runner_group_id
+            inCustomResource: status.id
+      - action: update
+        method: PATCH
+        path: /orgs/{org}/actions/runner-groups/{runner_group_id}
+        requestFieldMapping:
+          - inPath: runner_group_id
+            inCustomResource: status.id
+      - action: delete
+        method: DELETE
+        path: /orgs/{org}/actions/runner-groups/{runner_group_id}
+        requestFieldMapping:
+          - inPath: runner_group_id
+            inCustomResource: status.id

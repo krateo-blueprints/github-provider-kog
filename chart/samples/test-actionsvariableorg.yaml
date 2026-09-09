@@ -1,0 +1,22 @@
+# An org-wide plaintext Actions variable. `visibility` is required on create and decides which
+# repositories may read it: `all`, `private`, or `selected`.
+#
+# With `selected`, list the repository IDs in `selected_repository_ids` — a CREATE-ONLY field
+# (GitHub never echoes it on read, so it is not compared and editing it later does nothing).
+# Changing the selected set after creation goes through
+# /orgs/{org}/actions/variables/{name}/repositories, which this kind does not model; watch
+# `status.selected_repositories_url` to see where that set lives.
+apiVersion: github.krateo.io/v1alpha1
+kind: ActionsVariableOrg
+metadata:
+  name: test-org-registry-var
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  org: krateo-blueprints
+  name: KRATEO_REGISTRY
+  value: ghcr.io/krateo-blueprints
+  visibility: all

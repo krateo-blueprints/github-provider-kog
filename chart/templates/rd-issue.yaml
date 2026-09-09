@@ -1,0 +1,64 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-issue
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-issue/issue.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: Issue
+    # `number` is the issue's identity (titles are not unique) and a property of the GET
+    # response, so status populates and the item path can be keyed off it.
+    identifiers:
+      - number
+    additionalStatusFields:
+      - number
+      - id
+      - node_id
+      - html_url
+      - state
+      - comments
+    # issue_number is assigned by GitHub on create, so it must NOT be a (required) spec
+    # field; get/update source it from status.number via the requestFieldMapping below.
+    # Same shape as PullRequest's pull_number.
+    excludedSpecFields:
+      - issue_number
+    # `updatable` compares title, body, state and state_reason — the whole PATCH body, and all
+    # four are properties of the GET response.
+    #
+    # `fullSpec` would be actively wrong here. It compares the whole spec against the observed
+    # body, and while spec keys the response omits are simply skipped, `labels`, `assignees` and
+    # `milestone` are NOT omitted — GitHub returns all three, as objects, where the request takes
+    # strings and an integer (see assets/issue.yaml). They would therefore be compared and always
+    # differ: drift on every reconcile, a PATCH that cannot fix it, forever, against a
+    # 5000 req/hr budget. `identifiersAndStatus` would avoid that too, but it would also stop
+    # comparing title, body and state — and those ARE fixable, so it would silently drop the one
+    # thing this kind is for: reopening/closing and re-titling an issue from the CR.
+    compareScope: updatable
+    configurationFields: []
+    #
+    # NO DELETE VERB — the same shape PullRequest ships with, and for the same reason: GitHub's
+    # REST API has no endpoint that deletes an issue (only the GraphQL deleteIssue mutation,
+    # which needs admin rights and is not reachable from a RestDefinition). Nothing is being
+    # papered over: there is no 204-returning or otherwise substitutable endpoint to map.
+    #
+    # So deleting the CR only stops Krateo managing the issue; the issue stays where it is on
+    # GitHub. To CLOSE it, set `spec.state: closed` (optionally with `spec.state_reason`) and let
+    # the update verb run — then delete the CR if you no longer want it tracked.
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/issues
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/issues/{issue_number}
+        requestFieldMapping:
+          - inPath: issue_number
+            inCustomResource: status.number
+      - action: update
+        method: PATCH
+        path: /repos/{owner}/{repo}/issues/{issue_number}
+        requestFieldMapping:
+          - inPath: issue_number
+            inCustomResource: status.number

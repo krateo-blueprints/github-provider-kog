@@ -1,0 +1,21 @@
+# A plaintext Actions variable on one repository. Variables are NOT secrets — GitHub stores
+# and returns `value` verbatim, which is exactly why this kind is expressible natively.
+# Never put a token or password here; there is no encryption on this path.
+#
+# `name` doubles as the create-body field and the {name} path segment of get/update/delete,
+# so editing it does not rename the variable — it points the CR at a different one, and the
+# controller creates that one instead. Delete and recreate the CR if you really mean to rename.
+apiVersion: github.krateo.io/v1alpha1
+kind: ActionsVariableRepo
+metadata:
+  name: test-demo-registry-var
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  name: KRATEO_REGISTRY
+  value: ghcr.io/krateo-blueprints

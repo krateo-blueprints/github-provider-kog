@@ -1,0 +1,63 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-automatedsecurityfixes
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-automatedsecurityfixes/automatedsecurityfixes.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: AutomatedSecurityFixes
+    # Empty, and correct: this sub-resource has no identity of its own. The repository is the key
+    # and it is carried in the path (spec.owner / spec.repo), while the response holds nothing but
+    # the toggle's state. Inventing an identifier out of `enabled` would call a state field an
+    # identity. Status generation only needs identifiers + additionalStatusFields to be non-empty
+    # between them, which the two observable fields below satisfy.
+    identifiers: []
+    additionalStatusFields:
+      - enabled
+      - paused
+    # compareScope is deliberately NOT set, so it stays the default fullSpec — safe here, for a
+    # reason worth stating rather than assuming.
+    #
+    # `updatable` is unavailable: there is no update verb (this toggle has only on and off), and
+    # the CRD rejects `updatable` without one.
+    #
+    # fullSpec compares every spec field against the observed response, and the spec is exactly
+    # owner + repo — the enable endpoint takes no request body, so the generated CRD spec holds
+    # nothing but the two path parameters. Neither name is a property of {enabled, paused}, and the
+    # comparison ignores a spec key the response does not carry, so fullSpec compares nothing and
+    # cannot report false drift.
+    #
+    # The drift that matters is not a body comparison anyway: it is "somebody turned this off",
+    # which the get verb's notFoundBody catches below.
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: PUT
+        path: /repos/{owner}/{repo}/automated-security-fixes
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/automated-security-fixes
+        # LOAD-BEARING. A repository with the feature switched off answers 200
+        # {"enabled": false, "paused": false} — verified against the live API — not the 404 the
+        # docs suggest. Without this predicate the controller would see a successful GET, report
+        # the resource Available, and the CR would claim Dependabot security updates were on while
+        # they were off. The predicate reads the RAW body and reports `enabled: false` as ABSENT,
+        # so the controller re-runs create (PUT) and switches it back on.
+        #
+        # `paused` is not part of the predicate: pausing is Dependabot's own back-off on a repo
+        # whose fix PRs nobody merges, the enable endpoint does not clear it, and treating it as
+        # absence would re-PUT forever against a state this API cannot change. It is surfaced on
+        # status instead.
+        #
+        # A repository that cannot have the feature at all (Dependabot unavailable for the plan or
+        # the org policy) will hold `enabled: false` through the PUT, so the CR stays NotReady and
+        # retries with backoff rather than converging. That is visible and correct — it is a real
+        # unmet declaration, not a controller fault.
+        notFoundBody:
+          inline: |
+            .enabled == false
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/automated-security-fixes

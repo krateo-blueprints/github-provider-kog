@@ -1,0 +1,74 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-milestone
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-milestone/milestone.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: Milestone
+    # `number` (not `title`) identifies a milestone: GitHub allows two milestones with the same
+    # title, and the item path is keyed by number. It is a property of the GET response.
+    identifiers:
+      - number
+    additionalStatusFields:
+      - number
+      - id
+      - node_id
+      - html_url
+      - state
+      # The due date GitHub actually stored, which is not necessarily the one `spec.due_on`
+      # asked for — GitHub keeps the day and re-times it to midnight in the token account's
+      # timezone. Surfaced so that difference is readable rather than invisible.
+      - due_on
+      - open_issues
+      - closed_issues
+    # milestone_number is assigned by GitHub on create, so it must NOT be a (required) spec
+    # field; get/update/delete source it from status.number via the requestFieldMapping below.
+    # Same shape as PullRequest's pull_number.
+    excludedSpecFields:
+      - milestone_number
+    # DELIBERATE, and load-bearing rather than cosmetic: this kind HAS a create-only field.
+    #
+    # `due_on` is in the create body and NOT in the update body, because GitHub decides its
+    # response value for itself — it keeps the day, discards the time, and re-times it to
+    # midnight in the timezone of the account that owns the token before echoing it back in
+    # UTC. No value a CR can carry reliably equals what GET returns (for a positive UTC offset
+    # not even the DATE survives: an Europe/Rome token writing 2026-12-31 gets back
+    # 2026-12-30T23:00:00Z). assets/milestone.yaml carries the measurements.
+    #
+    # `updatable` compares exactly what the PATCH body can send — title, state, description —
+    # each of which GitHub echoes back verbatim and each of which is a property of the GET
+    # response, so every difference is both detectable and fixable and the reconcile converges.
+    #
+    # `fullSpec` would be wrong here, and not in a subtle way: it compares every spec field, so
+    # `due_on` would join the comparison and never match, and the controller would PATCH the
+    # milestone on every single reconcile, forever, against a 5000 req/hr budget — a PATCH that
+    # "succeeds" each time, since GitHub does store the right day, and therefore never
+    # self-corrects. `identifiersAndStatus` would dodge that too, but it would also stop
+    # comparing title, state and description, which are the fields this kind exists to manage.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/milestones
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/milestones/{milestone_number}
+        requestFieldMapping:
+          - inPath: milestone_number
+            inCustomResource: status.number
+      - action: update
+        method: PATCH
+        path: /repos/{owner}/{repo}/milestones/{milestone_number}
+        requestFieldMapping:
+          - inPath: milestone_number
+            inCustomResource: status.number
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/milestones/{milestone_number}
+        requestFieldMapping:
+          - inPath: milestone_number
+            inCustomResource: status.number

@@ -1,0 +1,21 @@
+# Turn bare ticket references in issues, PRs and commit messages into links to the tracker:
+# writing "TICKET-1234" anywhere in this repository renders as a link to the Jira issue.
+#
+# An autolink is immutable — to change the prefix or the template, delete this CR and create a
+# new one.
+apiVersion: github.krateo.io/v1alpha1
+kind: Autolink
+metadata:
+  name: test-demo-destination-jira
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  key_prefix: "TICKET-"
+  # <num> is substituted with whatever followed the prefix.
+  url_template: "https://jira.example.com/browse/TICKET-<num>"
+  is_alphanumeric: true

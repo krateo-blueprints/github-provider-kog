@@ -1,0 +1,25 @@
+# Cut a release on an existing repository.
+#
+# `tag_name` is the only required field: if the tag does not exist yet GitHub creates it
+# from `target_commitish` (a branch or SHA), and if it does exist target_commitish is
+# ignored. Editing name/body/draft/prerelease on this CR IS reconciled — the RestDefinition
+# uses compareScope `updatable`, so those fields are compared against GitHub and PATCHed
+# back. `generate_release_notes` is create-only and is not compared.
+apiVersion: github.krateo.io/v1alpha1
+kind: Release
+metadata:
+  name: test-demo-release
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  tag_name: "1.0.0"
+  target_commitish: main
+  name: "1.0.0"
+  body: "First packaged release of the demo blueprint."
+  draft: false
+  prerelease: false

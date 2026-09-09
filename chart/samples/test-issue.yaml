@@ -1,0 +1,34 @@
+# File an issue in the destination repository — e.g. the follow-up work a blueprint leaves behind.
+#
+# GitHub assigns the issue NUMBER on create; it lands on `status.number`, and the get and update
+# calls address the issue through it (there is no issue_number field to set here).
+#
+# `labels`, `assignees` and `milestone` are sent ONLY on create and are not reconciled
+# afterwards: GitHub returns them as objects rather than in the string/number form it accepts,
+# so comparing them could only produce an update that changes nothing (see assets/issue.yaml).
+# `milestone` takes a Milestone CR's status.number, not its title.
+#
+# There is no delete: GitHub's REST API cannot delete an issue. Deleting this CR just stops
+# Krateo tracking it. To close the issue, set `state: closed` (with an optional `state_reason`)
+# and let the update run.
+apiVersion: github.krateo.io/v1alpha1
+kind: Issue
+metadata:
+  name: test-demo-issue
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  title: "Review the generated blueprint chart"
+  body: "Authored by Krateo. Check values.schema.json before the first release tag."
+  labels:
+    - krateo/blueprint
+  # assignees:
+  #   - octocat
+  # milestone: 1          # a Milestone CR's status.number
+  # state: closed         # set to close the issue; POST always opens it
+  # state_reason: completed

@@ -1,0 +1,27 @@
+# Grant the team write access to a repository it does not own.
+#
+# Order matters: both the Team and the Repository must exist first — GitHub 422s an attempt to add a
+# repository the organization does not own, and 404s an unknown team slug.
+#
+# `org` and `owner` hold the same value here and are still two fields: `org` scopes the TEAM, `owner`
+# the REPOSITORY. GitHub allows a team to be granted access to a direct fork owned outside the org,
+# and the endpoint's path carries both, so they cannot be collapsed into one.
+apiVersion: github.krateo.io/v1alpha1
+kind: TeamRepo
+metadata:
+  name: test-platform-engineering-demo-destination
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  org: krateo-blueprints
+  # The team's SLUG, not its display name — see status.slug on the Team CR.
+  team_slug: platform-engineering
+  owner: krateo-blueprints
+  repo: demo-destination
+  # One of pull | triage | push | maintain | admin. Custom organization repository roles are not
+  # accepted: GitHub does not report them in a form the reconciler could compare, so allowing one
+  # would mean re-granting it on every reconcile forever.
+  permission: push

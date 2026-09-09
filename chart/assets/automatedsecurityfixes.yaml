@@ -1,0 +1,85 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Automated Security Fixes
+servers:
+  - url: https://api.github.com
+paths:
+  # Dependabot security updates (the "automated security fixes" toggle) for one repository.
+  #
+  # A SINGLETON TOGGLE: no id, no request body anywhere, the (owner, repo) pair is the key and the
+  # same two CR fields serve all three verbs. The resource's whole desired state is its existence —
+  # the CR says "Dependabot opens security-fix PRs on this repo", create switches that on, deleting
+  # the CR switches it off.
+  #
+  # Unlike the sibling vulnerability-alerts toggle, this one has a GET that RETURNS A BODY, which
+  # is what makes it expressible at all: there is something to populate status from, and something
+  # for the drift predicate to read.
+  "/repos/{owner}/{repo}/automated-security-fixes":
+    put:
+      summary: Enable automated security fixes
+      operationId: repos/enable-automated-security-fixes
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      responses:
+        '204':
+          description: Response
+    get:
+      summary: Check if automated security fixes are enabled
+      operationId: repos/check-automated-security-fixes
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutomatedSecurityFixes'
+      # NOTE: GitHub documents a 404 for "Dependabot is not enabled", but a live probe of a repo
+      # with the feature switched OFF answers 200 {"enabled": false, "paused": false}. Both are
+      # handled — the 404 by the controller's own not-found path, the 200-with-false by the get
+      # verb's notFoundBody predicate in rd-automatedsecurityfixes.yaml — because the 200 case is
+      # the one that would otherwise report a disabled repository as healthy forever.
+    delete:
+      summary: Disable automated security fixes
+      operationId: repos/disable-automated-security-fixes
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    AutomatedSecurityFixes:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        # Dependabot pauses security updates on a repository nobody has merged its PRs in for a
+        # long while. That is a GitHub-side state the enable endpoint does not clear, so it is
+        # reported on status and never reconciled against.
+        paused:
+          type: boolean
+security:
+  - accessToken: []

@@ -1,0 +1,53 @@
+# The same protection, applied org-wide instead of per repository: every repository's default
+# branch requires a signed, reviewed PR, with two repositories carved out.
+#
+# The org-level `conditions` must say WHICH repositories it applies to as well as which refs.
+# Only the repository_name targeting style is modelled — `~ALL` plus fnmatch patterns; targeting
+# by repository id or by org custom property is not expressible here (see assets/orgruleset.yaml).
+#
+# `parameters` is a UNION keyed by `type`; set only the keys belonging to that rule type — and
+# all of that type's required keys, which the CRD cannot enforce (see assets/orgruleset.yaml). Keep
+# `rules` and `bypass_actors` in a stable order — array comparison is order-sensitive.
+#
+# There is no ruleset_id field: GitHub assigns it on create and the provider carries it in
+# status.id, from where get/update/delete bind the path.
+apiVersion: github.krateo.io/v1alpha1
+kind: OrgRuleset
+metadata:
+  name: test-demo-org-protect-main
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  org: krateo-blueprints
+  name: org-protect-default-branch
+  target: branch
+  enforcement: active
+  bypass_actors:
+    - actor_type: OrganizationAdmin
+      bypass_mode: always
+  conditions:
+    ref_name:
+      include:
+        - "~DEFAULT_BRANCH"
+    repository_name:
+      include:
+        - "~ALL"
+      exclude:
+        - ".github"
+        - "sandbox-*"
+  rules:
+    - type: non_fast_forward
+    - type: deletion
+    - type: required_signatures
+    # Once `parameters` is present on a pull_request rule, GitHub requires ALL FIVE of the
+    # keys below together and defaults none of them: a partial object is a 422.
+    - type: pull_request
+      parameters:
+        required_approving_review_count: 1
+        dismiss_stale_reviews_on_push: true
+        require_code_owner_review: false
+        require_last_push_approval: false
+        required_review_thread_resolution: true

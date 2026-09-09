@@ -1,0 +1,196 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Repository collaborators
+servers:
+  - url: https://api.github.com
+paths:
+  # CREATE and UPDATE are the SAME call. GitHub is explicit about it (repos/add-collaborator):
+  # "The endpoint can also be used to change the permissions of an existing collaborator without
+  # first removing and re-adding the collaborator. To change the permissions, use the same endpoint
+  # and pass a different `permission` parameter." So there is no separate update endpoint to model,
+  # and PUT is declared twice below only because a RestDefinition names create and update separately.
+  #
+  # The path parameter is called `login`, not GitHub's `username`, ON PURPOSE. The observe verb is a
+  # findby over /repos/{owner}/{repo}/collaborators, whose items carry the user under the key
+  # `login`; `identifiers: [login]` matches the CR field against that key. Naming the path parameter
+  # `username` would give the CRD two fields for one value that the author had to keep in sync.
+  # GitHub never sees the placeholder name — only the substituted value.
+  "/repos/{owner}/{repo}/collaborators/{login}":
+    put:
+      summary: Add a repository collaborator (also updates an existing one's permission)
+      operationId: repos/add-collaborator
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/login'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                # Required here although GitHub's own body marks it optional (defaulting to `push`).
+                # compareScope: updatable projects the spec down to the update body's fields, and
+                # projectSpecFields SKIPS a path absent from spec — so an unset `permission` would
+                # make the comparison set empty and the grant would silently never be reconciled.
+                # Requiring it keeps the CR's intent explicit and drift detection meaningful.
+                - permission
+              properties:
+                permission:
+                  type: string
+                  # Deliberately NOT an enum. GitHub accepts pull, triage, push, maintain, admin AND
+                  # any custom repository role name the owning organization has defined; an enum
+                  # would reject those. The observed side is normalized back into this vocabulary by
+                  # the findby fieldMapping in rd-collaborator.yaml.
+                  description: >-
+                    pull, triage, push, maintain, admin, or the name of a custom repository role
+                    defined by the owning organization.
+      responses:
+        # An organization member added to an organization repository becomes a collaborator
+        # immediately and GitHub answers 204 with no body.
+        '204':
+          description: The user is now a collaborator
+        # A user who is NOT an organization member cannot be added directly: GitHub creates a repo
+        # INVITATION and answers 201 with the invitation. The invitation is a different resource,
+        # living at /repos/{owner}/{repo}/invitations, and the user does not become a collaborator
+        # until they accept. See the honest note about this state in rd-collaborator.yaml.
+        '201':
+          description: An invitation was created (the user is not a collaborator yet)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryInvitation'
+    delete:
+      summary: Remove a repository collaborator
+      operationId: repos/remove-collaborator
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/login'
+      responses:
+        '204':
+          description: Response
+  # OBSERVE. GitHub's obvious candidates both fail:
+  #
+  #   GET /repos/{owner}/{repo}/collaborators/{username}          -> 204 / 404, NO BODY. There is
+  #       nothing to populate status from or to compare, so it cannot be an observe verb.
+  #   GET /repos/{owner}/{repo}/collaborators/{username}/permission -> 200 with a body, but it
+  #       reports the user's EFFECTIVE permission: 200 + permission "read" for a plain non-member on
+  #       a public repo, and 200 + the org base permission for any org member. Observe would report
+  #       "exists, up to date" for a user who has no repository-level grant at all, and the PUT would
+  #       silently never fire. Verified live: octocat on a public repo returns
+  #       {"permission":"read","role_name":"read"} while holding no grant on it.
+  #
+  # The list endpoint filtered to affiliation=direct is the only one that reports the resource this
+  # CR actually owns — the repository-level grant. Verified live on an org repo whose three members
+  # have admin through the organization: affiliation=all returns 3, affiliation=direct returns 0.
+  "/repos/{owner}/{repo}/collaborators":
+    get:
+      summary: List repository collaborators
+      operationId: repos/list-collaborators
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        # affiliation and per_page are pinned by the verb's static `queries` in rd-collaborator.yaml
+        # and removed from the CRD via excludedSpecFields, so they are not user-settable: letting a
+        # user set affiliation=all would reintroduce exactly the false-exists bug described above.
+        # They are declared here because this document must describe the call that is actually made.
+        - $ref: '#/components/parameters/affiliation'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Collaborator'
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    login:
+      name: login
+      in: path
+      required: true
+      schema:
+        type: string
+    affiliation:
+      name: affiliation
+      in: query
+      required: false
+      schema:
+        type: string
+        enum:
+          - outside
+          - direct
+          - all
+        default: all
+    per_page:
+      name: per_page
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 30
+  schemas:
+    # One item of the affiliation=direct list. `permissions` (an object of booleans) is deliberately
+    # NOT modelled: it duplicates role_name, and the create response uses the same key for a STRING,
+    # which would make oasgen's create-vs-observe schema comparison fail on a type mismatch.
+    Collaborator:
+      type: object
+      properties:
+        login:
+          type: string
+        id:
+          type: integer
+        node_id:
+          type: string
+        html_url:
+          type: string
+        # The role GitHub reports. Two things to know about it, both from GitHub's own docs:
+        #  - it uses the DISPLAY vocabulary (read / triage / write / maintain / admin), not the PUT
+        #    body's (pull / triage / push / maintain / admin). rd-collaborator.yaml aliases the two
+        #    ends that differ, or spec.permission "push" would read as permanent drift against "write".
+        #  - it is "the highest role assigned to the collaborator after considering all sources of
+        #    grants, including: repo, teams, organization, and enterprise", and GitHub states there is
+        #    "presently not a way to differentiate between an organization level grant and a
+        #    repository level grant from this endpoint response". That second point has a cost the
+        #    alias cannot pay: where the effective role EXCEEDS spec.permission, observe can never
+        #    agree with the spec and the resource updates on every reconcile. See the residual drift
+        #    loop documented at compareScope in rd-collaborator.yaml.
+        role_name:
+          type: string
+    # The 201 body. Only enough of it is modelled to document what comes back and to give oasgen a
+    # create response schema to validate against the observe one; none of these reach status (see
+    # additionalStatusFields in rd-collaborator.yaml for why).
+    RepositoryInvitation:
+      type: object
+      properties:
+        id:
+          type: integer
+        html_url:
+          type: string
+        expired:
+          type: boolean
+        created_at:
+          type: string
+security:
+  - accessToken: []

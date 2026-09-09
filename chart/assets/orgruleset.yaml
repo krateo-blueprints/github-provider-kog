@@ -1,0 +1,392 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Organization Rulesets
+servers:
+  - url: https://api.github.com
+paths:
+  # The org-level twin of assets/reporuleset.yaml. Same body, same response, same server-assigned
+  # id; the two differences are the scope (`org` instead of `owner`/`repo`) and the conditions,
+  # which here must also choose WHICH repositories the ruleset applies to.
+  "/orgs/{org}/rulesets":
+    post:
+      summary: Create an organization repository ruleset
+      operationId: repos/create-org-ruleset
+      parameters:
+        - $ref: '#/components/parameters/org'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - enforcement
+              properties:
+                name:
+                  type: string
+                target:
+                  type: string
+                  enum:
+                    - branch
+                    - tag
+                    - push
+                  default: branch
+                # `evaluate` (dry-run) is GitHub Enterprise only; elsewhere GitHub 422s.
+                enforcement:
+                  type: string
+                  enum:
+                    - disabled
+                    - active
+                    - evaluate
+                bypass_actors:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/BypassActor'
+                conditions:
+                  $ref: '#/components/schemas/Conditions'
+                rules:
+                  $ref: '#/components/schemas/Rules'
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ruleset'
+  # ruleset_id is assigned by GitHub on create. It is excluded from the spec and bound from
+  # status.id by requestFieldMapping (see rd-orgruleset.yaml).
+  "/orgs/{org}/rulesets/{ruleset_id}":
+    get:
+      summary: Get an organization repository ruleset
+      operationId: repos/get-org-ruleset
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/ruleset_id'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ruleset'
+    put:
+      summary: Update an organization repository ruleset
+      operationId: repos/update-org-ruleset
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/ruleset_id'
+      # The SAME property set as create, with nothing required — GitHub keeps whatever the body
+      # omits. Every create field is therefore updatable and this resource has no create-only
+      # field, which is what makes compareScope: updatable a pure tightening here rather than a
+      # rescue (see rd-orgruleset.yaml).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                target:
+                  type: string
+                  enum:
+                    - branch
+                    - tag
+                    - push
+                enforcement:
+                  type: string
+                  enum:
+                    - disabled
+                    - active
+                    - evaluate
+                bypass_actors:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/BypassActor'
+                conditions:
+                  $ref: '#/components/schemas/Conditions'
+                rules:
+                  $ref: '#/components/schemas/Rules'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ruleset'
+    delete:
+      summary: Delete an organization repository ruleset
+      operationId: repos/delete-org-ruleset
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/ruleset_id'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    org:
+      name: org
+      in: path
+      required: true
+      schema:
+        type: string
+    ruleset_id:
+      name: ruleset_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    # bypass_actors, conditions and rules are $ref'd rather than inlined twice: create and
+    # update take the identical structures, and `rules` alone is ~70 lines.
+    BypassActor:
+      type: object
+      required:
+        - actor_type
+      properties:
+        # Numeric id of the team / user / app / repository role. Omit it entirely for
+        # OrganizationAdmin and DeployKey, which take no id.
+        actor_id:
+          type: integer
+        actor_type:
+          type: string
+          enum:
+            - Integration
+            - OrganizationAdmin
+            - RepositoryRole
+            - Team
+            - DeployKey
+            - User
+        bypass_mode:
+          type: string
+          enum:
+            - always
+            - pull_request
+            - exempt
+          default: always
+    # Upstream this is a oneOf of three targeting styles — by repository NAME, by repository ID,
+    # or by repository PROPERTY — each allOf'd with the shared ref_name condition. oasgen-provider
+    # merges allOf but has no oneOf handling, so the union cannot be carried through to the CRD.
+    #
+    # Flattened to the repository_name variant ALONE, which is the one a declarative platform can
+    # actually write: names and `~ALL` are stable, human-authored values.
+    #   - repository_id     — dropped: it targets repositories by numeric id, which nothing in this
+    #                         provider can resolve, and which changes meaning if a repo is recreated.
+    #   - repository_property — dropped: it depends on org custom properties, a separate resource
+    #                         this chart does not model, so a CR referencing one could not be
+    #                         made self-consistent.
+    # Both remain settable through the GitHub UI; a ruleset created there with either targeting
+    # style is simply not manageable as an OrgRuleset CR.
+    Conditions:
+      type: object
+      properties:
+        ref_name:
+          type: object
+          properties:
+            # `~DEFAULT_BRANCH` and `~ALL` are the two magic values; anything else is an fnmatch
+            # pattern over full ref names (refs/heads/...).
+            include:
+              type: array
+              items:
+                type: string
+            exclude:
+              type: array
+              items:
+                type: string
+        repository_name:
+          type: object
+          properties:
+            # `~ALL` selects every repository in the org.
+            include:
+              type: array
+              items:
+                type: string
+            exclude:
+              type: array
+              items:
+                type: string
+            # Whether renaming a targeted repository is prevented.
+            protected:
+              type: boolean
+    # THE HARD TRIM — identical to assets/reporuleset.yaml, because GitHub uses the same
+    # `repository-rule` schema at both levels. Upstream, `rules` is an array whose items are a
+    # oneOf of 23 rule variants, each with its own `parameters` object. Two things make that
+    # unusable verbatim:
+    #
+    #   1. oasgen-provider has no oneOf/anyOf handling at all (only allOf is merged), so a oneOf
+    #      item schema reaches the generated CRD with no usable shape.
+    #   2. Even flattened, several variants nest further unions — pull_request's
+    #      `dismissal_restriction.allowed_actors` and `required_reviewers[].reviewer` are both
+    #      actor unions of their own.
+    #
+    # So an item here is a flat {type, parameters} pair, and `parameters` is the UNION of the
+    # parameter sets of the rule types below, every key optional. Which keys are legal depends on
+    # `type`; GitHub 422s on a mismatch rather than ignoring it, which is the correct and loud
+    # failure. Set only the keys belonging to the type you chose.
+    #
+    # "every key optional" is a property of THIS union, not of GitHub. Flattening the oneOf drops
+    # each variant's own `required` list, so the CRD cannot enforce it: a PARTIAL `parameters`
+    # object passes admission and is then rejected by the API. Once `parameters` is present, send
+    # the complete set for that type —
+    #   pull_request           required_approving_review_count, dismiss_stale_reviews_on_push,
+    #                          require_code_owner_review, require_last_push_approval,
+    #                          required_review_thread_resolution  (all five; allowed_merge_methods
+    #                          is the only optional extra)
+    #   required_status_checks required_status_checks, strict_required_status_checks_policy
+    #                          (do_not_enforce_on_create is optional)
+    #   update                 update_allows_fetch_and_merge
+    #   required_deployments   required_deployment_environments
+    # The parameterless types — creation, deletion, non_fast_forward, required_linear_history,
+    # required_signatures — take no `parameters` key at all.
+    #
+    # MODELLED (the branch-protection replacement set — what a platform team actually writes):
+    #   creation, deletion, update, non_fast_forward, required_linear_history,
+    #   required_signatures, pull_request, required_status_checks, required_deployments.
+    #
+    # LEFT OUT, and why:
+    #   merge_queue                     — seven co-required parameters, all of which GitHub
+    #                                     requires together, for a feature configured per-repo in
+    #                                     the UI far more often than declaratively.
+    #   commit_message_pattern,         — five near-identical {name, negate, operator, pattern}
+    #   commit_author_email_pattern,      rules. Cheap to add later; omitted now because their
+    #   committer_email_pattern,          `name`/`pattern` keys would read as the ruleset's own
+    #   branch_name_pattern,              name inside a union `parameters` object.
+    #   tag_name_pattern
+    #   workflows, code_scanning,       — reference other GitHub products by identifiers this
+    #   license_compliance_scanning,      provider cannot resolve (Actions workflow files keyed by
+    #   copilot_code_review               repository_id + path, code-scanning tool names, Copilot).
+    #                                     Hand-copying a repository_id into a CR is the wrong
+    #                                     shape for a KOG kind.
+    #   file_path_restriction,          — push-target rules (target: push), GitHub Enterprise
+    #   max_file_path_length,             Cloud only. Out of scope for a provider that must work
+    #   file_extension_restriction,       on any plan.
+    #   max_file_size
+    #
+    #   pull_request.dismissal_restriction and pull_request.required_reviewers are dropped for
+    #   reason (2) above; required_reviewers is additionally still in beta upstream.
+    Rules:
+      type: array
+      items:
+        type: object
+        required:
+          - type
+        properties:
+          type:
+            type: string
+            enum:
+              - creation
+              - update
+              - deletion
+              - non_fast_forward
+              - required_linear_history
+              - required_signatures
+              - pull_request
+              - required_status_checks
+              - required_deployments
+          parameters:
+            type: object
+            properties:
+              # type: update
+              update_allows_fetch_and_merge:
+                type: boolean
+              # type: pull_request
+              required_approving_review_count:
+                type: integer
+              dismiss_stale_reviews_on_push:
+                type: boolean
+              require_code_owner_review:
+                type: boolean
+              require_last_push_approval:
+                type: boolean
+              required_review_thread_resolution:
+                type: boolean
+              allowed_merge_methods:
+                type: array
+                items:
+                  type: string
+                  enum:
+                    - merge
+                    - squash
+                    - rebase
+              # type: required_status_checks
+              strict_required_status_checks_policy:
+                type: boolean
+              do_not_enforce_on_create:
+                type: boolean
+              required_status_checks:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - context
+                  properties:
+                    # The check's name as it appears on a commit, e.g. "security / sbom".
+                    context:
+                      type: string
+                    integration_id:
+                      type: integer
+              # type: required_deployments
+              required_deployment_environments:
+                type: array
+                items:
+                  type: string
+    # Response schema. It carries the fields the status is built from and nothing else: drift
+    # comparison reads the LIVE response body, never this schema, so `rules`, `conditions` and
+    # `bypass_actors` need no response-side declaration and are not duplicated here.
+    Ruleset:
+      type: object
+      properties:
+        id:
+          type: integer
+        node_id:
+          type: string
+        name:
+          type: string
+        target:
+          type: string
+          # `repository` appears HERE but not in the request enums above, and — unlike the
+          # repo-level twin, where GitHub genuinely rejects it on the request — that is a
+          # deliberate trim, not an API limit: POST/PUT /orgs/{org}/rulesets DO accept
+          # `target: repository` (a repository-policy ruleset, which governs repo creation and
+          # naming rather than refs). It is not offered because such a ruleset has a different
+          # shape end to end — its rules are repository-property rules, none of which are
+          # modelled below, and its `conditions` must NOT carry `ref_name`. Exposing the value
+          # without that shape would only let a user assemble a ruleset GitHub rejects.
+          #
+          # It MUST still be listed here — status.target takes its schema from this property,
+          # and an enum that cannot hold what GitHub returns would make the status write fail.
+          enum:
+            - branch
+            - tag
+            - push
+            - repository
+        # Always `Organization` for this kind; kept for symmetry with RepoRuleset, where the same
+        # endpoint shape can also report an inherited ruleset.
+        source_type:
+          type: string
+          enum:
+            - Repository
+            - Organization
+            - Enterprise
+        source:
+          type: string
+        enforcement:
+          type: string
+          enum:
+            - disabled
+            - active
+            - evaluate
+        created_at:
+          type: string
+        updated_at:
+          type: string
+security:
+  - accessToken: []

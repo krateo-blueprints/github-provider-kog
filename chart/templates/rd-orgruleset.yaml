@@ -1,0 +1,55 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-orgruleset
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-orgruleset/orgruleset.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: OrgRuleset
+    # As with RepoRuleset: `name` is not unique, so the server-assigned id is the only identity.
+    # It is a property of the GET response schema and binds the item path.
+    identifiers:
+      - id
+    additionalStatusFields:
+      - node_id
+      - name
+      - target
+      - source_type
+      - source
+      - enforcement
+      - created_at
+      - updated_at
+    # ruleset_id is assigned by GitHub on create, so it must NOT be a (required) spec field;
+    # get/update/delete source it from status.id via the requestFieldMapping below.
+    excludedSpecFields:
+      - ruleset_id
+    compareScope: updatable
+    # ^ Same reasoning as rd-reporuleset.yaml: the update body carries every create field, so
+    # this is a tightening rather than a rescue. It keeps the `org` path parameter out of the
+    # drift comparison by construction, and the array-ordering caveat there applies here too —
+    # `rules` and `bypass_actors` are compared element-by-element in order.
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /orgs/{org}/rulesets
+      - action: get
+        method: GET
+        path: /orgs/{org}/rulesets/{ruleset_id}
+        requestFieldMapping:
+          - inPath: ruleset_id
+            inCustomResource: status.id
+      - action: update
+        method: PUT
+        path: /orgs/{org}/rulesets/{ruleset_id}
+        requestFieldMapping:
+          - inPath: ruleset_id
+            inCustomResource: status.id
+      - action: delete
+        method: DELETE
+        path: /orgs/{org}/rulesets/{ruleset_id}
+        requestFieldMapping:
+          - inPath: ruleset_id
+            inCustomResource: status.id

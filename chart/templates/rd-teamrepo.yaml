@@ -1,0 +1,84 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-teamrepo
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-teamrepo/teamrepo.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: TeamRepo
+    # The observe response is the REPOSITORY object, so the only response property that identifies
+    # this grant is the repository half of it. `full_name` ("org/repo") is the legible form.
+    identifiers:
+      - full_name
+    additionalStatusFields:
+      - id
+      - html_url
+      # GitHub's own name for what it granted, in ITS vocabulary (a `pull` grant reads back as
+      # "read", a `push` grant as "write"). Reported as-is rather than translated, so the status
+      # shows what GitHub says, not what the CR asked for.
+      - role_name
+    # The one non-obvious file in this kind, and the reason it needs no proxy plugin.
+    #
+    # `fullSpec` is not merely imprecise here, it is BROKEN: the observed body is a repository, whose
+    # `owner` is a user OBJECT, while spec.owner is a STRING. The two can never compare equal, so the
+    # controller would read permanent drift and PUT on every reconcile, forever. Trimming `owner` out
+    # of the OAS response schema does not help — the comparison runs against the raw response body,
+    # not a schema-filtered projection of it.
+    #
+    # `updatable` narrows the comparison to exactly what the PUT body can express: `permission`. That
+    # alone is not enough, though — `permission` is not a key of a repository object, and a spec key
+    # absent from the response is SKIPPED by the comparison, which would leave the grant silently
+    # unmanaged (never drifting, never re-applied). The get verb's responseTransform below closes
+    # that gap by deriving `permission` from the observed `permissions` booleans, before status
+    # population and drift comparison. Only then is the permission the CR sets genuinely observable.
+    #
+    # `identifiersAndStatus` was rejected for the mirror-image reason: it projects the SPEC down to
+    # identifiers + additionalStatusFields, and none of full_name/id/html_url/role_name is a spec
+    # field here, so the projected set would be EMPTY. `permission` — the one field this kind exists
+    # to set — would never be compared, and the grant would read as up to date whatever role it
+    # actually holds. (rd-deployment.yaml relies on that emptiness deliberately; here it is a bug.)
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      # PUT is create-or-update, so create and update are the same call — the same shape RepoContent
+      # uses. There is no separate create endpoint to reconcile against.
+      - action: create
+        method: PUT
+        path: /orgs/{org}/teams/{team_slug}/repos/{owner}/{repo}
+      - action: update
+        method: PUT
+        path: /orgs/{org}/teams/{team_slug}/repos/{owner}/{repo}
+      - action: get
+        method: GET
+        path: /orgs/{org}/teams/{team_slug}/repos/{owner}/{repo}
+        # Without this header GitHub answers 204 No Content and there is nothing to observe. With it
+        # the same endpoint returns 200 + the repository object carrying the team's `permissions`.
+        # This is precisely the job the upstream chart hands to a proxy plugin; a static per-verb
+        # header does it natively. Verified live against api.github.com.
+        headers:
+          - name: Accept
+            value: application/vnd.github.v3.repository+json
+        # Derive the CR-domain `permission` from the observed grant. The `permissions` booleans are
+        # cumulative (an `admin` grant sets all five), so the HIGHEST true flag is the effective
+        # level — and those five names are exactly the PUT body's vocabulary, which is why this
+        # reads them rather than `role_name` ("read"/"write"/...). Response-direction jq, which is
+        # implemented; a request-direction jq valueMapping would not be.
+        #
+        # The floor is `pull` and not null: this endpoint only answers 200 when the team HAS some
+        # permission (no permission is a 404), so "200 with every flag false" is not a reachable
+        # state, and a null would compare unequal to every legal spec value.
+        responseTransform:
+          inline: |
+            . + { permission: (
+              if   .permissions.admin    then "admin"
+              elif .permissions.maintain then "maintain"
+              elif .permissions.push     then "push"
+              elif .permissions.triage   then "triage"
+              else "pull"
+              end
+            ) }
+      - action: delete
+        method: DELETE
+        path: /orgs/{org}/teams/{team_slug}/repos/{owner}/{repo}

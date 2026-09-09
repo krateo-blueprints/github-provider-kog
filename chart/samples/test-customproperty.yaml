@@ -1,0 +1,26 @@
+# Define an org-wide custom property every repository must classify itself with.
+#
+# PUT is an upsert, so create and update are the same call: editing `allowed_values`,
+# `required` or `default_value` on this CR is reconciled straight back onto the definition.
+# Removing the CR removes the definition AND the values set on every repository in the org.
+apiVersion: github.krateo.io/v1alpha1
+kind: CustomProperty
+metadata:
+  name: test-demo-tier
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  org: krateo-blueprints
+  property_name: service-tier
+  value_type: single_select
+  description: "Operational tier of the service this repository holds"
+  allowed_values:
+    - tier-1
+    - tier-2
+    - tier-3
+  default_value: tier-3
+  required: true
+  values_editable_by: org_actors

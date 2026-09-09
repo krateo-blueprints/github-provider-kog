@@ -1,0 +1,29 @@
+# Grant a user push access to a repository.
+#
+# The happy path is an ORGANIZATION MEMBER on an organization repository: GitHub adds them directly
+# (204), they appear in the affiliation=direct list at once, and the CR reaches Ready on the first
+# reconcile. A user who is NOT an organization member cannot be added directly — GitHub creates a
+# repository invitation instead, and they do not become a collaborator until they accept, so such a
+# CR stays not-Ready until then (see rd-collaborator.yaml).
+#
+# `permission` takes GitHub's PUT vocabulary — pull, triage, push, maintain, admin, or a custom
+# repository role name — not the read/write names shown in the UI. status.role_name reports back what
+# GitHub actually computes, which can be HIGHER than this if a team or organization grant exceeds it.
+# When it IS higher the CR never settles: GitHub offers no way to read the repository-level grant on
+# its own, so observe keeps reporting the higher role and the controller re-issues the PUT every
+# reconcile. Ask for a permission at or above what the user already holds through the organization or
+# a team — do not use this kind to grant an org owner less than owner.
+apiVersion: github.krateo.io/v1alpha1
+kind: Collaborator
+metadata:
+  name: test-demo-collaborator
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  login: octocat
+  permission: push

@@ -1,0 +1,139 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Actions Variables (environment)
+servers:
+  - url: https://api.github.com
+paths:
+  # The environment-scoped twin of ActionsVariableRepo: identical {name, value} shape, one
+  # extra path parameter. The environment must already exist — GitHub 404s the create
+  # otherwise, and this kind deliberately does not create it (that is a different resource).
+  "/repos/{owner}/{repo}/environments/{environment_name}/variables":
+    post:
+      summary: Create an environment variable
+      operationId: actions/create-environment-variable
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/environment_name'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - value
+              properties:
+                # `name` is BOTH the create-body field and the {name} path parameter of the item
+                # endpoints below, so one CR field serves every verb.
+                name:
+                  type: string
+                value:
+                  type: string
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                # Empty object — GitHub echoes nothing on create. Fine: the identifier (`name`)
+                # is a caller-supplied spec field, so the first Observe can address the item.
+                type: object
+  "/repos/{owner}/{repo}/environments/{environment_name}/variables/{name}":
+    get:
+      summary: Get an environment variable
+      operationId: actions/get-environment-variable
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/environment_name'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionsVariable'
+    patch:
+      summary: Update an environment variable
+      operationId: actions/update-environment-variable
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/environment_name'
+        - $ref: '#/components/parameters/name'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                # `value` only, for the same reason as in actionsvariablerepo.yaml: the item is
+                # ADDRESSED by {name}, so a rename could never be observed, and keeping `name`
+                # out of the update body keeps it out of the `updatable` compare set.
+                value:
+                  type: string
+      responses:
+        '204':
+          description: Response
+    delete:
+      summary: Delete an environment variable
+      operationId: actions/delete-environment-variable
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/environment_name'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    # Environment names may contain characters that need escaping; GitHub decodes %2F and
+    # friends, so a multi-segment or spaced environment name is not a blocker.
+    environment_name:
+      name: environment_name
+      in: path
+      required: true
+      schema:
+        type: string
+    name:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    ActionsVariable:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+security:
+  - accessToken: []

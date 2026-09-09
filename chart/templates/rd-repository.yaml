@@ -20,25 +20,26 @@ spec:
       - clone_url
       - ssh_url
       - default_branch
-    # DELIBERATE, and the one non-obvious choice in this file.
+    # Compare only what the PATCH body can express.
     #
-    # Under the default `fullSpec`, Observe compares EVERY spec field against the GET response.
-    # Three fields in the create body — auto_init, gitignore_template, license_template — are
-    # create-only: GitHub accepts them on POST and never echoes them back on GET. Under fullSpec
-    # they read as permanent drift, and the controller would PATCH the repository on every single
-    # reconcile, forever, against an API with a 5000 req/hr budget.
+    # NOTE, because an earlier version of this comment said the opposite and the wrong reasoning
+    # was copied into several other kinds: the three create-only fields (auto_init,
+    # gitignore_template, license_template) do NOT cause a drift loop under the default fullSpec.
+    # GitHub never echoes them on GET, and the comparison SKIPS any spec key the response does not
+    # carry — `rmValue, ok := rm[key]; if !ok { continue }` in the controller's comparison
+    # (rest-dynamic-controller, internal/tools/comparison). An absent key contributes nothing.
     #
-    # `updatable` compares exactly the fields the PATCH body can express, derived from the OAS.
-    # That is the right set here: the three create-only fields drop out (the controller could not
-    # fix them anyway, so comparing them can only produce an update that changes nothing), while
-    # description, homepage, private, visibility, has_issues, has_wiki, has_projects,
-    # default_branch and archived stay compared and stay fixable.
+    # What DOES loop is a spec key the response DOES carry, in a different shape or a
+    # server-normalised value, that the update verb cannot fix — a spec string against a response
+    # object, or a timestamp the server re-writes. That is the case `updatable` exists for, and it
+    # is why several other kinds here genuinely need it (TeamRepo's owner, Issue's labels,
+    # Milestone's due_on, Collaborator's effective role).
     #
-    # This was `identifiersAndStatus` when first written, because `updatable` did not exist below
-    # oasgen-provider 0.23.0. That older setting compared only `name` plus the status fields, so
-    # editing `description` or `private` on an existing CR was silently never pushed. `updatable`
-    # removes that gap without reintroducing the create-only drift loop, so it strictly replaces
-    # it. It requires an update verb, which this resource has.
+    # For Repository specifically, `updatable` is therefore defensive rather than load-bearing:
+    # every spec field the GET echoes is also in the PATCH body, so it and fullSpec should agree
+    # today. It is kept because it states the intent explicitly and stays correct if a
+    # non-updatable field is ever added to the create body. It requires an update verb, which this
+    # resource has, and oasgen-provider >= 0.23.0.
     compareScope: updatable
     configurationFields: []
     verbsDescription:

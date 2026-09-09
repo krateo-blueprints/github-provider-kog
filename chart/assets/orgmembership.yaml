@@ -1,0 +1,122 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Organization membership
+servers:
+  - url: https://api.github.com
+paths:
+  # Every verb addresses the same URL with the same two path parameters, `org` and `username`, so no
+  # renaming is needed to make one pair of CR fields serve all four calls (contrast Repository, whose
+  # create path and item path disagree upstream, and Collaborator, whose observe is a list).
+  #
+  # CREATE and UPDATE are the SAME idempotent PUT: it sets the user's role, whether or not they are
+  # already a member. There is no separate update endpoint to model.
+  "/orgs/{org}/memberships/{username}":
+    put:
+      summary: Set organization membership for a user
+      operationId: orgs/set-membership-for-user
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/username'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                # Required here although GitHub's own body marks it optional (defaulting to `member`).
+                # compareScope: updatable projects the spec down to the update body's fields, and a
+                # path absent from spec is skipped — an unset `role` would leave the comparison set
+                # empty and the membership's role would silently never be reconciled.
+                - role
+              properties:
+                role:
+                  type: string
+                  # A real enum, unlike Collaborator's permission: PUT accepts only these two. The
+                  # GET response can additionally report `billing_manager`, which PUT cannot set;
+                  # a CR observing that value drifts and is corrected to the role it asks for.
+                  enum:
+                    - admin
+                    - member
+                  description: >-
+                    admin makes the user an organization owner; member makes them a non-owner member.
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgMembership'
+    # OBSERVE. Unlike a repository collaborator, an organization membership is a first-class GitHub
+    # resource with its own GET: it returns a body, and it returns 404 — verified live — for a user
+    # who is not a member, so absence needs no notFoundBody predicate and no proxy.
+    #
+    # It also observes the INVITED state natively. A PUT for a non-member creates an invitation, and
+    # GitHub models that as the same membership with state "pending" rather than as a separate
+    # resource, so the CR reaches Ready immediately with status.state = pending and flips to active
+    # when the user accepts. (A repository Collaborator has no equivalent: there the invitation IS a
+    # different resource at a different URL, which is why that kind cannot observe its pending state.)
+    get:
+      summary: Get organization membership for a user
+      operationId: orgs/get-membership-for-user
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/username'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgMembership'
+    delete:
+      summary: Remove organization membership for a user
+      operationId: orgs/remove-membership-for-user
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/username'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    org:
+      name: org
+      in: path
+      required: true
+      schema:
+        type: string
+    username:
+      name: username
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    OrgMembership:
+      type: object
+      properties:
+        # The membership's canonical URL, https://api.github.com/orgs/{org}/memberships/{username}.
+        # It is the only response field that identifies the membership itself: `org` and `username`
+        # live in the path and are not echoed in the body, and the user appears only nested under
+        # `user.login`. Used as the identifier.
+        url:
+          type: string
+        # pending until the user accepts the invitation, then active. The one field that tells a
+        # Krateo user whether the membership is real yet.
+        state:
+          type: string
+        role:
+          type: string
+        organization_url:
+          type: string
+        # Whether the membership is held directly rather than derived from an enterprise team.
+        direct_membership:
+          type: boolean
+security:
+  - accessToken: []

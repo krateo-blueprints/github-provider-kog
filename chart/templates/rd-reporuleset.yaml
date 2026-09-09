@@ -1,0 +1,67 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-reporuleset
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-reporuleset/reporuleset.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: RepoRuleset
+    # A ruleset has no natural key: GitHub allows two rulesets with the same `name` on the same
+    # repository, so only the server-assigned id identifies one. `id` is a property of the GET
+    # response schema and is what the item path is bound from.
+    identifiers:
+      - id
+    additionalStatusFields:
+      - node_id
+      - name
+      - target
+      - source_type
+      - source
+      - enforcement
+      - created_at
+      - updated_at
+    # ruleset_id is assigned by GitHub on create, so it must NOT be a (required) spec field;
+    # get/update/delete source it from status.id via the requestFieldMapping below.
+    excludedSpecFields:
+      - ruleset_id
+    compareScope: updatable
+    # ^ The update body carries every create field (name, target, enforcement, bypass_actors,
+    # conditions, rules), so `updatable` and `fullSpec` compare the same ruleset content
+    # today. `owner` and `repo` are not the difference between them: they are path parameters
+    # the response never carries, and the comparison SKIPS any spec key absent from the
+    # response (`rmValue, ok := rm[key]; if !ok { continue }`), under either scope. So this is
+    # defensive — it states the intent, and stays correct if a field the PUT cannot express is
+    # added to this OAS later.
+    #
+    # The genuine drift risk is the other kind, and no scope filters it out: `rules`,
+    # `bypass_actors` and `conditions.ref_name.include`/`exclude` are arrays the response DOES
+    # carry, and the comparator walks them BY INDEX. The same set returned in GitHub's own
+    # order reads as drift, and the PUT re-sends the CR's order without settling it — so list
+    # them in a stable order. Extra keys GitHub adds inside a rule's `parameters` (defaults it
+    # fills in, e.g. do_not_enforce_on_create) are ignored — the comparison only walks keys the
+    # CR declares — so a partially-specified rule does not read as drift.
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/rulesets
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/rulesets/{ruleset_id}
+        requestFieldMapping:
+          - inPath: ruleset_id
+            inCustomResource: status.id
+      - action: update
+        method: PUT
+        path: /repos/{owner}/{repo}/rulesets/{ruleset_id}
+        requestFieldMapping:
+          - inPath: ruleset_id
+            inCustomResource: status.id
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/rulesets/{ruleset_id}
+        requestFieldMapping:
+          - inPath: ruleset_id
+            inCustomResource: status.id

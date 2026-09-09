@@ -1,0 +1,179 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Releases
+servers:
+  - url: https://api.github.com
+paths:
+  # CREATE is collection-scoped; every other verb addresses the release by the id GitHub
+  # assigns on create. The two paths share `owner` and `repo`, so one pair of CR fields
+  # serves all four verbs (see rd-release.yaml for how release_id is sourced from status).
+  "/repos/{owner}/{repo}/releases":
+    post:
+      summary: Create a release
+      operationId: repos/create-release
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tag_name
+              properties:
+                tag_name:
+                  type: string
+                # Branch or commit SHA the tag is cut from. Unused when the tag already
+                # exists; omitted, GitHub uses the repository's default branch.
+                target_commitish:
+                  type: string
+                name:
+                  type: string
+                body:
+                  type: string
+                draft:
+                  type: boolean
+                prerelease:
+                  type: boolean
+                # CREATE-ONLY: PATCH has no equivalent, and GET never echoes it. It is safe
+                # to carry here ONLY because compareScope is `updatable` — the drift compare
+                # is derived from the PATCH body, which does not contain this field, so it is
+                # never compared and never loops. See rd-release.yaml.
+                generate_release_notes:
+                  type: boolean
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+  "/repos/{owner}/{repo}/releases/{release_id}":
+    get:
+      summary: Get a release
+      operationId: repos/get-release
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/release_id'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+    patch:
+      summary: Update a release
+      operationId: repos/update-release
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/release_id'
+      # This body defines the drift-compared field set (compareScope: updatable), so every
+      # field in it MUST also be a property of the Release response schema below.
+      # GitHub's real PATCH body additionally accepts `make_latest` and
+      # `discussion_category_name`; both are DELIBERATELY omitted because GET returns
+      # neither, so neither could ever be reconciled — setting one would be a write the
+      # controller can never confirm. (It would NOT loop: the comparison skips any spec key
+      # the response does not carry. Omitting them is about not promising what we cannot
+      # observe, not about avoiding drift.)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tag_name:
+                  type: string
+                target_commitish:
+                  type: string
+                name:
+                  type: string
+                body:
+                  type: string
+                draft:
+                  type: boolean
+                prerelease:
+                  type: boolean
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+    delete:
+      summary: Delete a release
+      operationId: repos/delete-release
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/release_id'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    # GitHub types this as an integer. It is declared a string here on purpose: the
+    # controller stringifies an identifier when it writes it to status, and this parameter
+    # is sourced from status.id (rd-release.yaml). Same choice as pullrequest.yaml's
+    # pull_number. A path parameter's value cannot be transformed, so the types must line up
+    # here rather than in a mapping.
+    release_id:
+      name: release_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Release:
+      type: object
+      properties:
+        id:
+          type: integer
+        node_id:
+          type: string
+        tag_name:
+          type: string
+        target_commitish:
+          type: string
+        name:
+          type: string
+        body:
+          type: string
+        draft:
+          type: boolean
+        prerelease:
+          type: boolean
+        html_url:
+          type: string
+        # The RFC 6570 template a client POSTs release assets to. Surfaced on status
+        # because it is what a downstream CI job actually needs.
+        upload_url:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+security:
+  - accessToken: []

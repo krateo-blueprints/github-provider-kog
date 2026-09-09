@@ -1,0 +1,80 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-deployment
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-deployment/deployment.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: Deployment
+    # Server-assigned id, as for Release and PullRequest.
+    identifiers:
+      - id
+    additionalStatusFields:
+      - node_id
+      # The commit the ref actually resolved to, and where a CI job posts progress.
+      - sha
+      - url
+      - statuses_url
+      # original_environment, NOT environment, and the choice matters under the compareScope
+      # below. identifiersAndStatus projects the SPEC down to identifiers +
+      # additionalStatusFields before comparing it with the response, so any entry here that
+      # is ALSO a spec field becomes the compared set. `environment` is a spec field, so
+      # listing it would make it the one and only thing compared — and this resource has no
+      # update verb, so a difference could never be fixed: the CR would sit
+      # ResourceUpToDate=false forever while Update logged "API action update not found".
+      # That difference is not hypothetical. GitHub's create-deployment-status body documents
+      # its `environment` as "Name for the target deployment environment, which can be changed
+      # when setting a deploy status" — a CI job reporting progress can rewrite the
+      # deployment's environment, which is exactly why GitHub also returns
+      # original_environment. original_environment is server-side only, never appears in the
+      # spec, and is therefore populated on status without entering the comparison. With it,
+      # the projected compared set is empty and the deployment is up-to-date for as long as
+      # it exists — which is the honest reading of an immutable record.
+      - original_environment
+      - created_at
+    excludedSpecFields:
+      - deployment_id
+    # DELIBERATE, and the opposite call from Release — because this resource has no update
+    # verb at all. GitHub's deployments API is create/read/delete: a deployment is an
+    # immutable historical record of "this ref was deployed to this environment", and there
+    # is no PATCH to change one after the fact.
+    #
+    # `updatable` is therefore unavailable (and rejected at admission: with no update verb the
+    # updatable field set is empty, so nothing would ever be compared) — the choice here was
+    # only ever between `fullSpec` and `identifiersAndStatus`.
+    #
+    # `fullSpec` is NOT safe here, though not because of auto_merge and required_contexts:
+    # those are create-time instructions the deployment object never echoes, and the
+    # comparison SKIPS any spec key the response does not carry (`rmValue, ok := rm[key];
+    # if !ok { continue }`), so they never enter it under any scope. The hazard is the fields
+    # the GET DOES echo and the spec also sets — ref, task, environment, description,
+    # transient_environment, production_environment. Any difference there is unfixable,
+    # because there is no update call for the controller to make; and `environment` is
+    # rewritten server-side (see above), so the difference is not hypothetical. Comparing
+    # them can only produce an update attempt that cannot succeed.
+    #
+    # `identifiersAndStatus` is the honest description of this resource: the only thing worth
+    # reconciling is "does the deployment this CR created still exist, and is it still the one
+    # we recorded". Everything else is create-only by the API's own design — which is exactly
+    # the narrow case this scope exists for. Changing a Deployment CR's spec is not an update;
+    # it is a request for a NEW deployment, and should be a new CR.
+    compareScope: identifiersAndStatus
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/deployments
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/deployments/{deployment_id}
+        requestFieldMapping:
+          - inPath: deployment_id
+            inCustomResource: status.id
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/deployments/{deployment_id}
+        requestFieldMapping:
+          - inPath: deployment_id
+            inCustomResource: status.id

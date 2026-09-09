@@ -1,0 +1,53 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-actionsvariableorg
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-actionsvariableorg/actionsvariableorg.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: ActionsVariableOrg
+    # The variable name distinguishes the resource within the organization; `org` scopes it and
+    # is a path param on every verb. `name` is a property of the GET response, so status
+    # populates.
+    identifiers:
+      - name
+    # Read-only server facts. selected_repositories_url is returned only when visibility is
+    # `selected`; surfacing it lets a caller inspect WHICH repositories were granted access
+    # without this kind having to model that sub-collection.
+    additionalStatusFields:
+      - created_at
+      - updated_at
+      - selected_repositories_url
+    # Same reasoning as rd-actionsvariablerepo: the field that genuinely loops is `name`.
+    #
+    # NOTE, correcting an earlier version of this comment: neither `org` (a path param) nor
+    # `selected_repository_ids` (accepted on POST, never echoed on GET — the read side gives only
+    # selected_repositories_url) can cause drift. The comparison SKIPS any spec key the response
+    # does not carry — `rmValue, ok := rm[key]; if !ok { continue }` in rest-dynamic-controller's
+    # internal/tools/comparison — under fullSpec as much as under any other scope.
+    #
+    # `name` is the one echoed spec field the PATCH cannot fix: GitHub returns it normalised
+    # (`my_var` created, `MY_VAR` read back), and it is trimmed from the update body for the
+    # rename reason documented in the asset. Echoed but unfixable is what would PATCH forever
+    # under fullSpec.
+    #
+    # `updatable` narrows the compare set to this asset's PATCH body — `value` + `visibility`,
+    # both properties of the GET response, so both detectable and fixable — and leaves `name`
+    # out. It requires an update verb; this resource has PATCH.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /orgs/{org}/actions/variables
+      - action: get
+        method: GET
+        path: /orgs/{org}/actions/variables/{name}
+      - action: update
+        method: PATCH
+        path: /orgs/{org}/actions/variables/{name}
+      - action: delete
+        method: DELETE
+        path: /orgs/{org}/actions/variables/{name}

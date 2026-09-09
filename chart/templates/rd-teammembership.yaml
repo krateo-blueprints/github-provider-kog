@@ -1,0 +1,45 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-teammembership
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-teammembership/teammembership.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: TeamMembership
+    # The response is only {url, role, state} — `username` never comes back — so `url` is the one
+    # response property that identifies the membership.
+    identifiers:
+      - url
+    additionalStatusFields:
+      - role
+      # `active` or `pending`: adding a user who is not yet an organization member creates a pending
+      # INVITATION, and this stays "pending" until they accept. Surfacing it is the only way an
+      # operator can tell a granted membership from an outstanding one.
+      - state
+    # `updatable` compares exactly what the PUT body can express — `role` — which is a property of
+    # the response and is fixable by the same call. Everything else in spec is addressing (org,
+    # team_slug, username), and `state` is observable but not settable, so neither belongs in a
+    # comparison that decides whether to issue an update.
+    #
+    # `fullSpec` would coincidentally agree today, since none of org/team_slug/username appears in
+    # the response body and an absent key is skipped. That is a property of this particular response
+    # shape rather than a guarantee, and it would silently start comparing `state` the day GitHub
+    # echoed something spec-shaped back. It requires an update verb, which this resource has (the
+    # PUT is create-or-update).
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: PUT
+        path: /orgs/{org}/teams/{team_slug}/memberships/{username}
+      - action: update
+        method: PUT
+        path: /orgs/{org}/teams/{team_slug}/memberships/{username}
+      - action: get
+        method: GET
+        path: /orgs/{org}/teams/{team_slug}/memberships/{username}
+      - action: delete
+        method: DELETE
+        path: /orgs/{org}/teams/{team_slug}/memberships/{username}

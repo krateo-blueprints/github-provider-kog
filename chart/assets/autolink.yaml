@@ -1,0 +1,121 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Autolink References
+servers:
+  - url: https://api.github.com
+paths:
+  # An autolink turns a bare reference in an issue, PR or commit message ("TICKET-1234") into a
+  # link to an external system. It is the smallest useful platform-engineering resource in this
+  # chart: three fields, no nesting.
+  #
+  # THERE IS NO UPDATE VERB — GitHub exposes only POST on the collection and GET/DELETE on the
+  # item; an autolink is immutable and changing one means delete + recreate. That shapes
+  # compareScope in rd-autolink.yaml, see the reasoning there.
+  "/repos/{owner}/{repo}/autolinks":
+    post:
+      summary: Create an autolink reference for a repository
+      operationId: repos/create-autolink
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - key_prefix
+                - url_template
+              properties:
+                # The literal prefix that triggers the link, e.g. "TICKET-".
+                key_prefix:
+                  type: string
+                # Must contain the token <num>, which GitHub substitutes with the matched
+                # reference, e.g. "https://jira.example.com/browse/TICKET-<num>".
+                url_template:
+                  type: string
+                # Whether <num> matches A-Z/0-9/- (true) or digits only (false). The default
+                # mirrors GitHub's OWN default, so the defaulted CR field equals what GET
+                # echoes and the drift comparison converges instead of flagging a field the
+                # author never set.
+                is_alphanumeric:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Autolink'
+  "/repos/{owner}/{repo}/autolinks/{autolink_id}":
+    get:
+      summary: Get an autolink reference of a repository
+      operationId: repos/get-autolink
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/autolink_id'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Autolink'
+    delete:
+      summary: Delete an autolink reference from a repository
+      operationId: repos/delete-autolink
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/autolink_id'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    # Server-assigned. Excluded from the spec in rd-autolink.yaml and sourced from status.id,
+    # the same pattern PullRequest uses for pull_number.
+    autolink_id:
+      name: autolink_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    # The response carries the whole resource: every create-body field comes back verbatim,
+    # which is what makes compareScope=fullSpec honest for this kind.
+    Autolink:
+      type: object
+      properties:
+        id:
+          type: integer
+        key_prefix:
+          type: string
+        url_template:
+          type: string
+        is_alphanumeric:
+          type: boolean
+        # updated_at is NOT surfaced: it is nullable, oasgen drops `nullable`, and a null would
+        # fail status validation on every reconcile.
+security:
+  - accessToken: []

@@ -1,0 +1,24 @@
+# Create the org team that will own the destination repositories.
+#
+# There is no `team_slug` field, on purpose: GitHub derives the team SLUG from `name`
+# ("Platform Engineering" -> "platform-engineering") and every item verb addresses the team by that
+# slug, so it is server-assigned and lands on status.slug after create. Name the team in already
+# slug-shaped form when other CRs will reference it, as here — a TeamRepo or TeamMembership CR
+# points at the team by SLUG, and reading that slug off `kubectl get team ... -o jsonpath=
+# '{.status.slug}'` is the only way to be certain of it for a name that is not.
+apiVersion: github.krateo.io/v1alpha1
+kind: Team
+metadata:
+  name: test-platform-engineering
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  org: krateo-blueprints
+  name: platform-engineering
+  description: "Platform engineering team, managed by Krateo"
+  # Visible to every member of the organization. `secret` (the default) is owners + team members.
+  privacy: closed
+  notification_setting: notifications_enabled

@@ -1,0 +1,32 @@
+# A release milestone to group the issues a blueprint files.
+#
+# GitHub assigns the milestone NUMBER on create; it lands on `status.number`, and the get,
+# update and delete calls address the milestone through it (there is no milestone_number field
+# to set here). Read it back with:
+#   kubectl get milestone test-demo-milestone -n krateo-system -o jsonpath='{.status.number}'
+# That number is also what an Issue CR's `spec.milestone` takes.
+#
+# `due_on` is SET ON CREATE ONLY. Editing it here later has no effect: GitHub keeps only the
+# day and re-times it to midnight in the timezone of the account behind the token, so what GET
+# returns is not what was written and comparing the two could only PATCH forever. It is
+# therefore left out of the update body on purpose. Only the date part below matters, and what
+# GitHub actually stored is readable with:
+#   kubectl get milestone test-demo-milestone -n krateo-system -o jsonpath='{.status.due_on}'
+# (an Europe/Rome token writing 2026-12-31 will show 2026-12-30T23:00:00Z — the right day, in
+# its own timezone). To move a due date, change it on GitHub or recreate the CR.
+apiVersion: github.krateo.io/v1alpha1
+kind: Milestone
+metadata:
+  name: test-demo-milestone
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  title: "v1.0"
+  description: "First cut of the demo blueprint"
+  state: open
+  due_on: "2026-12-31T00:00:00Z"

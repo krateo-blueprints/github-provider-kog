@@ -1,0 +1,165 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Deployment Branch Policies
+servers:
+  - url: https://api.github.com
+paths:
+  # A branch/tag name pattern allowed to deploy to one Environment. It only exists while its
+  # parent environment has deployment_branch_policy.custom_branch_policies = true; against an
+  # environment without it, the POST below returns 404 rather than a validation error. Order
+  # your CRs accordingly (Environment first).
+  "/repos/{owner}/{repo}/environments/{environment_name}/deployment-branch-policies":
+    post:
+      summary: Create a deployment branch policy
+      operationId: repos/create-deployment-branch-policy
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/environment_name'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                # The fnmatch pattern, e.g. `release/*` or `main`. Wildcards do not match `/`.
+                name:
+                  type: string
+                # CREATE-ONLY: the PUT below accepts `name` and nothing else, so a policy cannot
+                # be switched between branch and tag after creation. Defaulted by GitHub to
+                # `branch`. This asymmetry is the reason rd-deploymentbranchpolicy.yaml sets
+                # compareScope: updatable — see the note there.
+                type:
+                  type: string
+                  enum:
+                    - branch
+                    - tag
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentBranchPolicy'
+        # GitHub answers 303 when a policy with the same pattern already exists. That code is
+        # deliberately NOT declared, so it can never be taken for success: a 303 carries no body,
+        # so status.id would stay empty and every later GET/PUT/DELETE would be unaddressable.
+        #
+        # Do not read more guarantee into that than it carries. Whether the controller ever SEES
+        # the 303 depends on GitHub sending a Location header with it, which this endpoint's OAS
+        # does not declare. rest-dynamic-controller calls http.Client.Do under Go's DEFAULT
+        # redirect policy (it overrides CheckRedirect only inside its jq module), so a 303 that
+        # does carry a Location is followed as a GET and the create returns 200 with the
+        # PRE-EXISTING policy — the CR would adopt a resource it did not author and delete it on
+        # teardown. Without a Location, Go stops at the 303 and the undeclared status fails the
+        # create loudly, which is the intent. Either way the remedy is the same: own an
+        # environment's policies entirely from CRs, so a same-pattern collision cannot arise.
+  # branch_policy_id is assigned by GitHub on create. It is excluded from the spec and bound
+  # from status.id by requestFieldMapping (see rd-deploymentbranchpolicy.yaml), exactly as
+  # PullRequest binds pull_number from status.number.
+  "/repos/{owner}/{repo}/environments/{environment_name}/deployment-branch-policies/{branch_policy_id}":
+    get:
+      summary: Get a deployment branch policy
+      operationId: repos/get-deployment-branch-policy
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/environment_name'
+        - $ref: '#/components/parameters/branch_policy_id'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentBranchPolicy'
+    put:
+      summary: Update a deployment branch policy
+      operationId: repos/update-deployment-branch-policy
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/environment_name'
+        - $ref: '#/components/parameters/branch_policy_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentBranchPolicy'
+    delete:
+      summary: Delete a deployment branch policy
+      operationId: repos/delete-deployment-branch-policy
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/environment_name'
+        - $ref: '#/components/parameters/branch_policy_id'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    environment_name:
+      name: environment_name
+      in: path
+      required: true
+      schema:
+        type: string
+    branch_policy_id:
+      name: branch_policy_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    DeploymentBranchPolicy:
+      type: object
+      properties:
+        id:
+          type: integer
+        node_id:
+          type: string
+        name:
+          type: string
+        # Surfaced on status precisely because it is create-only: status.type is the only way to
+        # see what GitHub actually stored, since drift on it is (correctly) not reconciled.
+        type:
+          type: string
+          enum:
+            - branch
+            - tag
+security:
+  - accessToken: []

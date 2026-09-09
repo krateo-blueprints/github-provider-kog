@@ -1,0 +1,56 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-codesecurityconfig
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-codesecurityconfig/codesecurityconfig.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: CodeSecurityConfig
+    # Server-assigned id: `name` is unique within the org but is NOT what the item endpoints
+    # address, so the id is read from the create/get response into status.id and the path
+    # parameter is sourced from there.
+    identifiers:
+      - id
+    additionalStatusFields:
+      - target_type
+      - html_url
+      - created_at
+    excludedSpecFields:
+      - configuration_id
+    # `updatable` compares the fields the PATCH body can express. For this kind that happens
+    # to be the entire modelled surface — GitHub's update accepts everything its create does,
+    # so nothing is create-only and nothing drops out of the comparison. It is still the right
+    # setting rather than the default `fullSpec`: the compared set is derived from the update
+    # body instead of from the whole spec, so the `org` path parameter (which the
+    # configuration object does not echo) is excluded, and any create-only field GitHub adds
+    # later cannot silently start a PATCH loop.
+    #
+    # `identifiersAndStatus` would be wrong here: every feature toggle in the spec IS fixable
+    # through PATCH, and a security configuration is precisely the kind of resource whose
+    # drift must be corrected rather than observed.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /orgs/{org}/code-security/configurations
+      - action: get
+        method: GET
+        path: /orgs/{org}/code-security/configurations/{configuration_id}
+        requestFieldMapping:
+          - inPath: configuration_id
+            inCustomResource: status.id
+      - action: update
+        method: PATCH
+        path: /orgs/{org}/code-security/configurations/{configuration_id}
+        requestFieldMapping:
+          - inPath: configuration_id
+            inCustomResource: status.id
+      - action: delete
+        method: DELETE
+        path: /orgs/{org}/code-security/configurations/{configuration_id}
+        requestFieldMapping:
+          - inPath: configuration_id
+            inCustomResource: status.id

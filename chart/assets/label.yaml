@@ -1,0 +1,161 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Labels
+servers:
+  - url: https://api.github.com
+paths:
+  # The label NAME is both the create-body field and the item-path parameter upstream, so ONE
+  # pair of CR fields (owner/repo) plus `name` serves every verb — no renamed parameter is
+  # needed here, unlike Repository (whose create path is org-scoped).
+  "/repos/{owner}/{repo}/labels":
+    post:
+      summary: Create a label
+      operationId: issues/create-label
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                # Hex colour WITHOUT the leading '#', e.g. "d73a4a". GitHub echoes it back
+                # lower-cased, so write it lower-case or the comparison reads as drift.
+                color:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
+  # {name} is the label's CURRENT name. A label name may contain '/' or spaces
+  # ("kind/bug", "good first issue"); both forms were probed live and resolve — GitHub routes
+  # the remainder of the path as the name, and accepts the percent-encoded form too.
+  "/repos/{owner}/{repo}/labels/{name}":
+    get:
+      summary: Get a label
+      operationId: issues/get-label
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
+    patch:
+      summary: Update a label
+      operationId: issues/update-label
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/name'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              # DELIBERATELY only color + description. GitHub's PATCH also accepts `new_name`
+              # and `archived`; both are omitted, and the first reason is the same for both:
+              # NEITHER IS RETURNED BY GET — verified against the live API and against GitHub's
+              # own response schema, whose required set is id/node_id/url/name/description/
+              # color/default. The drift comparison only inspects spec keys the observed body
+              # also carries, so a field GitHub never echoes can never TRIGGER an update; it can
+              # only ride along on a PATCH that some OTHER field's drift fired.
+              #
+              # `archived` — that makes it a silent no-op: set it and nothing happens until, say,
+              # `color` drifts and drags it along. A knob that works only by coincidence is worse
+              # than an absent one.
+              #
+              # `new_name` — here the ride-along is destructive, and RENAME IS NOT EXPRESSIBLE
+              # anyway. A rename needs TWO names at once (the item path binds {name} to the
+              # CURRENT name while the new one travels in the body), which no single CR field can
+              # carry and no request-side transform can derive — only `alias` runs request-side.
+              # And the first PATCH fired by an unrelated colour edit would carry new_name too,
+              # renaming the label out from under the item path: the next GET 404s at the old
+              # name, the controller CREATEs the label again, and the renamed one is orphaned.
+              # A rename is therefore a delete + create; see rd-label.yaml.
+              properties:
+                color:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
+    delete:
+      summary: Delete a label
+      operationId: issues/delete-label
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    name:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Label:
+      type: object
+      properties:
+        id:
+          type: integer
+        node_id:
+          type: string
+        url:
+          type: string
+        name:
+          type: string
+        color:
+          type: string
+        description:
+          type: string
+        # true for the labels GitHub seeds into a new repository (bug, enhancement, ...).
+        # Worth surfacing: adopting one of those with a CR is legitimate, but deleting the CR
+        # then deletes a label the repo shipped with.
+        default:
+          type: boolean
+security:
+  - accessToken: []

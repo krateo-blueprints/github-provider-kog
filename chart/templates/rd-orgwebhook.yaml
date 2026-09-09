@@ -1,0 +1,58 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-orgwebhook
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-orgwebhook/orgwebhook.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: OrgWebhook
+    # GitHub assigns the hook id on create; `org` only scopes it. `id` is a property of the GET
+    # response (schemas/OrgWebhook), so status.id is populated on the first successful observe.
+    identifiers:
+      - id
+    # Org hooks have no test_url (that is repository-only); the rest matches RepoWebhook.
+    additionalStatusFields:
+      - url
+      - ping_url
+      - deliveries_url
+      - created_at
+      - updated_at
+    # hook_id is a path parameter on get/update/delete but is not knowable at create time, so it
+    # must not become a (required) spec field; the requestFieldMapping entries below source it
+    # from status.id instead. Same pattern as PullRequest's pull_number.
+    excludedSpecFields:
+      - hook_id
+    # DELIBERATE, for the same reason as RepoWebhook — see rd-repowebhook.yaml for the full
+    # argument. In short: GitHub echoes config.secret as the mask "********", so under the
+    # default `fullSpec` the hook would read as permanently drifted and be PATCHed on every
+    # reconcile without ever converging. assets/orgwebhook.yaml keeps `secret` (and the
+    # create-only `name`) out of the update body, so `updatable` compares exactly config.url,
+    # config.content_type, config.insecure_ssl, events and active — the fixable set — while the
+    # secret still rides along on any PATCH, because the request body is assembled by top-level
+    # key and carries the whole `config` map.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /orgs/{org}/hooks
+      - action: get
+        method: GET
+        path: /orgs/{org}/hooks/{hook_id}
+        requestFieldMapping:
+          - inPath: hook_id
+            inCustomResource: status.id
+      - action: update
+        method: PATCH
+        path: /orgs/{org}/hooks/{hook_id}
+        requestFieldMapping:
+          - inPath: hook_id
+            inCustomResource: status.id
+      - action: delete
+        method: DELETE
+        path: /orgs/{org}/hooks/{hook_id}
+        requestFieldMapping:
+          - inPath: hook_id
+            inCustomResource: status.id

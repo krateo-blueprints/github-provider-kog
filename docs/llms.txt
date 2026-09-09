@@ -1,35 +1,79 @@
 # github-provider-kog — LLM doc index
-# One line per file. A Krateo KOG provider (oasgen-provider 0.9.x) exposing GitHub's
-# repository + git-write API — Repository, RepoContent, GitRef, PullRequest — as
-# github.krateo.io Kubernetes kinds. The chart ships RestDefinitions + trimmed OpenAPI
-# specs + a companion plugin (Repository does not use it — all four of its verbs are
-# native); oasgen-provider generates the CRDs and auto-deploys a rest-dynamic-controller
-# per kind.
-docs/index.md: the map — what the provider is, the four kinds, the repo layout, links to the whole bundle
-docs/overview.md: how it works — RestDefinitions + OpenAPI specs → oasgen CRDs + controllers, why the git-write kinds need the plugin and Repository does not
-docs/usage.md: install as a Krateo component, provision the token Secret (repo-create rights in the org for Repository) + one Configuration per kind, drive Repository→GitRef→RepoContent→PullRequest, verify
-docs/configuration.md: the surface — the one value resourceGroup, the RestDefinition mappings (incl. Repository's compareScope: updatable and why it replaced identifiersAndStatus), the OpenAPI servers overrides, the plugin routes/env, invariants
-docs/api.md: the generated github.krateo.io CRDs (Repository/RepoContent/GitRef/PullRequest + <Kind>Configuration) and the CompositionDefinition derived from values.schema.json
+# One line per file (the 27 native kinds pair their RestDefinition with its OpenAPI spec on
+# one line — they are 1:1). A Krateo KOG provider (oasgen-provider ≥ 0.23.0) exposing 31
+# GitHub REST resources as github.krateo.io Kubernetes kinds: git transport (Repository,
+# RepoContent, GitRef, PullRequest), access, repository configuration, CI/CD, work tracking
+# and governance. The chart ships RestDefinitions + trimmed OpenAPI specs + a companion
+# plugin serving ONLY GitRef, RepoContent and PullRequest (the other 28 kinds are native —
+# every verb goes straight to GitHub); oasgen-provider generates the CRDs and auto-deploys a
+# rest-dynamic-controller per kind.
+# Not expressible, and deliberately absent: Actions/Dependabot/Codespaces SECRETS (a write
+# needs an encrypted_value LibSodium sealed box + a key_id fetched first — no client-side
+# crypto and no dependent lookup in a RestDefinition; variables are NOT secrets and ARE
+# covered), and VulnerabilityAlerts (its GET returns 404 when off and 204 with NO BODY when
+# on, so no status schema can be derived — unlike AutomatedSecurityFixes, whose GET has one).
+docs/index.md: the map — what the provider is, the 31 kinds by family, the repo layout, links to the whole bundle
+docs/overview.md: how it works — RestDefinitions + OpenAPI specs → oasgen CRDs + controllers, why the three git-write kinds need the plugin and the other 28 do not
+docs/usage.md: install as a Krateo component, provision the token Secret (per-kind PAT rights differ) + one Configuration per kind, drive Repository→GitRef→RepoContent→PullRequest and the other kinds, verify
+docs/configuration.md: the surface — the one value resourceGroup, the per-kind RestDefinition mappings (identifiers, excludedSpecFields, compareScope: 23 updatable / 5 default fullSpec / 1 explicit fullSpec / 2 identifiersAndStatus), the OpenAPI servers overrides, the plugin routes/env, invariants
+docs/api.md: the generated github.krateo.io CRDs (31 resource kinds + a <Kind>Configuration each) and the CompositionDefinition derived from values.schema.json
 docs/examples.md: index of the runnable examples
 docs/release.md: how a release ships — one plain-semver tag drives release-oci (chart) + release-image (plugin image)
 docs/log.md: curated history
 examples/blueprint-authoring/README.md: the end-to-end git-write flow (GitRef→RepoContent→PullRequest) applied as three CRs against a scratch repo
-README.md: the repo front door — what it is, install, configure, examples, docs, develop & release
+README.md: the repo front door — what it is (the 31 kinds grouped by family, and what is deliberately not covered), install, configure, examples, docs, develop & release
 # Source (read at the same tag; the docs above are derived from these):
 chart/Chart.yaml: chart metadata; version is the CHART_VERSION placeholder, appVersion tracks the OpenAPI/mapping revision
-chart/values.yaml: the single value resourceGroup, with its rationale
+chart/values.yaml: the single value resourceGroup (the group all 31 generated CRDs land under), with its rationale
 chart/values.schema.json: the typed schema the CDC derives the component CRD from (scalar resourceGroup only)
-chart/templates/rd-repository.yaml: the Repository RestDefinition (all four verbs native; compareScope updatable, with the create-only-fields reasoning in-file)
-chart/templates/rd-repocontent.yaml: the RepoContent RestDefinition (identifiers, verb table)
-chart/templates/rd-gitref.yaml: the GitRef RestDefinition (get routed to the plugin)
-chart/templates/rd-pullrequest.yaml: the PullRequest RestDefinition (pull_number excluded, requestFieldMapping)
+chart/templates/configmap-<kind>.yaml: one ConfigMap per kind wrapping chart/assets/<kind>.yaml; tpl-rendered ONLY for the three plugin-served kinds (they carry servers overrides), copied verbatim for the other 28
 chart/templates/deployment-plugin.yaml: the plugin Deployment (image tag = .Chart.Version, distroless nonroot)
 chart/templates/service-plugin.yaml: the plugin ClusterIP Service
 chart/templates/_helpers.tpl: the pluginName + webServiceUrl helpers the OpenAPI servers overrides resolve to
+chart/samples/configurations.yaml: the 31 <Kind>Configuration CRs, all sharing the name github-blueprints-config and one gh-token Secret (whose PAT needs org repo-create rights for Repository and org admin rights for the org-scoped kinds)
+chart/samples/test-<kind>.yaml: one applyable test CR per kind, with the per-kind caveats in comments
+plugin/main.go: the rest-dynamic-controller plugin — every GitHub-inconsistency fix, per route
+plugin/Dockerfile: the distroless nonroot build of the plugin
+# The four git-transport kinds (Repository is native; the other three are the plugin's whole reason to exist):
+chart/templates/rd-repository.yaml: the Repository RestDefinition (all four verbs native; compareScope updatable — DEFENSIVE, not load-bearing: the comparison SKIPS any spec key the observe response omits, so the create-only fields could never have drifted under fullSpec either, and the two scopes should agree today; the in-file comment corrects that earlier claim)
+chart/templates/rd-repocontent.yaml: the RepoContent RestDefinition (identifiers, verb table)
+chart/templates/rd-gitref.yaml: the GitRef RestDefinition (get routed to the plugin)
+chart/templates/rd-pullrequest.yaml: the PullRequest RestDefinition (pull_number excluded, requestFieldMapping)
 chart/assets/repository.yaml: the Repository OpenAPI spec (org-scoped create only, auto_init defaults true, path params named org/name; no plugin servers override, so its ConfigMap is not tpl-rendered)
 chart/assets/repocontent.yaml: the RepoContent OpenAPI spec (plugin servers overrides on put/get)
 chart/assets/gitref.yaml: the GitRef OpenAPI spec (plugin servers overrides on create/get; sha not required on update)
 chart/assets/pullrequest.yaml: the PullRequest OpenAPI spec (plugin servers override on get)
-chart/samples/configurations.yaml: the four <Kind>Configuration CRs pointing at the gh-token Secret (whose PAT also needs org repo-create rights, for Repository)
-plugin/main.go: the rest-dynamic-controller plugin — every GitHub-inconsistency fix, per route
-plugin/Dockerfile: the distroless nonroot build of the plugin
+# The 27 native kinds — rd-<kind>.yaml carries the identifiers/compareScope reasoning, assets/<kind>.yaml the
+# trimmed field set and the measured GitHub quirks. <kind> is the kind name lowercased.
+# access:
+chart/templates/rd-team.yaml + chart/assets/team.yaml: Team — org team keyed by the server-derived slug (get/update/delete read it from status.slug, a rename converges via the PATCH response); the update declares BOTH 201 and 200, because a real change answers 201; compareScope updatable
+chart/templates/rd-teamrepo.yaml + chart/assets/teamrepo.yaml: TeamRepo — team→repo grant; observe returns the REPOSITORY object, so full_name is the identifier and updatable is mandatory (under fullSpec the string spec.owner compares against an owner OBJECT: permanent drift)
+chart/templates/rd-teammembership.yaml + chart/assets/teammembership.yaml: TeamMembership — user in a team as member/maintainer; identified by url (org/team/username are path-only), status carries role + state (pending until accepted); compareScope updatable
+chart/templates/rd-collaborator.yaml + chart/assets/collaborator.yaml: Collaborator — direct repo grant; observe is a findby pinned to affiliation=direct (a get reports the EFFECTIVE role, so a non-collaborator reads as present), role_name is aliased onto spec.permission to fix read/write vs pull/push; documented residual loop when the effective role EXCEEDS the grant, and outside-collaborator PUTs create an invitation, not a collaborator
+chart/templates/rd-orgmembership.yaml + chart/assets/orgmembership.yaml: OrgMembership — set a user's org membership/role; identified by url (org/username are path-only), status.state goes pending→active; compareScope updatable
+# repository configuration:
+chart/templates/rd-repowebhook.yaml + chart/assets/repowebhook.yaml: RepoWebhook — repo webhook keyed by the server-assigned id (sourced from status.id); compareScope updatable
+chart/templates/rd-orgwebhook.yaml + chart/assets/orgwebhook.yaml: OrgWebhook — the same shape at org scope
+chart/templates/rd-deploykey.yaml + chart/assets/deploykey.yaml: DeployKey — SSH deploy key; NO update verb (a key is immutable), so compareScope identifiersAndStatus — under fullSpec the compared field would be the pasted public key, unfixable and parking every CR Unavailable
+chart/templates/rd-environment.yaml + chart/assets/environment.yaml: Environment — deployment environment; create and update are the same PUT, so updatable IS the desired-state body (wait_timer, prevent_self_review, reviewers, deployment_branch_policy) by construction
+chart/templates/rd-reporuleset.yaml + chart/assets/reporuleset.yaml: RepoRuleset — branch/tag rules for one repo, id-keyed, update is PUT; compareScope updatable
+chart/templates/rd-orgruleset.yaml + chart/assets/orgruleset.yaml: OrgRuleset — the same ruleset document at org scope
+chart/templates/rd-autolink.yaml + chart/assets/autolink.yaml: Autolink — ticket-prefix→URL autolink; no update verb, yet fullSpec is kept DELIBERATELY: the GET echoes the whole resource, so an edited CR should report drift (an autolink can only be deleted and recreated)
+chart/templates/rd-branchprotection.yaml + chart/assets/branchprotection.yaml: BranchProtection — the protection document of one branch; PUT is both create and update; a jq responseTransform flattens GitHub's {"enabled": bool} wrappers and re-inserts the nulls the API demands for switched-off controls; compareScope updatable
+# CI/CD:
+chart/templates/rd-actionsvariablerepo.yaml + chart/assets/actionsvariablerepo.yaml: ActionsVariableRepo — plaintext repo Actions variable (a variable is not a secret: value is stored and returned verbatim, so no LibSodium step and no public-key lookup); compareScope updatable
+chart/templates/rd-actionsvariableorg.yaml + chart/assets/actionsvariableorg.yaml: ActionsVariableOrg — the org-scoped variable; adds selected_repositories_url to status
+chart/templates/rd-environmentvariable.yaml + chart/assets/environmentvariable.yaml: EnvironmentVariable — the same variable scoped to an environment
+chart/templates/rd-runnergroup.yaml + chart/assets/runnergroup.yaml: RunnerGroup — org self-hosted runner group; id comes from the create response, so no findby-by-name verb is needed; compareScope updatable
+chart/templates/rd-deploymentbranchpolicy.yaml + chart/assets/deploymentbranchpolicy.yaml: DeploymentBranchPolicy — which branches/tags may deploy to an environment; id-keyed, update is PUT; compareScope updatable
+chart/templates/rd-workflow.yaml + chart/assets/workflow.yaml: Workflow — create = PUT .../enable, delete = PUT .../disable (only a commit creates a workflow file); the record answers 200 in every state, so a notFoundBody predicate reports disabled_manually/disabled_inactivity/deleted as ABSENT; default fullSpec, which compares nothing (the spec is path parameters only)
+# work tracking:
+chart/templates/rd-label.yaml + chart/assets/label.yaml: Label — issue/PR label keyed by name; compareScope updatable
+chart/templates/rd-milestone.yaml + chart/assets/milestone.yaml: Milestone — number-keyed milestone; due_on is CREATE-ONLY because GitHub keeps the day and re-times it to midnight in the token account's timezone (measured over ~120 milestones, DST-tracking), so it can be written but never compared; whatever GitHub stored is on status.due_on; compareScope updatable
+chart/templates/rd-issue.yaml + chart/assets/issue.yaml: Issue — number-keyed issue; NO delete verb (GitHub REST has none — close it with spec.state instead); updatable keeps title/body/state/state_reason fixable while leaving labels/assignees/milestone (sent as strings, returned as objects) out of the comparison
+chart/templates/rd-release.yaml + chart/assets/release.yaml: Release — id-keyed release; compareScope updatable
+chart/templates/rd-deployment.yaml + chart/assets/deployment.yaml: Deployment — immutable deployment record with no update verb, so compareScope identifiersAndStatus; auto_merge is pinned FALSE in the asset (GitHub defaults it true and then answers 202 with no deployment at all); status carries original_environment, NOT environment, so the projected compared set stays empty
+# governance:
+chart/templates/rd-customproperty.yaml + chart/assets/customproperty.yaml: CustomProperty — org custom-property schema; PUT upserts on the same URL GET/DELETE use, so create and update are one call and updatable covers the whole settable surface
+chart/templates/rd-codesecurityconfig.yaml + chart/assets/codesecurityconfig.yaml: CodeSecurityConfig — org code-security configuration; named CodeSecurityConfig on purpose, so the generated auth kind is CodeSecurityConfigConfiguration rather than a doubled …ConfigurationConfiguration; compareScope updatable
+chart/templates/rd-automatedsecurityfixes.yaml + chart/assets/automatedsecurityfixes.yaml: AutomatedSecurityFixes — the Dependabot security-updates toggle for one repo; no identifiers (the repo is the key); a repo with it off answers 200 {"enabled": false}, so a notFoundBody predicate treats that as absence and re-runs the PUT; paused is surfaced on status, not treated as drift; default fullSpec, which compares nothing

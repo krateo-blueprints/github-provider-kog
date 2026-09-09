@@ -1,0 +1,118 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-branchprotection
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-branchprotection/branchprotection.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: BranchProtection
+    # A singleton sub-resource: no server-assigned id, the (owner, repo, branch) triple in the
+    # spec is the key. `url` is the only identity GitHub returns, and it is the only field that
+    # survives the responseTransform below unchanged, so it is the only safe identifier.
+    identifiers:
+      - url
+    # Deliberately empty. Every other observable field is a boolean control that GitHub returns
+    # as {"enabled": bool} and the get responseTransform flattens to a bare boolean. Putting one
+    # in status would force the SAME transform onto the create and update verbs too (status is
+    # populated from their responses as well, and those are raw), i.e. three copies of a 30-line
+    # jq program that must stay byte-identical or status silently disagrees with drift. The
+    # conditions already carry the signal that matters — Available means "the branch is protected
+    # exactly as this spec says" — and the spec carries the desired state.
+    additionalStatusFields: []
+    # PUT is both create and update, so the update body IS the full protection document and
+    # `updatable` compares exactly the eleven controls the CR can express. It excludes the three
+    # path parameters (owner/repo/branch), which appear nowhere in the response.
+    #
+    # `fullSpec` would also work today — the comparison ignores spec keys absent from the response
+    # — but it is one response-shape change away from comparing a path parameter against nothing.
+    # `identifiersAndStatus` would be actively wrong here: it would compare only `url`, so editing
+    # `enforce_admins` or `required_status_checks` on a live CR would silently never be pushed.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: PUT
+        path: /repos/{owner}/{repo}/branches/{branch}/protection
+        # GitHub requires these four members to be PRESENT even when the control is off, and
+        # `null` is how "off" is spelled. A CRD field typed `object` cannot hold null (oasgen does
+        # not carry OAS `nullable` through), so the CR expresses "off" by omission and this
+        # transform turns omission into the explicit null the API demands. `has()` rather than
+        # `//` on purpose: `//` would rewrite a deliberate `enforce_admins: false` into null.
+        requestTransform:
+          inline: |
+            . + {
+              required_status_checks: (if has("required_status_checks") then .required_status_checks else null end),
+              enforce_admins: (if has("enforce_admins") then .enforce_admins else null end),
+              required_pull_request_reviews: (if has("required_pull_request_reviews") then .required_pull_request_reviews else null end),
+              restrictions: (if has("restrictions") then .restrictions else null end)
+            }
+      - action: update
+        method: PUT
+        path: /repos/{owner}/{repo}/branches/{branch}/protection
+        # Same endpoint, same body, same required-nullable members — so the same transform. PUT
+        # replaces the whole protection document, which is what makes one program serve both.
+        requestTransform:
+          inline: |
+            . + {
+              required_status_checks: (if has("required_status_checks") then .required_status_checks else null end),
+              enforce_admins: (if has("enforce_admins") then .enforce_admins else null end),
+              required_pull_request_reviews: (if has("required_pull_request_reviews") then .required_pull_request_reviews else null end),
+              restrictions: (if has("restrictions") then .restrictions else null end)
+            }
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/branches/{branch}/protection
+        # THE reason this kind needs no plugin. GitHub's GET answers in a different shape from the
+        # PUT that sets it, and this whole-document program rewrites it back into the CR domain
+        # once, at the reconcile chokepoint, before status population and drift comparison:
+        #
+        #   {"enabled": bool} objects        -> bare booleans      (nine controls)
+        #   status-check wrapper + urls      -> {strict, contexts}
+        #   restrictions users/teams/apps    -> login / slug strings
+        #   an unset control (key ABSENT)    -> null, which is what the spec omitting it means
+        #
+        # Every list is sorted, because the comparison is order-sensitive and GitHub does not
+        # return these in the order they were sent; sorting makes the comparison deterministic
+        # (the asset tells authors to write the lists sorted for the same reason).
+        #
+        # `null` covers an absent key too — jq indexes a missing key as null — so a branch with no
+        # required_status_checks normalizes to null and matches a CR that omits it.
+        responseTransform:
+          inline: |
+            {
+              url: .url,
+              required_status_checks: (
+                if .required_status_checks == null then null else {
+                  strict: (.required_status_checks.strict // false),
+                  contexts: ((.required_status_checks.contexts // []) | sort)
+                } end
+              ),
+              enforce_admins: (.enforce_admins.enabled // false),
+              required_pull_request_reviews: (
+                if .required_pull_request_reviews == null then null else {
+                  dismiss_stale_reviews: (.required_pull_request_reviews.dismiss_stale_reviews // false),
+                  require_code_owner_reviews: (.required_pull_request_reviews.require_code_owner_reviews // false),
+                  required_approving_review_count: (.required_pull_request_reviews.required_approving_review_count // 0),
+                  require_last_push_approval: (.required_pull_request_reviews.require_last_push_approval // false)
+                } end
+              ),
+              restrictions: (
+                if .restrictions == null then null else {
+                  users: ((.restrictions.users // []) | map(.login) | sort),
+                  teams: ((.restrictions.teams // []) | map(.slug) | sort),
+                  apps: ((.restrictions.apps // []) | map(.slug) | sort)
+                } end
+              ),
+              required_linear_history: (.required_linear_history.enabled // false),
+              allow_force_pushes: (.allow_force_pushes.enabled // false),
+              allow_deletions: (.allow_deletions.enabled // false),
+              block_creations: (.block_creations.enabled // false),
+              required_conversation_resolution: (.required_conversation_resolution.enabled // false),
+              lock_branch: (.lock_branch.enabled // false),
+              allow_fork_syncing: (.allow_fork_syncing.enabled // false)
+            }
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/branches/{branch}/protection

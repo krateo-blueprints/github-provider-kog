@@ -1,0 +1,63 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-team
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-team/team.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: Team
+    # `slug`, not `name`, is the team's external identity: every item verb addresses
+    # /orgs/{org}/teams/{team_slug}, and GitHub derives that slug from the name. It is a property of
+    # the create, get AND update responses, so it lands on status.slug — which is exactly what the
+    # fieldMapping below reads back.
+    identifiers:
+      - slug
+    additionalStatusFields:
+      - id
+      - node_id
+      - html_url
+    # team_slug is assigned by GitHub (derived from `name`) on create, so it must NOT be a required
+    # spec field the author fills in: get/update/delete source it from status.slug below. Same
+    # server-assigned-identifier shape as PullRequest's pull_number.
+    excludedSpecFields:
+      - team_slug
+    # `updatable` compares exactly the fields the PATCH body can express — name, description,
+    # privacy, notification_setting — and every one of them is a property of the team response, so
+    # each compared field is both observable and fixable.
+    #
+    # `fullSpec` would happen to behave the same TODAY, because the only other spec field (`org`) is
+    # absent from the response and an absent key is skipped by the comparison. That is an accident of
+    # the response shape, not a guarantee: the moment a create-only field is added to the create body
+    # (GitHub's own `maintainers` / `repo_names`, say), fullSpec starts comparing something the PATCH
+    # could never fix. `updatable` states the intent instead of relying on the coincidence. It
+    # requires an update verb, which this resource has.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /orgs/{org}/teams
+      - action: get
+        method: GET
+        path: /orgs/{org}/teams/{team_slug}
+        fieldMapping:
+          - inPath: team_slug
+            inCustomResource: status.slug
+      # Renaming a team (editing spec.name) re-derives the slug server-side. It converges because
+      # this PATCH returns the whole team: status.slug is repopulated from the update response, so
+      # the next observe addresses the NEW slug. The PATCH is still ADDRESSED by the old slug — the
+      # one in status at the time — which is still valid, since the rename has not happened yet.
+      - action: update
+        method: PATCH
+        path: /orgs/{org}/teams/{team_slug}
+        fieldMapping:
+          - inPath: team_slug
+            inCustomResource: status.slug
+      - action: delete
+        method: DELETE
+        path: /orgs/{org}/teams/{team_slug}
+        fieldMapping:
+          - inPath: team_slug
+            inCustomResource: status.slug

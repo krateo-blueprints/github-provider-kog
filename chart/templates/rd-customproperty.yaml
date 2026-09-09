@@ -1,0 +1,41 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-customproperty
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-customproperty/customproperty.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: CustomProperty
+    # The author-chosen name distinguishes the property; `org` scopes it. Both are path
+    # parameters on every verb, and `property_name` is also what the GET response calls the
+    # value (the path parameter was renamed from GitHub's `custom_property_name` in the asset
+    # precisely so that one CR field covers path, identifier and status).
+    identifiers:
+      - property_name
+    additionalStatusFields:
+      - source_type
+      - url
+    # There is no server-assigned id and no create/item path split: PUT is an upsert on the
+    # same URL GET and DELETE use, so create and update are the SAME call, and the update
+    # body is the whole settable surface — value_type, required, default_value, description,
+    # allowed_values, values_editable_by, require_explicit_values. `updatable` therefore
+    # compares every field an author can set, and each one is echoed by GET, so drift is both
+    # detected and fixable with no create-only residue. (fullSpec would additionally compare
+    # the `org` path parameter, which the response does not carry.)
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: PUT
+        path: /orgs/{org}/properties/schema/{property_name}
+      - action: update
+        method: PUT
+        path: /orgs/{org}/properties/schema/{property_name}
+      - action: get
+        method: GET
+        path: /orgs/{org}/properties/schema/{property_name}
+      - action: delete
+        method: DELETE
+        path: /orgs/{org}/properties/schema/{property_name}

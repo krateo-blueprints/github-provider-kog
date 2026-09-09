@@ -1,0 +1,189 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Teams
+servers:
+  - url: https://api.github.com
+paths:
+  # CREATE takes the team NAME. GitHub derives the team's SLUG from that name
+  # ("Platform Engineering" -> "platform-engineering") and every item verb below addresses the team
+  # by SLUG, never by name. The slug is therefore server-assigned, exactly like PullRequest's
+  # pull_number: it is excluded from the CR spec and the item verbs read it back from status.slug
+  # (see the fieldMapping in rd-team.yaml). Modelling it as a second spec field the author fills in
+  # by hand would be a duplicate pair to keep in sync — and silently wrong for any name that is not
+  # already slug-shaped.
+  #
+  # The create body is trimmed to what a Krateo user sets on a team. Deliberately left out:
+  #   - maintainers / repo_names: create-only arrays that this chart already covers as first-class
+  #     kinds (TeamMembership, TeamRepo), so modelling them here would give two writers for one fact.
+  #   - permission: GitHub marks it "closing down notice"; TeamRepo carries the per-repo grant.
+  #   - parent_team_id / parent_team_slug: team nesting. Both are create- AND update-expressible, but
+  #     the response reports the parent as a `parent` OBJECT rather than a slug string, so a spec
+  #     field would be write-only — never compared, hence silently never reconciled. Adding it would
+  #     mean lifting `parent.slug` into the CR domain with a response fieldMapping first; out of
+  #     scope for this kind.
+  "/orgs/{org}/teams":
+    post:
+      summary: Create a team
+      operationId: teams/create
+      parameters:
+        - $ref: '#/components/parameters/org'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                # Defaulted here to GitHub's own default so the field is ALWAYS present in spec and
+                # therefore always compared against the observed team: an absent spec key is skipped
+                # by the drift comparison, which would leave the privacy level unmanaged.
+                privacy:
+                  type: string
+                  enum:
+                    - secret
+                    - closed
+                  default: secret
+                notification_setting:
+                  type: string
+                  enum:
+                    - notifications_enabled
+                    - notifications_disabled
+                  default: notifications_enabled
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+  "/orgs/{org}/teams/{team_slug}":
+    get:
+      summary: Get a team by name
+      operationId: teams/get-by-name
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/team_slug'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+    patch:
+      # The update body is the SAME four fields as create, which is what makes compareScope:
+      # updatable exact for this kind — every compared field is both observable on the response and
+      # fixable by this call.
+      #
+      # `name` is in it on purpose: renaming a team re-derives its slug server-side. That works
+      # because this call returns the whole team, so status.slug is repopulated from the PATCH
+      # response and the NEXT observe addresses the new slug. Without a team-shaped response here
+      # the rename would strand the CR on a slug that no longer resolves.
+      summary: Update a team
+      operationId: teams/update-in-org
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/team_slug'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                privacy:
+                  type: string
+                  enum:
+                    - secret
+                    - closed
+                notification_setting:
+                  type: string
+                  enum:
+                    - notifications_enabled
+                    - notifications_disabled
+      responses:
+        # BOTH codes, and 201 is the one that matters. This endpoint answers 201 when it actually
+        # changes something, and 200 only "when the updated information already exists" — while the
+        # controller issues an update ONLY after observing drift, i.e. exactly in the changing case.
+        #
+        # The declared response codes are not documentation: rest-dynamic-controller accepts only the
+        # 2xx codes DECLARED on the operation (getValidResponseCode -> HasValidStatusCode), so a
+        # document listing 200 alone would turn every real update into "invalid status code: 201".
+        # The CR would never converge and a team rename would fail forever, reported as an API error.
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '200':
+          description: Response when the updated information already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+    delete:
+      summary: Delete a team
+      operationId: teams/delete-in-org
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/team_slug'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    org:
+      name: org
+      in: path
+      required: true
+      schema:
+        type: string
+    # Required: true is load-bearing, not decoration. The controller decides whether the external
+    # resource is already "known" by trying to BUILD the get request; with team_slug still empty
+    # (before create) that build fails on the missing required path parameter, which is what routes
+    # the first reconcile to create instead of to a GET against /orgs/{org}/teams/.
+    team_slug:
+      name: team_slug
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Team:
+      type: object
+      properties:
+        id:
+          type: integer
+        node_id:
+          type: string
+        name:
+          type: string
+        # The team's external identity — see the create-path comment above.
+        slug:
+          type: string
+        description:
+          type: string
+        privacy:
+          type: string
+        notification_setting:
+          type: string
+        html_url:
+          type: string
+security:
+  - accessToken: []
