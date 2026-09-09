@@ -1,5 +1,5 @@
 ---
-type: Design
+type: Architecture
 title: github-provider-kog — restoring RepoContent natively
 description: What the removed RepoContent kind did, exactly what the proxy plugin's putRepoContent/getRepoContent handlers did for it and why, and the oasgen-provider 0.23.0 RestDefinition that replaces each behaviour without a plugin.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
@@ -7,10 +7,16 @@ tags: [kog, design, repocontent, oasgen-provider, plugin-removal]
 timestamp: 2026-09-09T00:00:00Z
 ---
 
-Written against `be409bc` (the last commit that still carries the kind). Runtime line
-numbers are from the rest-dynamic-controller `0.20.0` tree at
-`/Users/diegobraga/krateo/krateo-rest-dynamic-controller`; the only behaviour relevant here
-that 0.23.0 changed is #113, called out where it matters.
+Written against `be409bc` (the last commit that still carries the kind).
+
+**Provenance of the runtime citations, stated because it matters:** the line numbers below were
+read from a **rest-dynamic-controller `0.20.0`** tree — the standalone
+`krateo-platformops/rest-dynamic-controller` repo, which is now **archived**; the engine was folded
+into the `krateo-platformops/oasgen-provider` monorepo under `go/rest-dynamic-controller/` in
+August 2026. The runtime this chart targets is **0.23.0**. The behaviour relied on here is
+unchanged between the two (the one relevant difference, the `%252F` double-escape fixed by #113, is
+called out where it matters), but **a reader implementing this should re-read the cited lines at
+`0.23.0` in the monorepo rather than trusting the numbers verbatim.**
 
 ---
 
@@ -120,7 +126,7 @@ comparison succeeds". The task asked me to verify the "no-op for a single-file G
 rather than repeat it. **Verified, and the comment's rationale is the wrong one:**
 
 - **On the GET it is a genuine no-op.** Probed `GET
-  /repos/krateoplatformops/krateo/contents/README.md`: top-level keys are `_links, content,
+  /repos/krateo-platformops/oasgen-provider/contents/README.md`: top-level keys are `_links, content,
   download_url, encoding, git_url, html_url, name, path, sha, size, type, url`. `content` is a
   **string**, so `m["content"].(map[string]any)` fails and the body returns unchanged. (A
   directory GET is a JSON array; `json.Unmarshal` into a map fails — also unchanged.)

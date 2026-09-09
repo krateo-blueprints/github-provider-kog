@@ -1,5 +1,5 @@
 ---
-type: Design
+type: Architecture
 title: github-provider-kog — restoring `PullRequest` natively
 description: What the plugin's `GET /repos/{owner}/{repo}/pulls/{number}` handler did for PullRequest, why it was needed, and the exact native replacement at oasgen-provider 0.23.0 — a whole-document `responseTransform` on the get verb plus `compareScope: updatable` — with the idempotency proof, the rejected alternatives, and the traps a reviewer must check.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
@@ -136,11 +136,12 @@ The drift is **unfixable by construction**, which is why this is a hard loop rat
 ## 3. The native replacement
 
 One field: a whole-document `responseTransform` on the get verb. It is
-[documented upstream as the declarative form of exactly this plugin](../../krateo-oasgen-provider/docs/USAGE_GUIDE.md):
+documented upstream as the declarative form of exactly this plugin
+(`docs/USAGE_GUIDE.md` in [krateo-platformops/oasgen-provider](https://github.com/krateo-platformops/oasgen-provider)):
 
 > For simple cases of this problem, the declarative `fieldMapping` (with an `inResponse` anchor) or a
 > `responseTransform` jq program in the RestDefinition can do the same normalization without a plugin
-> — `krateo-oasgen-provider/docs/USAGE_GUIDE.md:595`
+> — oasgen-provider `docs/USAGE_GUIDE.md:595`
 
 **It exists at 0.23.0** — `krateo-oasgen-provider` tag `0.23.0`,
 `go/oasgen-provider/apis/restdefinitions/v1alpha1/types.go:297-302`:

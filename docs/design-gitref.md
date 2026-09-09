@@ -16,8 +16,8 @@ companion plugin, because the frontend now publishes through a `BuilderPublish` 
 brings it back **natively**, so the knowledge outlives the code.
 
 Everything below is against **oasgen-provider / rest-dynamic-controller 0.23.0**
-(`~/krateo/krateo-oasgen-provider`, tag `0.23.0`, monorepo layout `go/oasgen-provider` +
-`go/rest-dynamic-controller`) and chart commit **be409bc**.
+(`krateo-platformops/oasgen-provider`, tag `0.23.0` — a monorepo carrying both engines under
+`go/oasgen-provider/` and `go/rest-dynamic-controller/`) and chart commit **be409bc**.
 
 ## 1. What the kind did
 
