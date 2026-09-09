@@ -11,6 +11,57 @@ timestamp: 2026-09-09T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-09-09 — 31 kinds become 28, and the plugin goes with them
+
+`GitRef`, `RepoContent` and `PullRequest` are **deleted**, and the companion proxy plugin
+is deleted with them. The chart is now **28 kinds and 100% native**: it renders 28
+ConfigMaps + 28 RestDefinitions and nothing else — no Deployment, no Service, no image, no
+proxy, and therefore **no runtime component at all**. Nineteen files went: those three
+kinds' assets, ConfigMaps, RestDefinitions and samples, `deployment-plugin.yaml`,
+`service-plugin.yaml`, `_helpers.tpl` (it held only the two plugin helpers), the whole
+`plugin/` Go tree, and `.github/workflows/release-image.yaml`. The three
+`<Kind>Configuration` entries left `chart/samples/configurations.yaml`, which now carries
+28. Nothing is `tpl`-rendered any more either: the per-operation `servers` overrides that
+forced it were the plugin's routing, so all 28 ConfigMaps are a plain `.Files.Get`.
+
+**Why: the caller is gone.** Those three were the transport of the legacy
+blueprint-publish path — the Autopilot builder writing a chart tree to a repo as
+`github.krateo.io` CRs (`GitRef` → `RepoContent` per file → `PullRequest`). The frontend
+now defaults to an SCM-agnostic route: `AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults to
+`"true"` in the frontend chart's `values.yaml` **and** its `values.schema.json`, so a
+fresh install publishes through a `BuilderPublish` claim over `git-provider`, and the
+`github.krateo.io` route is the explicit `"false"` fallback. They were also the only kinds
+still routed through the plugin, so removing them and the plugin was one change rather than
+two. This retires a superseded path; no current capability moved or was lost with it.
+
+**The knowledge survives the deletion.** One design document per removed kind records what
+the kind did, what the plugin's handlers did for it and why, and exactly what it would take
+to bring the kind back **natively**: [design-gitref](./design-gitref.md),
+[design-repocontent](./design-repocontent.md),
+[design-pullrequest](./design-pullrequest.md). Their headline findings:
+
+- **`PullRequest` comes back whole today.** Its only plugin behaviour was flattening
+  `head`/`base` on observe; one whole-document `responseTransform` on the get verb (plus
+  `compareScope: updatable`) replaces it, and fixes the fork case the plugin got wrong.
+- **`RepoContent` comes back fully native today.** `status.sha` auto-populates the update
+  body, `responseTransform`s replace the content normalisation, and the `%252F`
+  double-escape that shaped the old handler is fixed upstream in 0.23.0 (#113). The one
+  loss is a bounded 422-retry the next resync recovers.
+- **`GitRef` comes back except for one thing.** Resolving the base HEAD sha on create is a
+  pre-call dependent read `RestDefinition` cannot express — tracked as oasgen-provider
+  **#120**. Natively, the kind returns with `spec.sha` as a required input; observe, update
+  and delete are native with no caveat.
+
+Release is simpler by exactly one artifact: the tag now drives `release-oci.yaml` alone,
+publishing the chart, with no image to co-version ([release](./release.md)).
+
+Verified: `helm lint` clean; `helm template` renders 28 ConfigMaps + 28 RestDefinitions
+with zero plugin references anywhere in the output; every RestDefinition path and method
+cross-checked against its own OAS document; and all 28 rendered RestDefinitions accepted by
+the **deployed** `restdefinitions.ogen.krateo.io` CRD at oasgen-provider 0.23.0 on
+krateo-057 via `kubectl apply --dry-run=server`. As before, there is **no** live end-to-end
+run against GitHub for any kind.
+
 ## 2026-09-09 — four kinds become 31
 
 The chart now ships 31 `RestDefinition`s. The 27 new ones are **native** — none of them
@@ -254,16 +305,15 @@ krateo-platformops/installer#52.
 - **KOG, not a forked provider.** Every kind is a pure OpenAPI mapping
   (`RestDefinition` + trimmed spec); oasgen-provider (≥ 0.23.0, for `compareScope:
   updatable`) generates the CRDs and auto-deploys a `rest-dynamic-controller` per kind.
-  The chart ships no controller of its own.
-- **A companion plugin only for what OpenAPI cannot express.** The plugin
-  (`plugin/main.go`) is reached solely via per-operation OpenAPI `servers` overrides,
-  for exactly the verbs that need it — GitRef create (auto-resolve base sha) and observe
-  (git/ref-vs-git/refs asymmetry), RepoContent idempotent write + branch-aware,
-  base64-canonicalizing observe, and PullRequest observe (flatten head/base). Every
-  other verb goes straight to GitHub.
-- **The plugin carries no credential.** It forwards the caller's `Authorization`
-  header; the token lives in an out-of-band Secret referenced by the oasgen-generated
-  `<Kind>Configuration` CRs, which the portal write-path only references.
-- **Chart and plugin image co-version on one tag.** The plugin Deployment pins
-  `:{{ .Chart.Version }}`; `release-image.yaml` publishes the image on the same
-  bare-semver tag `release-oci.yaml` uses for the chart.
+  The chart ships no controller of its own — and since the plugin's removal, no runtime
+  component of any kind.
+- **No proxy.** All 28 kinds are native: every verb goes straight to GitHub. The
+  companion plugin existed for exactly three kinds and was deleted with them. When a kind
+  needs more than a plain OpenAPI mapping, the answer is a 0.23.0 RestDefinition feature —
+  `responseTransform`, `fieldMapping`, `compareScope` — not a service; where even that is
+  not enough, the gap is written down (`docs/design-*.md`) instead of coded around.
+- **The chart carries no credential.** The token lives in an out-of-band Secret
+  referenced by the oasgen-generated `<Kind>Configuration` CRs, which whatever drives the
+  kinds only references.
+- **One tag, one artifact.** A bare-semver tag drives `release-oci.yaml`, which packages
+  the chart. There is nothing else to publish and nothing to co-version.

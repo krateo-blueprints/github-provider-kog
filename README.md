@@ -4,18 +4,15 @@
 
 A Krateo **KOG** (Krateo OpenAPI Generation) provider, built on
 [`oasgen-provider`](https://github.com/krateo-platformops/oasgen-provider) **≥ 0.23.0**,
-that exposes 31 GitHub REST resources as Kubernetes kinds under the `github.krateo.io`
+that exposes 28 GitHub REST resources as Kubernetes kinds under the `github.krateo.io`
 group. Each kind is listed by its create endpoint; get/update/delete sit on the matching
 item path.
 
-**Git transport** — the blueprint-authoring chain:
+**Repositories** — what every other kind hangs off:
 
 | Kind | GitHub API | Purpose |
 |------|-----------|---------|
 | `Repository` | `POST /orgs/{org}/repos` | create the destination repository itself |
-| `RepoContent` | `PUT /repos/{owner}/{repo}/contents/{path}` | create/update a file in a repo |
-| `GitRef` | `POST /repos/{owner}/{repo}/git/refs` | create a branch/ref |
-| `PullRequest` | `POST /repos/{owner}/{repo}/pulls` | open a pull request |
 
 **Access** — who can reach what:
 
@@ -84,33 +81,44 @@ with **no body** when it is on, so it never returns anything a status schema cou
 derived from. `AutomatedSecurityFixes` is covered for exactly the opposite reason — its
 GET does return a body (`enabled`, `paused`).
 
-The git-transport four are why the chart exists — they are the in-cluster transport for
-**Krateo portal blueprint authoring**: the
-Autopilot blueprint builder writes a chart tree to a repo (`GitRef` → `RepoContent` per
-file → `PullRequest`) entirely as `github.krateo.io` apiserver CRs, so external CI can
-package and push the OCI chart on merge.
+**Removed: `GitRef`, `RepoContent` and `PullRequest`** — and the companion proxy plugin
+with them. Those three were the transport of the **legacy blueprint-publish path**, where
+the Autopilot builder wrote a chart tree to a repo (`GitRef` → `RepoContent` per file →
+`PullRequest`) as `github.krateo.io` CRs. The frontend now defaults to an SCM-agnostic
+route instead: `AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults to `"true"` in the frontend
+chart's `values.yaml` **and** `values.schema.json`, so a fresh install publishes through a
+`BuilderPublish` claim over `git-provider`, and the `github.krateo.io` route is the
+explicit `"false"` fallback. They were also the only three kinds that still needed the
+plugin, so both went in one change.
 
-`Repository` closes the gap at the front of that chain. Until it existed, a blueprint
-could only be published into a repository someone had already created by hand — which is
-backwards for a brand-new blueprint. It is deliberately ordered first: a repository
-created with `auto_init: false` has no commit and therefore no default branch, so a
-`GitRef` has no base sha to branch from and a `RepoContent` has nothing to commit
-against. The OAS defaults `auto_init` to `true` for exactly that reason.
+What each of them did, and exactly what it would take to bring it back **natively**, is
+recorded per kind: [docs/design-gitref.md](docs/design-gitref.md),
+[docs/design-repocontent.md](docs/design-repocontent.md),
+[docs/design-pullrequest.md](docs/design-pullrequest.md). `PullRequest` and `RepoContent`
+could return today — one `responseTransform` for `PullRequest`'s `head`/`base` flattening;
+`status.sha` plus a `responseTransform` for `RepoContent`, now that the `%252F`
+double-escape is fixed in 0.23.0. `GitRef` could too, but for one thing: resolving the
+base HEAD sha on create is a pre-call dependent read a `RestDefinition` cannot express,
+tracked as oasgen-provider **#120**.
 
-The chart ships 31 `RestDefinition`s + the trimmed OpenAPI spec each references (as a
-`ConfigMap`), plus a small companion **plugin** (`Deployment` + `Service`).
-`oasgen-provider` watches the RestDefinitions, generates the CRDs under
-`github.krateo.io`, and auto-deploys a `rest-dynamic-controller` per kind. The plugin
-handles only the GitHub REST inconsistencies the pure OpenAPI mapping cannot express, and
-serves exactly three kinds — `GitRef`, `RepoContent` and `PullRequest`. The other 28 are
-**native**: every one of their verbs goes straight to GitHub. See
+`Repository` is what creates a destination repo in the first place — until it existed, a
+blueprint could only be published into a repository someone had already made by hand. Its
+OAS defaults `auto_init` to `true` deliberately: a repository created with `auto_init:
+false` has no commit and therefore no default branch, so nothing can branch from it or
+commit against it until someone pushes by hand.
+
+The chart ships 28 `RestDefinition`s + the trimmed OpenAPI spec each references (as a
+`ConfigMap`), and nothing else — **no runtime component of its own**: no Deployment, no
+Service, no image, no proxy. `oasgen-provider` watches the RestDefinitions, generates the
+CRDs under `github.krateo.io`, and auto-deploys a `rest-dynamic-controller` per kind. All
+28 kinds are **native**: every one of their verbs goes straight to GitHub. See
 [docs/overview.md](docs/overview.md).
 
 ## Install
 
 Prerequisite: a Krateo cluster with `oasgen-provider` **≥ 0.23.0** — it provides
 `restdefinitions.ogen.krateo.io`, and 0.23.0 is where `compareScope: updatable` arrives,
-which 23 of the 31 kinds declare.
+which 23 of the 28 kinds declare.
 
 Per the Krateo "everything is a Composition" rule, this chart is installed as a
 **component** — a `component-pins` entry that the core-provider CDC turns into a
@@ -136,28 +144,28 @@ Configuration per kind pointing at it:
 ```console
 $ kubectl create secret generic gh-token -n krateo-system \
     --from-literal=token=<YOUR_GITHUB_PAT>
-$ kubectl apply -f chart/samples/configurations.yaml   # all 31 <Kind>Configuration CRs
+$ kubectl apply -f chart/samples/configurations.yaml   # all 28 <Kind>Configuration CRs
 ```
 
-One PAT can drive the whole chart: all 31 Configurations may share a single name
+One PAT can drive the whole chart: all 28 Configurations may share a single name
 (`github-blueprints-config`), since the kind is implied by the resource that references
-it. What the PAT must be *allowed* to do differs by kind, though — the git-write kinds
-need only contents/refs/pulls, `Repository` also needs repository creation in the org
-(classic `repo`; fine-grained org **Administration: read & write**), and the org-scoped
-kinds such as `Team` and `OrgMembership` need org admin rights. You only need the
+it. What the PAT must be *allowed* to do differs by kind, though — `Repository` needs
+repository creation in the org (classic `repo`; fine-grained org **Administration: read &
+write**), and the org-scoped kinds such as `Team` and `OrgMembership` need org admin
+rights. You only need the
 Configurations for the kinds you actually use; the rest are inert. (`CodeSecurityConfig`
 is named that rather than `CodeSecurityConfiguration` so its generated auth kind is
 `CodeSecurityConfigConfiguration`, not a doubled `…ConfigurationConfiguration`.)
 
-The Krateo portal write-path only **references** these Configuration CRs; it never
-creates them or the Secret. Full surface: [docs/configuration.md](docs/configuration.md).
+Whatever drives these kinds only **references** these Configuration CRs; it never creates
+them or the Secret. Full surface: [docs/configuration.md](docs/configuration.md).
 
 ## Examples
 
-- [examples/blueprint-authoring](examples/blueprint-authoring/README.md) — the
-  end-to-end git-write flow (`GitRef` → `RepoContent` → `PullRequest`) applied as three
-  `github.krateo.io` CRs against a scratch repo.
-- `chart/samples/` — the 31 `<Kind>Configuration` CRs and one applyable test CR per kind
+- [examples/blueprint-authoring](examples/blueprint-authoring/README.md) — the one-time
+  token + `<Kind>Configuration` wiring, and `github.krateo.io` CRs applied in order
+  against a scratch repo.
+- `chart/samples/` — the 28 `<Kind>Configuration` CRs and one applyable test CR per kind
   (`test-<kind>.yaml`).
 
 ## Docs
@@ -166,26 +174,28 @@ The full documentation bundle follows the Krateo Documentation Standard (OKF):
 
 - [docs/index.md](docs/index.md) — the map of the bundle.
 - [docs/overview.md](docs/overview.md) — how it works: RestDefinitions → CRDs +
-  controllers, and the plugin.
+  controllers.
 - [docs/usage.md](docs/usage.md) — install, provision auth, drive the kinds, verify.
-- [docs/configuration.md](docs/configuration.md) — values, mappings, plugin routes,
-  invariants.
+- [docs/configuration.md](docs/configuration.md) — values, mappings, invariants.
 - [docs/api.md](docs/api.md) — the generated CRDs and the CompositionDefinition.
 - [docs/examples.md](docs/examples.md) — the runnable examples.
 - [docs/release.md](docs/release.md) — how a release ships.
 - [docs/log.md](docs/log.md) — curated history.
 - [docs/llms.txt](docs/llms.txt) — the file-by-file index.
 
+The three removed kinds keep a design document each — what the kind did, what the plugin
+did for it, and the native `RestDefinition` that would replace it:
+[docs/design-gitref.md](docs/design-gitref.md),
+[docs/design-repocontent.md](docs/design-repocontent.md),
+[docs/design-pullrequest.md](docs/design-pullrequest.md).
+
 ## Develop & release
 
 - **Chart** — `chart/` is the single first-class chart; `chart/values.schema.json` types
   its values (and is what the CDC derives the component CRD from).
-- **Plugin** — `plugin/main.go` is a stdlib-only Go service; `plugin/Dockerfile` builds
-  it on a distroless `nonroot` base.
-- **Release** — one plain-semver tag (`X.Y.Z`, no `v`) drives both `release-oci.yaml`
-  (packages `chart/` to `oci://ghcr.io/krateo-blueprints/charts`) and `release-image.yaml`
-  (publishes `ghcr.io/krateo-blueprints/krateo-github-provider-kog-plugin:X.Y.Z`). The
-  plugin Deployment pins `:{{ .Chart.Version }}`, so the two always line up. Details:
-  [docs/release.md](docs/release.md).
+- **Release** — one plain-semver tag (`X.Y.Z`, no `v`) drives `release-oci.yaml`, which
+  packages `chart/` to `oci://ghcr.io/krateo-blueprints/charts`. The chart is the only
+  release artifact: there is no image in this repo any more, and nothing to co-version
+  with it. Details: [docs/release.md](docs/release.md).
 - **CI** — `lint.yaml` runs the shared `lint-docs` docs-standard check; `security.yml`
   runs the shared org security workflow.

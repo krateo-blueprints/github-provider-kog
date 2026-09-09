@@ -1,26 +1,20 @@
 ---
 type: ExampleIndex
 title: github-provider-kog — examples
-description: Index of the runnable examples — the end-to-end blueprint-authoring flow (GitRef then RepoContent then PullRequest) against a scratch repo, the Repository CR that creates the destination repo that flow writes into, and the sample CR per kind under chart/samples/, grouped by area with the order each group must be applied in.
+description: Index of the runnable examples — the Repository CR that creates the destination repository every repository-scoped sample configures, and the sample CR for each of the 28 kinds under chart/samples/, grouped by area with the order each group must be applied in.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
-tags: [examples, github, blueprint-authoring, samples]
+tags: [examples, github, samples]
 timestamp: 2026-09-09T00:00:00Z
 ---
 
 # Examples
 
-- [examples/blueprint-authoring](../examples/blueprint-authoring/README.md) — the
-  end-to-end write-path the Autopilot blueprint builder drives, as three
-  `github.krateo.io` CRs applied in order: a `GitRef` creates the builder branch, a
-  `RepoContent` writes a file onto it, and a `PullRequest` opens the PR into `main`. It
-  reuses the `chart/samples/` CRs and shows the one-time token + `<Kind>Configuration`
-  wiring they reference.
 - [chart/samples/test-repository.yaml](../chart/samples/test-repository.yaml) — the
-  **destination repository**, which comes before that write-path: `Repository` →
-  `GitRef` → `RepoContent` (per file) → `PullRequest`. It creates `demo-destination`
-  in the `krateo-blueprints` org with `auto_init: true`, so the new repo has a first
-  commit and therefore a default branch — without one the `GitRef` has no base sha to
-  branch from and the `RepoContent` has nothing to commit against.
+  **destination repository**, which comes before every other repository-scoped sample.
+  It creates `demo-destination` in the `krateo-blueprints` org with `auto_init: true`,
+  so the new repo has a first commit and therefore a default branch — without one a
+  `BranchProtection`, a `~DEFAULT_BRANCH` ruleset condition or a `Release` creating its
+  tag from `main` has nothing to bind to.
   [usage](./usage.md) works it through field by field.
 
   ```console
@@ -32,8 +26,8 @@ timestamp: 2026-09-09T00:00:00Z
 
   Three things to settle before running it. The PAT needs repo-creation rights in the
   org — classic token `repo`, fine-grained token organization **Administration: read &
-  write** — which is more than the contents/refs/pulls scopes the other three kinds
-  need, so a token that drives the write-path fine can still fail here. `delete` maps
+  write** — which is more than the repository-scoped kinds need, so a token that
+  configures an existing repository fine can still fail here. `delete` maps
   to `DELETE /repos/{org}/{name}`, so deleting the CR deletes the repository on GitHub:
   point the sample at a scratch org. And editing the applied CR is pushed to
   GitHub only for fields `PATCH` can send — `Repository` compares with
@@ -41,15 +35,23 @@ timestamp: 2026-09-09T00:00:00Z
   create-only `auto_init`, `gitignore_template` and `license_template` do not
   ([usage](./usage.md), [configuration](./configuration.md)).
 
+There is no git-write example any more. `GitRef`, `RepoContent` and `PullRequest` have
+been removed along with the proxy plugin that served them, and publishing now runs through
+the frontend's `BuilderPublish` claim over `git-provider`
+(`AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults to `"true"`). What each kind did and what
+bringing it back natively would take is recorded in [design-gitref](./design-gitref.md),
+[design-repocontent](./design-repocontent.md) and
+[design-pullrequest](./design-pullrequest.md).
+
 ## The sample CRs, by group
 
 The chart ships one sample per kind — `chart/samples/test-<kind>.yaml`, lower-cased —
-covering the 27 kinds beyond that write-path as well. Each carries its gotchas in a
+covering the other 27 kinds as well. Each carries its gotchas in a
 header comment and sets `krateo.io/connector-verbose: "true"`, and every one of them
 names the `krateo-blueprints` org and a `demo-destination` repository. Edit those first
 and work in a **scratch org**: several kinds delete the real thing when their CR is
-deleted, and none of the 31 has been run end to end against GitHub — the first apply is
-the real test.
+deleted, and no kind in this chart has ever reconciled against GitHub — the first apply
+is the real test.
 
 One `<Kind>Configuration` set serves all of them. `chart/samples/configurations.yaml`
 ships one per kind, each named `github-blueprints-config` and pointing at the same
@@ -59,7 +61,7 @@ allowed to do does differ by group — the per-group rights table is in
 [usage](./usage.md), which also works each group's fields and gotchas through.
 
 ```console
-$ kubectl apply -f chart/samples/configurations.yaml    # all 31, one shared name
+$ kubectl apply -f chart/samples/configurations.yaml    # all 28, one shared name
 ```
 
 ### Access
@@ -140,9 +142,9 @@ $ kubectl apply -f chart/samples/test-environmentvariable.yaml
 $ kubectl apply -f chart/samples/test-deploymentbranchpolicy.yaml
 ```
 
-`test-workflow.yaml` does not create a workflow: commit
-`.github/workflows/release.yaml` first (a `RepoContent`, as in the blueprint-authoring
-example) or point `workflow_id` at a file that already exists.
+`test-workflow.yaml` does not create a workflow, and no kind in this chart writes files:
+commit `.github/workflows/release.yaml` by some other route first, or point
+`workflow_id` at a file that already exists.
 
 ### Work tracking
 

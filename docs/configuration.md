@@ -1,9 +1,9 @@
 ---
 type: Configuration
 title: github-provider-kog — configuration
-description: The whole config surface — the single chart value resourceGroup, the 31 RestDefinition mappings grouped by area, the compareScope tally and the reasoning behind each non-default choice, the native normalizations that replace a plugin hop, the OpenAPI ConfigMaps and plugin servers overrides, the plugin routes and env, and the invariants that must hold.
+description: The whole config surface — the single chart value resourceGroup, the 28 RestDefinition mappings grouped by area, the compareScope tally and the reasoning behind each non-default choice, the native normalizations GitHub's REST inconsistencies demand, the OpenAPI ConfigMaps, and the invariants that must hold for a chart that ships no runtime component.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
-tags: [krateo, values, restdefinition, oasgen-provider, plugin]
+tags: [krateo, values, restdefinition, oasgen-provider]
 timestamp: 2026-09-09T00:00:00Z
 ---
 
@@ -19,7 +19,7 @@ The chart surface is deliberately tiny — one scalar. Everything else is fixed 
 
 | key | default | effect |
 |---|---|---|
-| `resourceGroup` | `github.krateo.io` | the API group every generated CRD lands under — 31 resource kinds plus a `<Kind>Configuration` auth kind for each. Referenced by every RestDefinition's `spec.resourceGroup`. |
+| `resourceGroup` | `github.krateo.io` | the API group every generated CRD lands under — 28 resource kinds plus a `<Kind>Configuration` auth kind for each. Referenced by every RestDefinition's `spec.resourceGroup`. |
 | `global` | `{}` (object) | Helm global values, injected by the chart-inspector / when used as a subchart. |
 
 The schema declares **only** a single top-level scalar on purpose: when the chart is
@@ -27,7 +27,7 @@ installed as a Krateo component the CDC derives the CompositionDefinition CRD fr
 schema, and a scalar default materializes cleanly in the component CR (nested-object
 toggles would not) ([api](./api.md)).
 
-There is **no per-kind toggle**. All 31 RestDefinitions are always installed; a
+There is **no per-kind toggle**. All 28 RestDefinitions are always installed; a
 RestDefinition costs nothing until a CR of its kind exists, and a per-kind switch would
 mean nested-object values the CDC cannot materialize.
 
@@ -35,7 +35,7 @@ mean nested-object values the CDC cannot materialize.
 
 Each `chart/templates/rd-<kind>.yaml` declares the API mapping oasgen-provider consumes;
 its in-file comments carry the reasoning behind every choice below. `configurationFields`
-is empty for all 31 — the token wiring comes from the oasgen-generated
+is empty for all 28 — the token wiring comes from the oasgen-generated
 `<Kind>Configuration` + `spec.configurationRef`, never from spec fields. The full
 per-kind verb, identifier, `compareScope` and status listing is in [api](./api.md); what
 follows is the mapping mechanics.
@@ -44,16 +44,16 @@ Three patterns recur across the set and are worth reading once:
 
 - **Server-assigned identifiers.** When GitHub assigns the item key on create, that key
   is `excludedSpecFields` (so it never becomes a required spec field the author has to
-  fill in) and each item verb sources it from status via `requestFieldMapping`. This is
-  `PullRequest`'s `pull_number` / `status.number` shape, reused by `Release`,
-  `Milestone`, `Issue`, `RepoWebhook`, `OrgWebhook`, `DeployKey`, `Autolink`,
-  `RunnerGroup`, `DeploymentBranchPolicy`, `RepoRuleset`, `OrgRuleset`,
-  `CodeSecurityConfig` and `Deployment`. `Team` uses the same shape on `team_slug`, and
-  `fieldMapping` rather than `requestFieldMapping`.
+  fill in) and each item verb sources it from status via `requestFieldMapping`. That is
+  `Release`'s `release_id` / `status.id` shape, shared by `Milestone`, `Issue`,
+  `RepoWebhook`, `OrgWebhook`, `DeployKey`, `Autolink`, `RunnerGroup`,
+  `DeploymentBranchPolicy`, `RepoRuleset`, `OrgRuleset`, `CodeSecurityConfig` and
+  `Deployment`. `Team` uses the same shape on `team_slug`, and `fieldMapping` rather than
+  `requestFieldMapping`.
 - **PUT as create *and* update.** Where GitHub exposes one idempotent upsert,
   `create` and `update` name the same method and path: `Collaborator`, `OrgMembership`,
-  `TeamMembership`, `TeamRepo`, `Environment`, `CustomProperty`, `BranchProtection` —
-  the shape `RepoContent` already uses.
+  `TeamMembership`, `TeamRepo`, `Environment`, `CustomProperty` and `BranchProtection`
+  all declare one method and one path for both.
 - **Path parameters are spec fields.** Every OAS parameter of every verb becomes a CR
   spec field of the same name, which is why several assets rename or exclude parameters
   rather than accept GitHub's naming (see `Repository`'s `org`/`name` below, and
@@ -111,24 +111,21 @@ Three patterns recur across the set and are worth reading once:
 | `CodeSecurityConfig` | `id` | `configuration_id` excluded, sourced from `status.id`. GitHub's update accepts everything its create does, so nothing here is create-only. |
 | `AutomatedSecurityFixes` | *(none)* | a singleton sub-resource with no identity of its own: the repository is the key and lives in the path. A `notFoundBody` predicate reports `enabled == false` as absent — load-bearing, because a repository with the feature off answers **200**, not 404. `paused` is surfaced on status but excluded from the predicate. |
 
-**Git-write and repository creation**
+**Repository creation**
 
 | kind | identifiers | key mapping facts |
 |---|---|---|
-| `Repository` | `name` | create on `/orgs/{org}/repos`, get/update/delete on `/repos/{org}/{name}` — every verb native, no plugin hop. `compareScope: updatable`, not the default (below); status carries `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch`. |
-| `RepoContent` | `path` | create/update/get/delete all on `/repos/{owner}/{repo}/contents/{path}`; status carries `sha`, `html_url`. |
-| `GitRef` | `ref` | create on `git/refs`, but **get** on the plugin's `/gitref/{owner}/{repo}/{ref}` (fixes GitHub's git/ref-vs-git/refs asymmetry); status carries `node_id`, `url`. |
-| `PullRequest` | `number` | `pull_number` is `excludedSpecFields` (GitHub assigns it on create); get/update source it from `status.number` via `requestFieldMapping`. Status carries `number`, `html_url`, `state`. |
+| `Repository` | `name` | create on `/orgs/{org}/repos`, get/update/delete on `/repos/{org}/{name}` — the parameters are renamed `org`/`name` so one pair of spec fields serves the create path, the create body and the item path. `compareScope: updatable`, not the default (below); status carries `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch`. |
 
 ### `compareScope` across the chart
 
 `compareScope` takes one of three values — `fullSpec` (the default),
-`identifiersAndStatus`, or `updatable`. Across the 31 kinds:
+`identifiersAndStatus`, or `updatable`. Across the 28 kinds:
 
 | value | kinds | count |
 |---|---|---|
 | `updatable` | `Repository`, `Team`, `TeamRepo`, `TeamMembership`, `Collaborator`, `OrgMembership`, `RepoWebhook`, `OrgWebhook`, `Environment`, `RepoRuleset`, `OrgRuleset`, `BranchProtection`, `ActionsVariableRepo`, `ActionsVariableOrg`, `EnvironmentVariable`, `RunnerGroup`, `DeploymentBranchPolicy`, `Label`, `Milestone`, `Issue`, `Release`, `CustomProperty`, `CodeSecurityConfig` | 23 |
-| default `fullSpec` (unset) | `RepoContent`, `GitRef`, `PullRequest`, `Workflow`, `AutomatedSecurityFixes` | 5 |
+| default `fullSpec` (unset) | `Workflow`, `AutomatedSecurityFixes` | 2 |
 | `fullSpec` (set explicitly) | `Autolink` | 1 |
 | `identifiersAndStatus` | `DeployKey`, `Deployment` | 2 |
 
@@ -191,9 +188,8 @@ budget. That is the case `updatable` exists for, and it splits the 23 kinds in t
   intent by construction and stays correct if a field the response *does* carry and the
   update *cannot* fix is added later — not because it is preventing a loop.
 
-The kinds that are not `updatable` are not oversights. `RepoContent`, `GitRef` and
-`PullRequest` leave `compareScope` unset and keep the default; the other five each carry
-the reason in their `rd-<kind>.yaml`:
+The five kinds that are not `updatable` are not oversights; each carries the reason in
+its `rd-<kind>.yaml`:
 
 - **`Workflow` and `AutomatedSecurityFixes`** have no update verb (enable/disable are the
   create and the delete, and a toggle has only on and off), so `updatable` is rejected at
@@ -259,12 +255,11 @@ not exist below oasgen-provider **0.23.0**. That setting compared only `name` pl
 `additionalStatusFields`, so editing `description` or `private` on an existing CR was
 silently never pushed — a real gap, and closing it is what the change was actually for.
 
-### Normalization without a plugin
+### Normalization in the RestDefinition
 
-The three git-write kinds route some verbs through the companion plugin (below). The
-other 28 do not, including every one of the 27 kinds added after the original four: where
-GitHub's REST API needs normalizing, the RestDefinition expresses it. The mechanisms, and
-where each is used:
+All 28 kinds are native: every verb goes straight to `api.github.com`, and where GitHub's
+REST API needs normalizing, the RestDefinition expresses it rather than a hop through
+something the chart would have to run. The mechanisms, and where each is used:
 
 | mechanism | used by | what it does |
 |---|---|---|
@@ -281,34 +276,16 @@ in-place or another entry writes to that key. That is why `Collaborator` carries
 identity mapping from `role_name` to `status.role_name`: without it the alias mapping
 would consume the key and `status.role_name` would silently never populate.
 
-## The OpenAPI specs and the plugin `servers` overrides
+## The OpenAPI specs
 
 Each RestDefinition references a trimmed OpenAPI 3.0 spec (`chart/assets/<kind>.yaml`)
-carried as a ConfigMap (`chart/templates/configmap-<kind>.yaml`). The RepoContent,
-GitRef and PullRequest ConfigMaps are `tpl`-rendered so the per-operation `servers`
-overrides resolve to the plugin's in-cluster URL via the `webServiceUrl` helper
-(`chart/templates/_helpers.tpl`):
+carried as a ConfigMap (`chart/templates/configmap-<kind>.yaml`). All **28** ConfigMaps
+are a plain `.Files.Get`: the assets contain no template action, so nothing is
+`tpl`-rendered and each spec is copied verbatim. No operation anywhere in the set
+overrides `servers` — every verb of every kind keeps `https://api.github.com`.
 
-```
-http://<release>-plugin.<namespace>.svc:8080
-```
-
-The other **28** ConfigMaps are a plain `.Files.Get` instead. Those kinds are fully
-native — every verb goes straight to `api.github.com`, so no operation overrides
-`servers` — and their assets therefore contain no template action: they are copied
-verbatim, with nothing for `tpl` to resolve.
-
-Only the operations that need normalization carry that override; every other verb keeps
-`https://api.github.com`. A notable OpenAPI subtlety: on `git/update-ref`, `sha` is
-intentionally **not** required — oasgen unions `required` across all verbs into one
-CRD `spec.required`, so requiring it on update would force it back onto the create path
-(which auto-resolves it). Similarly the RepoContent get operation names its query param
-`branch` (not GitHub's `ref`) so the controller — which only fills a query param whose
-name matches a CR spec field — populates it from `spec.branch`; the plugin forwards it
-to GitHub as `?ref`.
-
-`repository.yaml` renames path parameters for the same class of reason. GitHub
-addresses a repository as `/repos/{owner}/{repo}`; the asset declares the parameters
+What the assets do carry is parameter naming, and `repository.yaml` is the clearest case.
+GitHub addresses a repository as `/repos/{owner}/{repo}`; the asset declares the parameters
 as `org` and `name`. A path parameter becomes a CR spec field of the same name, so
 naming them after GitHub would give the CRD an `owner` alongside the `org` the create
 path (`/orgs/{org}/repos`) needs, and a `repo` alongside the `name` the create body
@@ -328,61 +305,56 @@ need a LibSodium sealed box plus a prior public-key fetch, and **`VulnerabilityA
 whose GET returns 404 or a bodiless 204 and therefore yields no status schema. Variables
 are not secrets and are covered at all three scopes.
 
-## The plugin
+## No runtime component
 
-`plugin/main.go`, a stdlib-only Go service; `plugin/Dockerfile` builds it on a
-distroless `nonroot` base (UID/GID 65532). It serves **only** `RepoContent`, `GitRef` and
-`PullRequest` — no kind added after the original four uses it. It exposes:
+The chart renders 28 ConfigMaps and 28 RestDefinitions, and nothing else — no Deployment,
+no Service, no image, no proxy, and no `_helpers.tpl` (it held only the two helpers the
+proxy needed). Installing the chart puts data in the cluster; the only workloads are the
+`rest-dynamic-controller` deployments oasgen-provider creates per kind.
 
-| route | purpose |
-|---|---|
-| `GET /healthz`, `GET /readyz` | liveness/readiness (always ok) |
-| `POST /repos/{owner}/{repo}/git/refs` | GitRef create — auto-resolve base sha when the CR omits it |
-| `GET /gitref/{owner}/{repo}/{ref...}` | GitRef observe — map onto GitHub's `git/ref/{ref}` (no `refs/` prefix) |
-| `PUT /repos/{owner}/{repo}/contents/{path...}` | RepoContent write — idempotent create-or-update, flatten `content{}` |
-| `GET /repos/{owner}/{repo}/contents/{path...}` | RepoContent observe — read from `?ref=<branch>`, canonicalize base64 `content` |
-| `GET /repos/{owner}/{repo}/pulls/{number}` | PullRequest observe — flatten `head`/`base` objects to `ref` strings |
+That became true when `GitRef`, `RepoContent` and `PullRequest` were removed. They were
+the three kinds whose verbs routed through a companion proxy, and the only users of it,
+so the plugin went with them. The frontend now publishes through a `BuilderPublish` claim
+over `git-provider` — `AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults to `"true"` in the
+frontend chart's `values.yaml` and `values.schema.json` — and the `github.krateo.io`
+route is the `"false"` fallback.
 
-The `Deployment` (`chart/templates/deployment-plugin.yaml`) sets the container's env
-and security context:
+What each of the three did, and exactly what it would take to bring it back **natively**,
+is written down per kind:
 
-| setting | value | effect |
+| document | kind | state of a native return at 0.23.0 |
 |---|---|---|
-| `PORT` | `8080` | the plugin listen port (`http`). |
-| `image` | `ghcr.io/krateo-blueprints/krateo-github-provider-kog-plugin:{{ .Chart.Version }}` | the chart version selects the plugin image tag, so chart X.Y.Z asks for plugin X.Y.Z. |
-| securityContext | runAsNonRoot 65532, read-only rootfs, drop ALL caps | distroless nonroot; the numeric UID lets the kubelet verify non-root. |
-| resources | 10m/32Mi → 128Mi | the plugin is tiny and stateless. |
+| [design-gitref](./design-gitref.md) | `GitRef` | blocked on one thing only: resolving the base HEAD sha on create is a pre-call dependent read a RestDefinition cannot express — oasgen-provider **#120**. |
+| [design-repocontent](./design-repocontent.md) | `RepoContent` | expressible today — `status.sha` plus a `responseTransform`, now that the `%252F` double-escape is fixed. |
+| [design-pullrequest](./design-pullrequest.md) | `PullRequest` | expressible today — a `responseTransform` flattening `head`/`base` to `ref` strings. |
 
 ## Invariants
 
 - **oasgen-provider must be ≥ 0.23.0.** 23 kinds declare `compareScope: updatable`,
   which does not exist below that version, and the CRD rejects it on a kind with no
   update verb.
-- **The plugin image tag equals the chart version.** The Deployment pins
-  `:{{ .Chart.Version }}`, and `release-image.yaml` publishes the plugin image on the
-  same bare-semver tag `release-oci.yaml` uses for the chart, so one tag push publishes
-  both and they line up ([release](./release.md)).
-- **`webServiceUrl` must resolve to the plugin Service.** The RepoContent, GitRef and
-  PullRequest ConfigMaps are `tpl`-rendered for exactly this reason; a plain
-  `.Files.Get` would leave the template literal in the OpenAPI and the controller would
-  call GitHub for the plugin-only verbs (breaking observe on GitRef/PullRequest and
-  idempotent write on RepoContent). The other 28 kinds have no override to resolve and
-  are correctly plain `.Files.Get`.
-- **`Repository` must exist and be initialised before the kinds that write into it.**
+- **The chart stays free of a runtime component.** It renders 28 ConfigMaps and 28
+  RestDefinitions and nothing else; every kind reaches `api.github.com` directly, no
+  asset overrides `servers`, and every ConfigMap is a plain `.Files.Get` with nothing for
+  `tpl` to resolve. A kind that needed a hop would reintroduce a Deployment, a Service and
+  an image to release — which is why the two kinds that could return natively are worth
+  the transforms their design docs specify.
+- **`Repository` must exist and be initialised before anything writes into it.**
   `auto_init` defaults to `true` so the new repo has a first commit and therefore a
-  default branch; without one, `GitRef` has no base sha to branch from and
-  `RepoContent` has nothing to commit against. Order: Repository → GitRef →
-  RepoContent (per file) → PullRequest.
+  default branch; without one there is no base sha to branch from and nothing to commit
+  against, whether the writer is the `BuilderPublish` path over `git-provider` or a CI
+  job.
 - **A RestDefinition's declared paths and methods must exist in its own asset.** Every
   verb resolves against the OpenAPI document the ConfigMap named by `oasPath` carries, so
   a path or method that is not in that document is a mapping the controller can never
-  execute. Every verb of all 31 was cross-checked against its own asset before shipping.
+  execute. Every verb of all 28 was cross-checked against its own asset, and all 28
+  RestDefinitions were accepted by the deployed `restdefinitions.ogen.krateo.io` CRD at
+  oasgen-provider 0.23.0 (`kubectl apply --dry-run=server`).
 - **The token is provisioned out-of-band, and its rights are the union of the kinds in
   use.** The chart holds no credential; the portal write-path only references the
-  `<Kind>Configuration` CRs ([usage](./usage.md)). One PAT can drive all 31 kinds, and
-  `chart/samples/configurations.yaml` ships all 31 Configuration CRs under a single name
-  — but the git-write kinds need only contents/refs/pulls write, `Repository` needs
-  repository creation in the org (classic `repo` scope, or a fine-grained token with org
-  **Administration: read & write**), and the org-scoped kinds — `Team`, `TeamMembership`,
+  `<Kind>Configuration` CRs ([usage](./usage.md)). One PAT can drive all 28 kinds, and
+  `chart/samples/configurations.yaml` ships all 28 Configuration CRs under a single name
+  — but `Repository` needs repository creation in the org (classic `repo` scope, or a
+  fine-grained token with org **Administration: read & write**), and the org-scoped kinds — `Team`, `TeamMembership`,
   `TeamRepo`, `OrgMembership`, `OrgWebhook`, `OrgRuleset`, `ActionsVariableOrg`,
   `RunnerGroup`, `CustomProperty`, `CodeSecurityConfig` — need organization admin rights.

@@ -1,11 +1,11 @@
 apiVersion: v2
 name: github-provider-kog
 description: >-
-  Krateo KOG provider (oasgen-provider) exposing GitHub's repository and git-write
-  API — Repository, RepoContent, GitRef, PullRequest — as github.krateo.io Kubernetes
-  kinds. Ships only RestDefinitions + trimmed OpenAPI specs; oasgen-provider generates
-  the CRDs and auto-deploys a rest-dynamic-controller per kind. No bundled controller
-  image.
+  Krateo KOG provider (oasgen-provider >= 0.23.0) exposing GitHub's platform-engineering
+  API — repositories, teams, memberships, webhooks, environments, rulesets, Actions
+  variables, branch protection and more — as 28 github.krateo.io Kubernetes kinds. Every
+  kind is native: the chart ships only RestDefinitions + trimmed OpenAPI specs, with no
+  controller image and no proxy plugin.
 type: application
 
 # release-oci substitutes CHART_VERSION from the pushed semver tag.

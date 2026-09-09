@@ -1,9 +1,9 @@
 ---
 type: Usage
 title: github-provider-kog — usage
-description: How to run the provider — install it as a Krateo component, provision the GitHub token Secret and one Configuration CR per kind (all 31 may share a single name), create the destination repository with Repository, author a chart tree with GitRef then RepoContent then PullRequest, drive the other 27 kinds group by group (access, repository configuration, CI/CD, work tracking, governance), and verify the generated CRDs and controllers.
+description: How to run the provider — install it as a Krateo component, provision the GitHub token Secret and one Configuration CR per kind (all 28 may share a single name), create the destination repository with Repository, drive the other 27 kinds group by group (access, repository configuration, CI/CD, work tracking, governance), and verify the generated CRDs and controllers. The chart ships no runtime component of its own.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
-tags: [krateo, install, oasgen-provider, github, blueprint-authoring]
+tags: [krateo, install, oasgen-provider, github]
 timestamp: 2026-09-09T00:00:00Z
 ---
 
@@ -14,9 +14,14 @@ timestamp: 2026-09-09T00:00:00Z
 A Krateo cluster with `oasgen-provider` **≥ 0.23.0** running (it provides
 `restdefinitions.ogen.krateo.io` and generates the CRDs + a controller per kind).
 
-0.9.x carried the four original kinds, but 23 of the 31 now set
+0.9.x carried the four kinds the chart started with, but 23 of the 28 that remain now set
 `compareScope: updatable`, a value older `RestDefinition` CRDs do not accept — below
 0.23.0 those RestDefinitions are rejected on apply and their kinds never appear.
+
+Nothing else is required. The chart renders 28 ConfigMaps and 28 RestDefinitions and
+nothing more: there is no Deployment, no Service and no image of its own to pull. Every
+verb of every kind is a native call to `api.github.com`, made by the
+rest-dynamic-controller oasgen-provider generates.
 
 ## Install — as a Krateo component
 
@@ -49,24 +54,23 @@ CR per kind pointing at it. First the Secret:
 ```console
 $ kubectl create secret generic gh-token \
     --namespace krateo-system \
-    --from-literal=token=<YOUR_GITHUB_PAT>   # PAT scopes: repo (contents/refs/pulls write)
+    --from-literal=token=<YOUR_GITHUB_PAT>   # PAT scopes: repo (one repository's settings)
                                              # + repo creation in the org (Repository)
                                              # + admin:org for the org-scoped kinds
 ```
 
-`Repository` needs **more** than the three git-write kinds: creating a repository in an
-organization is an admin operation, not a contents/refs/pulls write. A classic token
-needs `repo`; a fine-grained token needs the organization permission **Administration:
-read & write** on top of the repository permissions those three use. If the
-token is scoped only for the git-write kinds, `GitRef`/`RepoContent`/`PullRequest` still
-work and only `Repository` fails.
+`Repository` needs **more** than the repository-scoped kinds: creating a repository in an
+organization is an admin operation, not a write against a repository that already exists.
+A classic token needs `repo`; a fine-grained token needs the organization permission
+**Administration: read & write** on top of the repository permissions the rest use. A
+token scoped for one repository's settings drives those kinds and fails on `Repository`
+alone.
 
-The other 27 kinds spread the same way: a single PAT can drive the whole chart, but the
-rights it needs grow with the groups you actually use.
+The 28 kinds spread the same way: a single PAT can drive the whole chart, but the rights
+it needs grow with the groups you actually use.
 
 | kinds | what the token must be allowed to do | classic scope |
 |---|---|---|
-| `GitRef`, `RepoContent`, `PullRequest` | write contents, refs and pull requests on one repository | `repo` |
 | `Issue`, `Label`, `Milestone`, `Release`, `Deployment` | write issues, labels, releases and deployments on one repository | `repo` |
 | `RepoWebhook`, `DeployKey`, `Environment`, `DeploymentBranchPolicy`, `RepoRuleset`, `BranchProtection`, `Autolink`, `Collaborator`, `AutomatedSecurityFixes`, `ActionsVariableRepo`, `EnvironmentVariable`, `Workflow` | administer one repository's settings | `repo` |
 | `Repository` | create and delete repositories in the organization | `repo`, and the org must permit the token to create repositories |
@@ -77,18 +81,18 @@ repository **Administration**, **Webhooks**, **Environments**, **Variables**, an
 organization **Members**, **Administration**, **Custom properties**, **Self-hosted
 runners** — and GitHub's reference page for the endpoint a kind calls is the authority
 on which one. The endpoint per kind is in [configuration](./configuration.md). Expect a
-token that drives the blueprint write-path perfectly to `403` on the org-scoped kinds
+token that drives the repository-scoped kinds perfectly to `403` on the org-scoped ones
 until it is widened.
 
 Then one Configuration per kind. They may all share a name — the kind is implied by the
 resource that references it — which is why `chart/samples/configurations.yaml` ships all
-31 under the same `github-blueprints-config`:
+28 under the same `github-blueprints-config`:
 
 ```yaml
 apiVersion: github.krateo.io/v1alpha1
-kind: RepoContentConfiguration   # one of 31: GitRefConfiguration, PullRequestConfiguration,
-                                 # RepositoryConfiguration, TeamConfiguration,
-                                 # RepoRulesetConfiguration, LabelConfiguration, …
+kind: RepositoryConfiguration    # one of 28: TeamConfiguration, RepoRulesetConfiguration,
+                                 # LabelConfiguration, EnvironmentConfiguration,
+                                 # CustomPropertyConfiguration, …
 metadata:
   name: github-blueprints-config
   namespace: krateo-system
@@ -110,18 +114,16 @@ Two things about that set:
   `CodeSecurityConfig`, not `CodeSecurityConfiguration`, precisely so the generated auth
   kind reads that way instead of a doubled `…ConfigurationConfiguration`.
 
-The Krateo portal write-path **references** these Configuration CRs
-(`spec.configurationRef.name`); it never creates them or the Secret. The PAT is
-created and stored by an operator, never handled by the browser or snowplow.
+Whatever drives these kinds **references** these Configuration CRs
+(`spec.configurationRef.name`); nothing in the portal creates them or the Secret. The PAT
+is created and stored by an operator, never handled by the browser or snowplow.
 
 ## Create the destination repository
 
-`Repository` creates the repo everything else is written into, so it comes **first** —
-`Repository` → `GitRef` → `RepoContent` (per file) → `PullRequest`. Like every kind but
-the three git-write ones, it never routes through the plugin: create
-(`POST /orgs/{org}/repos`) and get/update/delete
-(`GET`/`PATCH`/`DELETE /repos/{org}/{name}`) all go straight to `api.github.com`. See
-`chart/samples/test-repository.yaml`:
+`Repository` creates the repo every other repository-scoped kind then configures, so it
+comes **first**. Like all 28 kinds it is fully native: create (`POST /orgs/{org}/repos`)
+and get/update/delete (`GET`/`PATCH`/`DELETE /repos/{org}/{name}`) all go straight to
+`api.github.com`. See `chart/samples/test-repository.yaml`:
 
 ```yaml
 apiVersion: github.krateo.io/v1alpha1
@@ -142,15 +144,16 @@ spec:
 Four things to know before you apply it:
 
 - **Leave `auto_init: true`** (it is the OAS default). A repository created with
-  `auto_init: false` has no commit and therefore no default branch, so a `GitRef` aimed
-  at it has no base sha to branch from and a `RepoContent` has nothing to commit
-  against — the rest of the chain fails until someone pushes by hand.
+  `auto_init: false` has no commit and therefore no default branch, so everything that
+  addresses a branch — `BranchProtection`, a `~DEFAULT_BRANCH` ruleset condition, a
+  `Release` creating its tag from `main` — has nothing to bind to until someone commits
+  by hand.
 - **The path params are `org` and `name`, not GitHub's `owner`/`repo`.** Deliberate:
   the same two CR fields serve the create path (`/orgs/{org}/repos`), the create body
   (`name`) and the get/update/delete path (`/repos/{org}/{name}`), so the CRD carries
   one pair of fields instead of an `org`/`owner` duplicate to keep in sync. The
-  downstream `GitRef`/`RepoContent`/`PullRequest` CRs keep GitHub's own `owner`/`repo`
-  spelling — that pair is this `org`/`name` pair, named the way GitHub names it.
+  repository-scoped kinds that configure it keep GitHub's own `owner`/`repo` spelling —
+  that pair is this `org`/`name` pair, named the way GitHub names it.
 - **Editing an applied `Repository` reaches GitHub, but only for fields `PATCH` can
   send.** The RestDefinition sets `compareScope: updatable` rather than the default
   `fullSpec`, so Observe compares exactly the fields the update body can express:
@@ -166,62 +169,57 @@ Four things to know before you apply it:
   `POST /user/repos` for user-owned repos, is deliberately absent: a RestDefinition has
   one create verb and cannot choose between two paths, and Krateo destinations are
   org-owned. Create the repo under an organization, or create it outside Krateo and
-  point `GitRef`/`RepoContent` at it.
+  point the repository-scoped kinds at it.
 
 `delete` maps to `DELETE /repos/{org}/{name}`, so deleting the CR deletes the repository
 on GitHub. The full spec/status field list is in [api](./api.md).
 
-The status fields carry what the next step needs: `full_name`, `clone_url`, `ssh_url`,
-`html_url` and the `default_branch` the `GitRef` will branch from.
+The status fields carry what the kinds that follow need: `full_name`, `clone_url`,
+`ssh_url`, `html_url` and the `default_branch` a ruleset or a branch protection binds to.
 
 ```console
 $ kubectl get repository test-demo-destination -n krateo-system \
     -o jsonpath='{.status.full_name} {.status.default_branch}{"\n"}'
 ```
 
-## Author a chart tree — the blueprint write-path
+## Publishing a chart tree — not this chart's job
 
-The three git-write kinds compose the git flow the Autopilot blueprint builder uses:
-create a branch, write each file, open a PR. Apply them in order
-([examples](./examples.md), `chart/samples/`):
+Three kinds used to sit here: `GitRef`, `RepoContent` and `PullRequest`, composing a
+create-a-branch → write-each-file → open-a-PR flow for the Autopilot blueprint builder.
+They are gone, and the companion proxy plugin — whose only callers they were — went with
+them.
 
-1. **`GitRef`** — create the builder branch. Leave `sha` out and the provider resolves
-   the repo's default-branch HEAD sha automatically, so an author never needs a commit
-   sha:
+Publishing is the frontend's job now, over an SCM-agnostic route:
+`AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults to `"true"` in the frontend chart's
+`values.yaml` **and** its `values.schema.json`, so a fresh install publishes through a
+`BuilderPublish` claim over `git-provider`; the `github.krateo.io` route is the explicit
+`"false"` fallback. Configure publishing there, not here.
 
-   ```yaml
-   apiVersion: github.krateo.io/v1alpha1
-   kind: GitRef
-   metadata:
-     name: test-builder-branch
-     namespace: krateo-system
-   spec:
-     configurationRef:
-       name: github-blueprints-config
-     owner: krateo
-     repo: krateo-blueprints
-     ref: refs/heads/builder/demo-branch
-   ```
+What each removed kind did, and exactly what it would take to bring it back natively, is
+written down, one document per kind: [GitRef](./design-gitref.md),
+[RepoContent](./design-repocontent.md), [PullRequest](./design-pullrequest.md).
+`PullRequest` and `RepoContent` could return today — a `responseTransform` for
+`PullRequest`'s head/base flattening; `status.sha` plus a `responseTransform` for
+`RepoContent`, now that 0.23.0 fixes the `%252F` double-escape. `GitRef` could too but
+for one thing: resolving the base HEAD sha on create is a pre-call dependent read
+oasgen-provider cannot express, tracked as oasgen-provider **#120**.
 
-2. **`RepoContent`** — write each file on that branch. `content` is base64-encoded file
-   bytes; omit `sha` to create, or let the provider update in place if the file exists.
-
-3. **`PullRequest`** — open the PR from the builder branch into `main`.
+What is left in the chart is 28 native kinds and no runtime component at all.
 
 ## The other 27 kinds
 
-`Repository` plus the git-write trio is one path through the chart; the other 27 kinds
-cover the rest of a repository's and an organization's configuration. They share a
-shape — reference a `<Kind>Configuration`, name the target with GitHub's own path
-parameters (`owner`/`repo`, or `org`), set the fields, apply — and none of them touches
-the plugin: every verb is native ([overview](./overview.md)).
+`Repository` creates the destination; the other 27 kinds cover the rest of a repository's
+and an organization's configuration. They share a shape — reference a
+`<Kind>Configuration`, name the target with GitHub's own path parameters (`owner`/`repo`,
+or `org`), set the fields, apply — and every verb of every one of them is native
+([overview](./overview.md)).
 
 Each has a sample at `chart/samples/test-<kind>.yaml`, lower-cased
 (`test-teammembership.yaml`, `test-reporuleset.yaml`, …), whose header comment carries
 that kind's gotchas. They all name the `krateo-blueprints` org and a `demo-destination`
 repository, and they are validated against the deployed RestDefinition CRD rather than
-run end to end against GitHub — so the first apply of a kind is the real test. Point
-them at a scratch org.
+run end to end against GitHub — no kind in this chart has ever reconciled against GitHub,
+so the first apply of a kind is the real test. Point them at a scratch org.
 
 One rule cuts across every group: **array order is part of the desired state.** Drift
 comparison walks arrays positionally, so a reshuffled `events`, `rules`, `bypass_actors`
@@ -360,7 +358,7 @@ spec:
 | `EnvironmentVariable` | a plaintext variable scoped to one environment | `Environment` |
 | `RunnerGroup` | an organization self-hosted runner group | — |
 | `DeploymentBranchPolicy` | which branches or tags may deploy to an environment | `Environment` with `custom_branch_policies: true` |
-| `Workflow` | the enabled state of a committed workflow file | the file committed (`RepoContent`) |
+| `Workflow` | the enabled state of a committed workflow file | the file committed in the repository |
 
 ```yaml
 apiVersion: github.krateo.io/v1alpha1
@@ -395,10 +393,11 @@ spec:
   `404`s against an environment that does not exist, and `DeploymentBranchPolicy` `404`s
   — not a validation error — against one without `custom_branch_policies: true`. Apply
   `Environment` first.
-- **`Workflow` does not create a workflow.** Commit the file first (a `RepoContent`
-  writing `.github/workflows/…`) and name it in `workflow_id`. What the CR owns is the
-  enabled state: create switches it on, deleting the CR switches it off, and a workflow
-  somebody disables in the UI is switched back on at the next reconcile.
+- **`Workflow` does not create a workflow.** No kind in this chart writes files, so
+  `.github/workflows/…` has to be committed by whatever else pushes into the repository;
+  name it in `workflow_id` once it is there. What the CR owns is the enabled state:
+  create switches it on, deleting the CR switches it off, and a workflow somebody
+  disables in the UI is switched back on at the next reconcile.
 
 ### Work tracking — issues, releases, deployments
 
@@ -508,16 +507,17 @@ spec:
 
 ```console
 $ # oasgen should generate a CRD per kind, plus a <Kind>Configuration CRD for each
-$ kubectl get crd | grep -c github.krateo.io     # 62 = 31 kinds + 31 Configurations
+$ kubectl get crd | grep -c github.krateo.io     # 56 = 28 kinds + 28 Configurations
 $ kubectl get restdefinitions.ogen.krateo.io -n krateo-system
 $ # and a rest-dynamic-controller Deployment per kind it has reconciled
 $ kubectl get deploy -n krateo-system \
-    | grep -E 'repository|repocontent|gitref|pullrequest|team|ruleset|plugin'
+    | grep -E 'repository|team|ruleset|environment|label'
 ```
 
-Set `krateo.io/connector-verbose: "true"` on a resource CR (as every sample does) and
-read the logs — which log depends on the kind. Only `GitRef`, `RepoContent` and
-`PullRequest` route verbs through the plugin, so `kubectl logs deploy/<release>-plugin`
-shows the observe/create URLs for those three and nothing else. The other 28 kinds are
-fully native, `Repository` included: nothing they do reaches the plugin, so read their
-own controller's logs instead.
+Every Deployment that shows up there was generated by oasgen-provider, because the chart
+ships none of its own: the release renders 28 ConfigMaps and 28 RestDefinitions and
+nothing else.
+
+Set `krateo.io/connector-verbose: "true"` on a resource CR (as every sample does) and read
+that kind's own controller's logs. There is one log to check per kind and no second place
+to look: with all 28 kinds native, nothing sits in front of them.
