@@ -120,6 +120,12 @@ components:
       properties:
         ref:
           type: string
+        # SYNTHESIZED, not returned by GitHub. A response fieldMapping on the get verb derives it
+        # from `ref` (dropping the leading "refs/") so update and delete can address the ref the way
+        # GitHub's per-ref endpoints require. Declared here only so the generated CRD types
+        # status.shortRef as a string instead of falling back to an untyped default.
+        shortRef:
+          type: string
         node_id:
           type: string
         url:

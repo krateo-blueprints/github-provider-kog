@@ -13,6 +13,10 @@ spec:
     additionalStatusFields:
       - node_id
       - url
+      # `heads/x` for a CR whose spec.ref is `refs/heads/x`. GitHub's create endpoint takes the full
+      # form in the BODY, while its per-ref endpoints take the short form in the PATH, and nothing
+      # can transform a path parameter on the request side (see the get verb below).
+      - shortRef
     configurationFields: []
     verbsDescription:
       - action: create
@@ -23,9 +27,40 @@ spec:
       - action: get
         method: GET
         path: /gitref/{owner}/{repo}/{ref}
+        # Derive status.shortRef from the observed ref. This is the RESPONSE direction, which is the
+        # only direction where a jq valueMapping actually runs — on the request side the switch in
+        # builder.BuildCallConfig hits `default: continue` and the entry is dropped silently, with no
+        # admission error. That is why update/delete below relocate a status field rather than
+        # transforming spec.ref in place.
+        fieldMapping:
+          # KEEP THIS FIRST ENTRY. A response mapping REMOVES its source key from the body unless the
+          # mapping is in-place (src == dst) or some other entry writes to that key. `ref` is an
+          # identifier, so losing it from the body would break both the drift comparison and status.
+          # This identity relocation (status.ref -> body key `ref`) pins it, and also makes `ref` a
+          # write target, which protects it from the removal pass for the entry below.
+          - inResponse: ref
+            inCustomResource: status.ref
+          - inResponse: ref
+            inCustomResource: status.shortRef
+            valueMapping:
+              type: jq
+              jq:
+                inline: 'ltrimstr("refs/")'
+      # {ref} here is GitHub's SHORT form. Without the mapping below, {ref} auto-populates from
+      # spec.ref (`refs/heads/x`) and the request goes to /git/refs/refs%2Fheads%2Fx, which 404s —
+      # so update never worked and delete held the finalizer forever. Percent-encoding is not the
+      # issue: GitHub decodes %2F fine. The leading `refs/` is.
       - action: update
         method: PATCH
         path: /repos/{owner}/{repo}/git/refs/{ref}
+        fieldMapping:
+          # Plain relocation, deliberately with NO valueMapping — a request-side jq would be dropped
+          # silently. status.shortRef was derived on the get verb above.
+          - inPath: ref
+            inCustomResource: status.shortRef
       - action: delete
         method: DELETE
         path: /repos/{owner}/{repo}/git/refs/{ref}
+        fieldMapping:
+          - inPath: ref
+            inCustomResource: status.shortRef
