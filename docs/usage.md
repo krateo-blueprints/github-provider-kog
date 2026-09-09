@@ -115,15 +115,16 @@ Four things to know before you apply it:
   one pair of fields instead of an `org`/`owner` duplicate to keep in sync. The
   downstream `GitRef`/`RepoContent`/`PullRequest` CRs keep GitHub's own `owner`/`repo`
   spelling — that pair is this `org`/`name` pair, named the way GitHub names it.
-- **Editing an applied `Repository` does not reach GitHub.** The RestDefinition sets
-  `compareScope: identifiersAndStatus` rather than the default `fullSpec` (the enum is
-  only those two), so Observe compares `name` plus the status fields and nothing else.
+- **Editing an applied `Repository` reaches GitHub, but only for fields `PATCH` can
+  send.** The RestDefinition sets `compareScope: updatable` rather than the default
+  `fullSpec`, so Observe compares exactly the fields the update body can express.
   Under `fullSpec` the three create-only body fields — `auto_init`,
   `gitignore_template`, `license_template`, which GitHub accepts on POST and never
   echoes on GET — would read as permanent drift, and the controller would PATCH the
-  repository on every reconcile, forever, against an API with a 5000 req/hr budget. The
-  cost of the narrower scope is real: change `description` or `private` on an existing
-  CR and it stays local; change it in GitHub instead. For a create-once destination
+  repository on every reconcile, forever, against an API with a 5000 req/hr budget.
+  Those three are therefore not reconciled: set them at create time, and changing them
+  afterwards does nothing. `description`, `private`, `visibility` and the rest are
+  compared and pushed. For a create-once destination
   repository that trade is the right one ([configuration](./configuration.md)).
 - **Only the org-scoped create is modelled.** GitHub's other create endpoint,
   `POST /user/repos` for user-owned repos, is deliberately absent: a RestDefinition has

@@ -8,7 +8,7 @@
 docs/index.md: the map — what the provider is, the four kinds, the repo layout, links to the whole bundle
 docs/overview.md: how it works — RestDefinitions + OpenAPI specs → oasgen CRDs + controllers, why the git-write kinds need the plugin and Repository does not
 docs/usage.md: install as a Krateo component, provision the token Secret (repo-create rights in the org for Repository) + one Configuration per kind, drive Repository→GitRef→RepoContent→PullRequest, verify
-docs/configuration.md: the surface — the one value resourceGroup, the RestDefinition mappings (incl. Repository's compareScope: identifiersAndStatus and its cost), the OpenAPI servers overrides, the plugin routes/env, invariants
+docs/configuration.md: the surface — the one value resourceGroup, the RestDefinition mappings (incl. Repository's compareScope: updatable and why it replaced identifiersAndStatus), the OpenAPI servers overrides, the plugin routes/env, invariants
 docs/api.md: the generated github.krateo.io CRDs (Repository/RepoContent/GitRef/PullRequest + <Kind>Configuration) and the CompositionDefinition derived from values.schema.json
 docs/examples.md: index of the runnable examples
 docs/release.md: how a release ships — one plain-semver tag drives release-oci (chart) + release-image (plugin image)
@@ -19,7 +19,7 @@ README.md: the repo front door — what it is, install, configure, examples, doc
 chart/Chart.yaml: chart metadata; version is the CHART_VERSION placeholder, appVersion tracks the OpenAPI/mapping revision
 chart/values.yaml: the single value resourceGroup, with its rationale
 chart/values.schema.json: the typed schema the CDC derives the component CRD from (scalar resourceGroup only)
-chart/templates/rd-repository.yaml: the Repository RestDefinition (all four verbs native; compareScope identifiersAndStatus, with the create-only-fields reasoning and its cost in-file)
+chart/templates/rd-repository.yaml: the Repository RestDefinition (all four verbs native; compareScope updatable, with the create-only-fields reasoning in-file)
 chart/templates/rd-repocontent.yaml: the RepoContent RestDefinition (identifiers, verb table)
 chart/templates/rd-gitref.yaml: the GitRef RestDefinition (get routed to the plugin)
 chart/templates/rd-pullrequest.yaml: the PullRequest RestDefinition (pull_number excluded, requestFieldMapping)

@@ -25,16 +25,21 @@ spec:
     # Under the default `fullSpec`, Observe compares EVERY spec field against the GET response.
     # Three fields in the create body — auto_init, gitignore_template, license_template — are
     # create-only: GitHub accepts them on POST and never echoes them back on GET. Under fullSpec
-    # they would read as permanent drift, and the controller would PATCH the repository on every
-    # single reconcile, forever, against an API with a 5000 req/hr budget.
+    # they read as permanent drift, and the controller would PATCH the repository on every single
+    # reconcile, forever, against an API with a 5000 req/hr budget.
     #
-    # The cost of `identifiersAndStatus` is real and worth stating: only `name` plus the status
-    # fields above are compared, so editing `description` or `private` on an existing CR will NOT
-    # be pushed to GitHub. For a blueprint DESTINATION repository — created once, then written to
-    # by GitRef/RepoContent — that trade is right. If full drift reconciliation is ever wanted,
-    # the fix is to drop the three create-only fields from the create body (losing auto_init,
-    # which is what guarantees the repo has a default branch) rather than to flip this back.
-    compareScope: identifiersAndStatus
+    # `updatable` compares exactly the fields the PATCH body can express, derived from the OAS.
+    # That is the right set here: the three create-only fields drop out (the controller could not
+    # fix them anyway, so comparing them can only produce an update that changes nothing), while
+    # description, homepage, private, visibility, has_issues, has_wiki, has_projects,
+    # default_branch and archived stay compared and stay fixable.
+    #
+    # This was `identifiersAndStatus` when first written, because `updatable` did not exist below
+    # oasgen-provider 0.23.0. That older setting compared only `name` plus the status fields, so
+    # editing `description` or `private` on an existing CR was silently never pushed. `updatable`
+    # removes that gap without reintroducing the create-only drift loop, so it strictly replaces
+    # it. It requires an update verb, which this resource has.
+    compareScope: updatable
     configurationFields: []
     verbsDescription:
       - action: create

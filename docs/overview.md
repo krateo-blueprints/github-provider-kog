@@ -77,17 +77,15 @@ Four things about the mapping are worth stating plainly:
 - **Every verb is native.** create `POST /orgs/{org}/repos`; get, update and delete
   `GET` / `PATCH` / `DELETE /repos/{org}/{name}`. All four go straight to
   `api.github.com` — `Repository` never touches the plugin.
-- **`compareScope: identifiersAndStatus`, not the default `fullSpec`** (the enum is
-  only those two). Under `fullSpec`, Observe compares every spec field against the GET
-  response, and three create-body fields — `auto_init`, `gitignore_template`,
-  `license_template` — are create-only: GitHub accepts them on POST and never echoes
-  them on GET. They would read as permanent drift, and the controller would PATCH the
-  repository on every reconcile, forever, against an API with a 5000 req/hr budget.
-  The cost of the narrower scope is real and cuts the other way: only `name` plus the
-  status fields (`id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`,
-  `default_branch`) are compared, so editing `description` or `private` on an existing
-  CR is **not** pushed to GitHub. For a create-once destination repository that trade
-  is the right one.
+- **`compareScope: updatable`, not the default `fullSpec`.** Under `fullSpec`, Observe
+  compares every spec field against the GET response, and three create-body fields —
+  `auto_init`, `gitignore_template`, `license_template` — are create-only: GitHub
+  accepts them on POST and never echoes them on GET. They would read as permanent
+  drift, and the controller would PATCH the repository on every reconcile, forever,
+  against an API with a 5000 req/hr budget. `updatable` compares exactly the fields the
+  PATCH body can express, so those three drop out while every mutable field stays
+  compared and fixable. It requires an update verb, which this resource has, and needs
+  oasgen-provider **0.23.0** or newer.
 - **`auto_init` defaults to true, and it is load-bearing.** A repository created with
   `auto_init=false` has no commit and therefore no default branch, so a `GitRef` aimed
   at it has no base sha to branch from and a `RepoContent` has nothing to commit

@@ -11,6 +11,34 @@ timestamp: 2026-09-09T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-09-09 — oasgen-provider 0.23.0: `Repository` moves to `compareScope: updatable`
+
+krateo-057 was upgraded to oasgen-provider **0.23.0**, which adds a third `compareScope`
+value. `Repository` now uses it, replacing the `identifiersAndStatus` recorded below.
+
+`updatable` compares exactly the fields the UPDATE verb's request body can express, derived
+from the OAS. That is the set this kind wanted all along: the three create-only fields
+(`auto_init`, `gitignore_template`, `license_template`) drop out — a field the update cannot
+send is one the controller cannot fix, so comparing it can only produce an update that
+changes nothing — while `description`, `homepage`, `private`, `visibility`, `has_issues`,
+`has_wiki`, `has_projects`, `default_branch` and `archived` stay compared and stay fixable.
+It requires an update verb, which `Repository` has.
+
+So the documented cost of the earlier setting — that editing `description` or `private` on
+an applied CR was silently never pushed — is gone. This strictly replaces it; there is no
+reason to prefer `identifiersAndStatus` here.
+
+Verified against the live cluster rather than inferred: all four RestDefinitions, plus the
+`GitRef` short-ref fix on its branch, were accepted by the deployed
+`restdefinitions.ogen.krateo.io` CRD at 0.23.0 via `kubectl apply --dry-run=server` under
+throwaway names — including the CRD's own "requires an update verb" validation on
+`updatable`. Nothing was created.
+
+0.23.0 also carries four fixes this chart cares about: the `%252F` double-escape in query
+values (#113), a delete-finalizer arbiter (#103), 200-tombstone-is-absence (#111), and
+nested dotted identifier selectors (#106). The chart still requires **≥ 0.20.0** in general;
+`compareScope: updatable` specifically requires **≥ 0.23.0**.
+
 ## 2026-09-09 — renamed to `github-provider-kog`, chart included
 
 The repository and the Helm chart are both now `github-provider-kog`; they were
@@ -63,10 +91,14 @@ permanent drift and the controller would `PATCH` the repository on every single 
 forever, against an API with a 5000 req/hr budget. `identifiersAndStatus` compares only
 `name` plus the `additionalStatusFields`, which ends the loop — and its cost is real and
 accepted: editing `description` or `private` on an existing CR is **not** pushed to
-GitHub. For a create-once destination repository that trade is right. The enum has only
-these two values (`fullSpec` | `identifiersAndStatus`), so the alternative is not a
-narrower compare but dropping the three create-only fields from the create body — which
-means losing `auto_init`, the thing that guarantees a default branch.
+GitHub. For a create-once destination repository that trade is right. At the version
+available when this was written the enum had only these two values, so the alternative
+was not a narrower compare but dropping the three create-only fields from the create body
+— which means losing `auto_init`, the thing that guarantees a default branch.
+
+> **Superseded the same day** — see *oasgen-provider 0.23.0* below. `updatable` compares
+> exactly what `PATCH` can send, which ends the loop *and* keeps mutable fields
+> reconciled, so the cost recorded above no longer applies.
 
 Two smaller decisions. The path parameters are named `org` and `name`, not GitHub's
 `owner`/`repo`: the same two CR fields then serve the create path (`/orgs/{org}/repos`),

@@ -79,10 +79,11 @@ at it has no base sha to branch from and a `RepoContent` has nothing to commit
 against. Repository is therefore first in the authoring chain: **Repository → GitRef →
 RepoContent (per file) → PullRequest**.
 
-Drift is compared with `compareScope: identifiersAndStatus`, not the default
-`fullSpec`, so **editing `description` or `private` on an existing CR is not pushed to
-GitHub** — only `name` and the status fields above are compared. The rationale and the
-cost are in [configuration](./configuration.md).
+Drift is compared with `compareScope: updatable`, not the default `fullSpec`: exactly
+the fields the `PATCH` body can express are compared, so the three create-only fields
+(`auto_init`, `gitignore_template`, `license_template`) cannot produce false drift,
+while every mutable field stays compared and fixable. The rationale is in
+[configuration](./configuration.md).
 
 GitHub's second create endpoint, `POST /user/repos` (user-owned repositories), is
 deliberately not modelled: a `RestDefinition` has one create verb and cannot choose

@@ -35,7 +35,8 @@ timestamp: 2026-08-11T00:00:00Z
   write** — which is more than the contents/refs/pulls scopes the other three kinds
   need, so a token that drives the write-path fine can still fail here. `delete` maps
   to `DELETE /repos/{org}/{name}`, so deleting the CR deletes the repository on GitHub:
-  point the sample at a scratch org. And editing the applied CR (say `description` or
-  `private`) is **not** pushed to GitHub — `Repository` compares with
-  `compareScope: identifiersAndStatus` ([usage](./usage.md),
-  [configuration](./configuration.md)).
+  point the sample at a scratch org. And editing the applied CR is pushed to
+  GitHub only for fields `PATCH` can send — `Repository` compares with
+  `compareScope: updatable`, so `description` or `private` reconcile while the
+  create-only `auto_init`, `gitignore_template` and `license_template` do not
+  ([usage](./usage.md), [configuration](./configuration.md)).

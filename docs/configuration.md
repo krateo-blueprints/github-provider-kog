@@ -34,7 +34,7 @@ The pieces that matter per kind:
 
 | kind | identifiers | key mapping facts |
 |---|---|---|
-| `Repository` | `name` | create on `/orgs/{org}/repos`, get/update/delete on `/repos/{org}/{name}` — every verb native, no plugin hop. `compareScope: identifiersAndStatus`, not the default (below); status carries `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch`. |
+| `Repository` | `name` | create on `/orgs/{org}/repos`, get/update/delete on `/repos/{org}/{name}` — every verb native, no plugin hop. `compareScope: updatable`, not the default (below); status carries `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch`. |
 | `RepoContent` | `path` | create/update/get/delete all on `/repos/{owner}/{repo}/contents/{path}`; status carries `sha`, `html_url`. |
 | `GitRef` | `ref` | create on `git/refs`, but **get** on the plugin's `/gitref/{owner}/{repo}/{ref}` (fixes GitHub's git/ref-vs-git/refs asymmetry); status carries `node_id`, `url`. |
 | `PullRequest` | `number` | `pull_number` is `excludedSpecFields` (GitHub assigns it on create); get/update source it from `status.number` via `requestFieldMapping`. Status carries `number`, `html_url`, `state`. |
@@ -44,9 +44,8 @@ oasgen-generated `<Kind>Configuration` + `spec.configurationRef`, not from spec 
 
 ### `compareScope` on `Repository`
 
-`compareScope` takes one of two values — `fullSpec` (the default, used by the other
-three kinds) or `identifiersAndStatus`. There is no third option that compares a
-chosen subset of spec.
+`compareScope` takes one of three values — `fullSpec` (the default, used by the other
+three kinds), `identifiersAndStatus`, or `updatable`.
 
 Under `fullSpec`, Observe compares **every** spec field against the GET response.
 Three fields in Repository's create body — `auto_init`, `gitignore_template`,
@@ -55,12 +54,19 @@ them back on `GET`. Under `fullSpec` they read as permanent drift, and the contr
 would `PATCH` the repository on every single reconcile, forever, against an API with a
 5000 req/hr budget.
 
-`identifiersAndStatus` compares only `name` plus the `additionalStatusFields`. The
-cost is real and worth stating plainly: **editing `description`, `private` or any
-other mutable field on an existing CR will not be pushed to GitHub.** For a blueprint
-destination repository — created once, then written to by `GitRef`/`RepoContent` —
-that trade is right. It would be the wrong trade for a kind whose spec is meant to
-stay authoritative over the remote object.
+`updatable` compares exactly the fields the `PATCH` body can express, derived from the
+OAS rather than declared by hand. That is the right set here: the three create-only
+fields drop out — a field the update cannot send is one the controller cannot fix, so
+comparing it can only produce an update that changes nothing — while `description`,
+`homepage`, `private`, `visibility`, `has_issues`, `has_wiki`, `has_projects`,
+`default_branch` and `archived` stay compared and stay fixable. It requires an update
+verb, which `Repository` has.
+
+This was `identifiersAndStatus` when the kind was first written, because `updatable`
+did not exist below oasgen-provider **0.23.0**. That setting compared only `name` plus
+the `additionalStatusFields`, so editing `description` or `private` on an existing CR
+was silently never pushed. `updatable` closes that gap without reintroducing the
+create-only drift loop, so it strictly replaces it here.
 
 If full drift reconciliation is ever wanted, the fix is to drop the three create-only
 fields from the create body — which means losing `auto_init`, the thing that
