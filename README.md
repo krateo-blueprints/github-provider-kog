@@ -1,14 +1,15 @@
-# krateo-github-provider-kog
+# github-provider-kog
 
 ## What is this
 
 A Krateo **KOG** (Krateo OpenAPI Generation) provider, built on
 [`oasgen-provider`](https://github.com/krateo-platformops/oasgen-provider) 0.9.x, that
-exposes GitHub's **git-write** REST API as Kubernetes kinds under the `github.krateo.io`
-group:
+exposes GitHub's **repository** and **git-write** REST API as Kubernetes kinds under the
+`github.krateo.io` group:
 
 | Kind | GitHub API | Purpose |
 |------|-----------|---------|
+| `Repository` | `POST /orgs/{org}/repos` | create the destination repository itself |
 | `RepoContent` | `PUT /repos/{owner}/{repo}/contents/{path}` | create/update a file in a repo |
 | `GitRef` | `POST /repos/{owner}/{repo}/git/refs` | create a branch/ref |
 | `PullRequest` | `POST /repos/{owner}/{repo}/pulls` | open a pull request |
@@ -18,12 +19,20 @@ Autopilot blueprint builder writes a chart tree to a repo (`GitRef` → `RepoCon
 file → `PullRequest`) entirely as `github.krateo.io` apiserver CRs, so external CI can
 package and push the OCI chart on merge.
 
-The chart ships three `RestDefinition`s + the trimmed OpenAPI spec each references (as a
+`Repository` closes the gap at the front of that chain. Until it existed, a blueprint
+could only be published into a repository someone had already created by hand — which is
+backwards for a brand-new blueprint. It is deliberately ordered first: a repository
+created with `auto_init: false` has no commit and therefore no default branch, so a
+`GitRef` has no base sha to branch from and a `RepoContent` has nothing to commit
+against. The OAS defaults `auto_init` to `true` for exactly that reason.
+
+The chart ships four `RestDefinition`s + the trimmed OpenAPI spec each references (as a
 `ConfigMap`), plus a small companion **plugin** (`Deployment` + `Service`).
 `oasgen-provider` watches the RestDefinitions, generates the CRDs under
 `github.krateo.io`, and auto-deploys a `rest-dynamic-controller` per kind. The plugin
 handles only the GitHub REST inconsistencies the pure OpenAPI mapping cannot express;
-every other verb goes straight to GitHub. See [docs/overview.md](docs/overview.md).
+every other verb goes straight to GitHub. `Repository` needs none of it — all four of its
+verbs are native. See [docs/overview.md](docs/overview.md).
 
 ## Install
 

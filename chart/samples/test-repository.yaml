@@ -1,0 +1,21 @@
+# Create the DESTINATION repository a blueprint will then be written into.
+#
+# Order matters: a Repository must exist (and be initialised) before a GitRef or RepoContent
+# aimed at it can succeed. `auto_init` defaults to true in the OAS precisely so the new repo
+# has a first commit and therefore a default branch — without one, GitRef has no base sha to
+# branch from and RepoContent has nothing to commit against.
+apiVersion: github.krateo.io/v1alpha1
+kind: Repository
+metadata:
+  name: test-demo-destination
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  org: krateo-blueprints
+  name: demo-destination
+  description: "Destination repository created by Krateo"
+  private: true
+  auto_init: true

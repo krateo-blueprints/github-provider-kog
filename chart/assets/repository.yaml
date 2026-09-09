@@ -1,0 +1,185 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Repositories
+servers:
+  - url: https://api.github.com
+paths:
+  # CREATE is org-scoped. GitHub has a second create endpoint, POST /user/repos, for
+  # user-owned repos; it is deliberately NOT modelled here, because a RestDefinition has one
+  # create verb and a resource cannot choose between two paths. Krateo destinations are
+  # org-owned. See docs/usage.md if a user-owned variant is ever needed.
+  "/orgs/{org}/repos":
+    post:
+      summary: Create an organization repository
+      operationId: repos/create-in-org
+      parameters:
+        - $ref: '#/components/parameters/org'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                homepage:
+                  type: string
+                private:
+                  type: boolean
+                visibility:
+                  type: string
+                has_issues:
+                  type: boolean
+                has_wiki:
+                  type: boolean
+                has_projects:
+                  type: boolean
+                # CREATE-ONLY, and load-bearing for a Krateo destination repository.
+                # A repo created with auto_init=false has no commit and therefore no default
+                # branch, so a GitRef or RepoContent aimed at it fails until someone pushes by
+                # hand. Leave this true unless the caller really wants an empty repo.
+                auto_init:
+                  type: boolean
+                  default: true
+                gitignore_template:
+                  type: string
+                license_template:
+                  type: string
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
+  # GET/PATCH/DELETE address the repo as /repos/{owner}/{repo} upstream. The parameters are
+  # named `org` and `name` here ON PURPOSE: the same two CR fields then serve the create path
+  # (/orgs/{org}/repos) and the create body (`name`), so the generated CRD carries ONE pair of
+  # fields instead of an `org`/`owner` duplicate the author has to keep in sync.
+  "/repos/{org}/{name}":
+    get:
+      summary: Get a repository
+      operationId: repos/get
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
+    patch:
+      summary: Update a repository
+      operationId: repos/update
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/name'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                homepage:
+                  type: string
+                private:
+                  type: boolean
+                visibility:
+                  type: string
+                has_issues:
+                  type: boolean
+                has_wiki:
+                  type: boolean
+                has_projects:
+                  type: boolean
+                default_branch:
+                  type: string
+                archived:
+                  type: boolean
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
+    delete:
+      summary: Delete a repository
+      operationId: repos/delete
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '204':
+          description: Response
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    org:
+      name: org
+      in: path
+      required: true
+      schema:
+        type: string
+    name:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Repository:
+      type: object
+      properties:
+        id:
+          type: integer
+        node_id:
+          type: string
+        name:
+          type: string
+        full_name:
+          type: string
+        html_url:
+          type: string
+        # clone_url / ssh_url are what a downstream GitRef, RepoContent or CI job actually
+        # needs to reach the repository, so they are surfaced on status.
+        clone_url:
+          type: string
+        ssh_url:
+          type: string
+        default_branch:
+          type: string
+        private:
+          type: boolean
+        visibility:
+          type: string
+        description:
+          type: string
+        homepage:
+          type: string
+        has_issues:
+          type: boolean
+        has_wiki:
+          type: boolean
+        has_projects:
+          type: boolean
+        archived:
+          type: boolean
+security:
+  - accessToken: []

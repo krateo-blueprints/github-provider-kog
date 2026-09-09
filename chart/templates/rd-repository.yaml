@@ -1,0 +1,51 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-repository
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-repository/repository.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: Repository
+    # The repo name distinguishes the resource; `org` scopes it (and is a path param on every
+    # verb), which is the same split RepoContent uses with `path` against owner/repo.
+    identifiers:
+      - name
+    additionalStatusFields:
+      - id
+      - node_id
+      - full_name
+      - html_url
+      - clone_url
+      - ssh_url
+      - default_branch
+    # DELIBERATE, and the one non-obvious choice in this file.
+    #
+    # Under the default `fullSpec`, Observe compares EVERY spec field against the GET response.
+    # Three fields in the create body — auto_init, gitignore_template, license_template — are
+    # create-only: GitHub accepts them on POST and never echoes them back on GET. Under fullSpec
+    # they would read as permanent drift, and the controller would PATCH the repository on every
+    # single reconcile, forever, against an API with a 5000 req/hr budget.
+    #
+    # The cost of `identifiersAndStatus` is real and worth stating: only `name` plus the status
+    # fields above are compared, so editing `description` or `private` on an existing CR will NOT
+    # be pushed to GitHub. For a blueprint DESTINATION repository — created once, then written to
+    # by GitRef/RepoContent — that trade is right. If full drift reconciliation is ever wanted,
+    # the fix is to drop the three create-only fields from the create body (losing auto_init,
+    # which is what guarantees the repo has a default branch) rather than to flip this back.
+    compareScope: identifiersAndStatus
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /orgs/{org}/repos
+      - action: get
+        method: GET
+        path: /repos/{org}/{name}
+      - action: update
+        method: PATCH
+        path: /repos/{org}/{name}
+      - action: delete
+        method: DELETE
+        path: /repos/{org}/{name}

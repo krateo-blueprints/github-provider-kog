@@ -1,4 +1,4 @@
-# Default values for krateo-github-provider-kog.
+# Default values for github-provider-kog.
 #
 # This chart ships RestDefinitions (ogen.krateo.io/v1alpha1) + the trimmed OpenAPI
 # specs they reference (as ConfigMaps). oasgen-provider (installed cluster-wide)
@@ -10,6 +10,6 @@
 # values.schema.json — which declares ONLY this single top-level scalar (a scalar
 # default materializes cleanly in the component CR; nested-object toggles would not).
 
-# The API group the generated CRDs (RepoContent/GitRef/PullRequest + the BearerAuth
-# auth kind) land under. All three kinds are always installed.
+# The API group the generated CRDs (Repository/RepoContent/GitRef/PullRequest + the
+# BearerAuth auth kind) land under. All four kinds are always installed.
 resourceGroup: github.krateo.io

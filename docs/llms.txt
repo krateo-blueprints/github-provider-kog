@@ -1,13 +1,15 @@
 # krateo-github-provider-kog — LLM doc index
 # One line per file. A Krateo KOG provider (oasgen-provider 0.9.x) exposing GitHub's
-# git-write API — RepoContent, GitRef, PullRequest — as github.krateo.io Kubernetes
-# kinds. The chart ships RestDefinitions + trimmed OpenAPI specs + a companion plugin;
-# oasgen-provider generates the CRDs and auto-deploys a rest-dynamic-controller per kind.
-docs/index.md: the map — what the provider is, the three kinds, the repo layout, links to the whole bundle
-docs/overview.md: how it works — RestDefinitions + OpenAPI specs → oasgen CRDs + controllers, and why the git-write kinds need the plugin
-docs/usage.md: install as a Krateo component, provision the token Secret + one Configuration per kind, drive GitRef→RepoContent→PullRequest, verify
-docs/configuration.md: the surface — the one value resourceGroup, the RestDefinition mappings, the OpenAPI servers overrides, the plugin routes/env, invariants
-docs/api.md: the generated github.krateo.io CRDs (RepoContent/GitRef/PullRequest + <Kind>Configuration) and the CompositionDefinition derived from values.schema.json
+# repository + git-write API — Repository, RepoContent, GitRef, PullRequest — as
+# github.krateo.io Kubernetes kinds. The chart ships RestDefinitions + trimmed OpenAPI
+# specs + a companion plugin (Repository does not use it — all four of its verbs are
+# native); oasgen-provider generates the CRDs and auto-deploys a rest-dynamic-controller
+# per kind.
+docs/index.md: the map — what the provider is, the four kinds, the repo layout, links to the whole bundle
+docs/overview.md: how it works — RestDefinitions + OpenAPI specs → oasgen CRDs + controllers, why the git-write kinds need the plugin and Repository does not
+docs/usage.md: install as a Krateo component, provision the token Secret (repo-create rights in the org for Repository) + one Configuration per kind, drive Repository→GitRef→RepoContent→PullRequest, verify
+docs/configuration.md: the surface — the one value resourceGroup, the RestDefinition mappings (incl. Repository's compareScope: identifiersAndStatus and its cost), the OpenAPI servers overrides, the plugin routes/env, invariants
+docs/api.md: the generated github.krateo.io CRDs (Repository/RepoContent/GitRef/PullRequest + <Kind>Configuration) and the CompositionDefinition derived from values.schema.json
 docs/examples.md: index of the runnable examples
 docs/release.md: how a release ships — one plain-semver tag drives release-oci (chart) + release-image (plugin image)
 docs/log.md: curated history
@@ -17,15 +19,17 @@ README.md: the repo front door — what it is, install, configure, examples, doc
 chart/Chart.yaml: chart metadata; version is the CHART_VERSION placeholder, appVersion tracks the OpenAPI/mapping revision
 chart/values.yaml: the single value resourceGroup, with its rationale
 chart/values.schema.json: the typed schema the CDC derives the component CRD from (scalar resourceGroup only)
+chart/templates/rd-repository.yaml: the Repository RestDefinition (all four verbs native; compareScope identifiersAndStatus, with the create-only-fields reasoning and its cost in-file)
 chart/templates/rd-repocontent.yaml: the RepoContent RestDefinition (identifiers, verb table)
 chart/templates/rd-gitref.yaml: the GitRef RestDefinition (get routed to the plugin)
 chart/templates/rd-pullrequest.yaml: the PullRequest RestDefinition (pull_number excluded, requestFieldMapping)
 chart/templates/deployment-plugin.yaml: the plugin Deployment (image tag = .Chart.Version, distroless nonroot)
 chart/templates/service-plugin.yaml: the plugin ClusterIP Service
 chart/templates/_helpers.tpl: the pluginName + webServiceUrl helpers the OpenAPI servers overrides resolve to
+chart/assets/repository.yaml: the Repository OpenAPI spec (org-scoped create only, auto_init defaults true, path params named org/name; no plugin servers override, so its ConfigMap is not tpl-rendered)
 chart/assets/repocontent.yaml: the RepoContent OpenAPI spec (plugin servers overrides on put/get)
 chart/assets/gitref.yaml: the GitRef OpenAPI spec (plugin servers overrides on create/get; sha not required on update)
 chart/assets/pullrequest.yaml: the PullRequest OpenAPI spec (plugin servers override on get)
-chart/samples/configurations.yaml: the three <Kind>Configuration CRs pointing at the gh-token Secret
+chart/samples/configurations.yaml: the four <Kind>Configuration CRs pointing at the gh-token Secret (whose PAT also needs org repo-create rights, for Repository)
 plugin/main.go: the rest-dynamic-controller plugin — every GitHub-inconsistency fix, per route
 plugin/Dockerfile: the distroless nonroot build of the plugin

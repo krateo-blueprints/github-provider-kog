@@ -3,10 +3,13 @@
 #
 #   kubectl create secret generic gh-token -n krateo-system \
 #     --from-literal=token=<YOUR_GITHUB_PAT>   # scopes: repo (contents/refs/pulls write)
+#                                            # + the org must allow the token to CREATE repos
+#                                            #   (classic: `repo`; fine-grained: org
+#                                            #   "Administration: read & write") — needed by Repository
 #
 # Then one <Kind>Configuration per kind, each pointing at that Secret. oasgen 0.9.x
 # generates these Configuration CRDs from the OAS securityScheme and auto-adds a
-# spec.configurationRef field to every resource CR. All three may share a name (the
+# spec.configurationRef field to every resource CR. All of them may share a name (the
 # kind is implied by the resource that references it).
 ---
 apiVersion: github.krateo.io/v1alpha1
@@ -37,6 +40,19 @@ spec:
 ---
 apiVersion: github.krateo.io/v1alpha1
 kind: PullRequestConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: RepositoryConfiguration
 metadata:
   name: github-blueprints-config
   namespace: krateo-system
