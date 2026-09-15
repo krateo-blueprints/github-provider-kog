@@ -10,7 +10,7 @@
 # Then one <Kind>Configuration per kind, each pointing at that Secret. oasgen 0.9.x
 # generates these Configuration CRDs from the OAS securityScheme and auto-adds a
 # spec.configurationRef field to every resource CR. All of them may share a name (the
-# kind is implied by the resource that references it) — which is why all 28 below carry
+# kind is implied by the resource that references it) — which is why all 29 below carry
 # the same `github-blueprints-config`, and why one PAT can drive the whole chart.
 #
 # You only need the Configuration for the kinds you actually use; the rest are inert.
@@ -264,6 +264,19 @@ spec:
 ---
 apiVersion: github.krateo.io/v1alpha1
 kind: OrgWebhookConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: PullRequestConfiguration
 metadata:
   name: github-blueprints-config
   namespace: krateo-system

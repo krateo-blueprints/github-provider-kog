@@ -1,7 +1,7 @@
 ---
 type: ExampleIndex
 title: github-provider-kog — examples
-description: Index of the runnable examples — the Repository CR that creates the destination repository every repository-scoped sample configures, and the sample CR for each of the 28 kinds under chart/samples/, grouped by area with the order each group must be applied in.
+description: Index of the runnable examples — the Repository CR that creates the destination repository every repository-scoped sample configures, and the sample CR for each of the 29 kinds under chart/samples/, grouped by area with the order each group must be applied in.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [examples, github, samples]
 timestamp: 2026-09-09T00:00:00Z
@@ -48,7 +48,7 @@ bringing it back natively would take is recorded in [design-gitref](./design-git
 ## The sample CRs, by group
 
 The chart ships one sample per kind — `chart/samples/test-<kind>.yaml`, lower-cased —
-covering the other 27 kinds as well. Each carries its gotchas in a
+covering the other 29 kinds as well. Each carries its gotchas in a
 header comment and sets `krateo.io/connector-verbose: "true"`, and every one of them
 names the `krateo-blueprints` org and a `demo-destination` repository. Edit those first
 and work in a **scratch org**: several kinds delete the real thing when their CR is
@@ -63,7 +63,7 @@ allowed to do does differ by group — the per-group rights table is in
 [usage](./usage.md), which also works each group's fields and gotchas through.
 
 ```console
-$ kubectl apply -f chart/samples/configurations.yaml    # all 28, one shared name
+$ kubectl apply -f chart/samples/configurations.yaml    # all 29, one shared name
 ```
 
 ### Access
@@ -155,6 +155,7 @@ commit `.github/workflows/release.yaml` by some other route first, or point
 | `test-label.yaml` | the `krateo/blueprint` label |
 | `test-milestone.yaml` | the `v1.0` milestone |
 | `test-issue.yaml` | a follow-up issue carrying that label |
+| `test-pullrequest.yaml` | a PR from `builder/demo-branch` into `main` |
 | `test-release.yaml` | release `1.0.0`, creating the tag from `main` |
 | `test-deployment.yaml` | a deployment record of `main` to `staging` |
 

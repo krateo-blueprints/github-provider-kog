@@ -3,7 +3,7 @@ name: github-provider-kog
 description: >-
   Krateo KOG provider (oasgen-provider >= 0.23.0) exposing GitHub's platform-engineering
   API — repositories, teams, memberships, webhooks, environments, rulesets, Actions
-  variables, branch protection and more — as 28 github.krateo.io Kubernetes kinds. Every
+  variables, branch protection and more — as 29 github.krateo.io Kubernetes kinds. Every
   kind is native: the chart ships only RestDefinitions + trimmed OpenAPI specs, with no
   controller image and no proxy plugin.
 type: application

@@ -1,0 +1,32 @@
+# Open a pull request from a builder branch into main — the last step of an authoring chain
+# (Repository -> branch+files -> PullRequest).
+#
+# GitHub assigns the PR NUMBER on create; it lands on `status.number`, and the get and update
+# calls address the PR through it (there is no pull_number field to set here).
+#
+# `head` is the branch the changes are on. For a PR from a FORK it must be written
+# "owner:branch" — the get verb's responseTransform normalizes GitHub's head/base objects back to
+# exactly the form used here, so either shape reconciles clean.
+#
+# There is no delete: GitHub's REST API cannot delete a pull request. Deleting this CR just stops
+# Krateo tracking it. Unlike Issue, this kind cannot close the PR from its spec either — `state`
+# lives in the PATCH body only and so never becomes a spec field. Merge or close the PR on
+# GitHub, then delete the CR.
+apiVersion: github.krateo.io/v2022-11-28
+kind: PullRequest
+metadata:
+  name: test-demo-pr
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  head: builder/demo-branch
+  base: main
+  title: "Add demo blueprint (authored via Krateo)"
+  body: "This blueprint chart was authored in the Krateo portal Autopilot rail."
+  # draft: true                  # create-only; NOT compared (compareScope: updatable)
+  # maintainer_can_modify: true  # create-only; NOT compared

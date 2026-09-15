@@ -4,7 +4,7 @@
 
 A Krateo **KOG** (Krateo OpenAPI Generation) provider, built on
 [`oasgen-provider`](https://github.com/krateo-platformops/oasgen-provider) **≥ 0.23.0**,
-that exposes 28 GitHub REST resources as Kubernetes kinds under the `github.krateo.io`
+that exposes 29 GitHub REST resources as Kubernetes kinds under the `github.krateo.io`
 group. Each kind is listed by its create endpoint; get/update/delete sit on the matching
 item path.
 
@@ -55,6 +55,7 @@ item path.
 | `Label` | `POST /repos/{owner}/{repo}/labels` | an issue/PR label |
 | `Milestone` | `POST /repos/{owner}/{repo}/milestones` | a milestone (`due_on` is create-only — see below) |
 | `Issue` | `POST /repos/{owner}/{repo}/issues` | open and update an issue (no delete — REST has none) |
+| `PullRequest` | `POST /repos/{owner}/{repo}/pulls` | open and update a pull request (no delete, and no close from spec) |
 | `Release` | `POST /repos/{owner}/{repo}/releases` | a release |
 | `Deployment` | `POST /repos/{owner}/{repo}/deployments` | an immutable deployment record |
 
@@ -107,18 +108,18 @@ OAS defaults `auto_init` to `true` deliberately: a repository created with `auto
 false` has no commit and therefore no default branch, so nothing can branch from it or
 commit against it until someone pushes by hand.
 
-The chart ships 28 `RestDefinition`s + the trimmed OpenAPI spec each references (as a
+The chart ships 29 `RestDefinition`s + the trimmed OpenAPI spec each references (as a
 `ConfigMap`), and nothing else — **no runtime component of its own**: no Deployment, no
 Service, no image, no proxy. `oasgen-provider` watches the RestDefinitions, generates the
 CRDs under `github.krateo.io`, and auto-deploys a `rest-dynamic-controller` per kind. All
-28 kinds are **native**: every one of their verbs goes straight to GitHub. See
+29 kinds are **native**: every one of their verbs goes straight to GitHub. See
 [docs/overview.md](docs/overview.md).
 
 ## Install
 
 Prerequisite: a Krateo cluster with `oasgen-provider` **≥ 0.23.0** — it provides
 `restdefinitions.ogen.krateo.io`, and 0.23.0 is where `compareScope: updatable` arrives,
-which 23 of the 28 kinds declare.
+which 24 of the 29 kinds declare.
 
 Per the Krateo "everything is a Composition" rule, this chart is installed as a
 **component** — a `component-pins` entry that the core-provider CDC turns into a
@@ -144,10 +145,10 @@ Configuration per kind pointing at it:
 ```console
 $ kubectl create secret generic gh-token -n krateo-system \
     --from-literal=token=<YOUR_GITHUB_PAT>
-$ kubectl apply -f chart/samples/configurations.yaml   # all 28 <Kind>Configuration CRs
+$ kubectl apply -f chart/samples/configurations.yaml   # all 29 <Kind>Configuration CRs
 ```
 
-One PAT can drive the whole chart: all 28 Configurations may share a single name
+One PAT can drive the whole chart: all 29 Configurations may share a single name
 (`github-blueprints-config`), since the kind is implied by the resource that references
 it. What the PAT must be *allowed* to do differs by kind, though — `Repository` needs
 repository creation in the org (classic `repo`; fine-grained org **Administration: read &
@@ -165,7 +166,7 @@ them or the Secret. Full surface: [docs/configuration.md](docs/configuration.md)
 - [examples/blueprint-authoring](examples/blueprint-authoring/README.md) — the one-time
   token + `<Kind>Configuration` wiring, and `github.krateo.io` CRs applied in order
   against a scratch repo.
-- `chart/samples/` — the 28 `<Kind>Configuration` CRs and one applyable test CR per kind
+- `chart/samples/` — the 29 `<Kind>Configuration` CRs and one applyable test CR per kind
   (`test-<kind>.yaml`).
 
 ## Docs

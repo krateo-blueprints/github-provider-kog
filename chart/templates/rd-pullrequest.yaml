@@ -1,0 +1,93 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-pullrequest
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-pullrequest/pullrequest.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: PullRequest
+    # `number` is the PR's identity (titles are not unique) and a property of the GET response,
+    # so status populates and the item path can be keyed off it.
+    identifiers:
+      - number
+    # head/base are deliberately NOT here. Status is populated from the create and update
+    # responses too, and those run with actions {"create"}/{"update"} — the get verb's
+    # responseTransform does not apply to them — so a `head` in status would be a string after
+    # observe and an object after update. `merged` would be safe (a plain boolean in all three
+    # responses, and not a spec field) but nothing needs it yet.
+    additionalStatusFields:
+      - number
+      - html_url
+      - state
+    # pull_number is assigned by GitHub on create, so it must NOT be a (required) spec field;
+    # get/update source it from status.number via the requestFieldMapping below. Same shape as
+    # Issue's issue_number.
+    excludedSpecFields:
+      - pull_number
+    # Compare exactly what the PATCH body can express. The CRD spec is built from the CREATE body
+    # plus the path/query parameters of every verb, so of the PATCH's four properties only
+    # title/body/base are spec fields — `state` is not — and the effective compared set is
+    # {title, body, base}: all three are properties of the GET response and all three are fixable
+    # by the PATCH.
+    #
+    # `fullSpec` is what this kind shipped with before 0.2.2, and it is what made the plugin
+    # necessary; even WITH the responseTransform below it stays wrong, because it also compares
+    # `draft` and `maintainer_can_modify` — both in the create body, both echoed by the GET,
+    # neither in the PATCH body. Mark a draft PR "ready for review" in the UI and a `draft: true`
+    # CR drifts forever against an update that cannot carry `draft`.
+    #
+    # `identifiersAndStatus` would be actively dangerous: it projects the SPEC onto identifiers +
+    # additionalStatusFields, and number/html_url/state are NONE of them spec fields, so the
+    # projected set is EMPTY and CompareExisting returns equal unconditionally. The CR would
+    # report Available whatever the PR's title, body or base said.
+    compareScope: updatable
+    configurationFields: []
+    #
+    # NO DELETE VERB — GitHub's REST API cannot delete a pull request (only the GraphQL mutation,
+    # which a RestDefinition cannot reach). Same shape as Issue. Deleting the CR only stops Krateo
+    # managing the PR; the PR stays open on GitHub. Unlike Issue, this kind cannot close it from
+    # the spec either — `state` lives in the PATCH body only and so never becomes a spec field.
+    # Merge or close the pull request on GitHub, then delete the CR.
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/pulls
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/pulls/{pull_number}
+        requestFieldMapping:
+          - inPath: pull_number
+            inCustomResource: status.number
+        # THE reason this kind needs no plugin. GitHub returns head/base as OBJECTS
+        # ({ref,label,sha,repo,user}) while spec.head/spec.base are the branch STRINGS the create
+        # body carried; compared raw, both read as permanent drift and the PATCH cannot fix either
+        # (head is not even in the PATCH body). This rewrites them back into the CR domain once,
+        # before status population and drift comparison.
+        #
+        # `base` is always .ref — GitHub requires base to be a branch of the base repository, so
+        # spec.base is never the "owner:branch" form; .label ("octocat:master") would be permanent
+        # drift. `head` is .ref for a same-repo PR and .label for a cross-repo one, because that is
+        # the form the create body must use; the old plugin always took .ref and therefore drifted
+        # on every fork PR. A deleted fork leaves head.repo null, which `// ""` turns into the
+        # cross-repo branch — still .label, still right.
+        #
+        # Type-guarded rather than `.head.ref // .head`: gojq does NOT swallow the indexing error
+        # of `.ref` on a string, so the naive form fails the reconcile the second time it sees an
+        # already-normalized body — and a jq runtime error stops the CR reconciling outright. This
+        # form is idempotent (verified over three passes on a live PR body) and total: an absent
+        # head/base is left absent rather than created as null, which would itself be drift.
+        responseTransform:
+          inline: |
+            . as $r
+            | ((($r.head | type) == "object") and (($r.base | type) == "object")
+               and ((($r.head.repo.full_name) // "") != (($r.base.repo.full_name) // ""))) as $cross
+            | (if (.head | type) == "object" then .head = (if $cross then .head.label else .head.ref end) else . end)
+            | (if (.base | type) == "object" then .base = .base.ref else . end)
+      - action: update
+        method: PATCH
+        path: /repos/{owner}/{repo}/pulls/{pull_number}
+        requestFieldMapping:
+          - inPath: pull_number
+            inCustomResource: status.number
