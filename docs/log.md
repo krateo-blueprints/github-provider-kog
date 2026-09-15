@@ -4,12 +4,65 @@ title: github-provider-kog — log
 description: Curated chronological history of github-provider-kog — notable changes and decisions, not a generated changelog.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [log, history]
-timestamp: 2026-09-09T00:00:00Z
+timestamp: 2026-09-15T00:00:00Z
 ---
 
 # Log
 
 Curated history; release notes live in GitHub Releases.
+
+## 2026-09-15 — `PullRequest` comes back, natively
+
+`PullRequest` returns as the **29th kind**, and it returns without the plugin that carried it
+before. The chart renders 29 ConfigMaps + 29 RestDefinitions and still ships **no runtime
+component**: no Deployment, no Service, no image, no proxy.
+
+One field does the work the plugin's `getPullRequest` handler used to do. GitHub returns
+`head`/`base` as objects (`{ref,label,sha,repo,user}`) while `spec.head`/`spec.base` are the
+branch strings the create body carried; compared raw they read as permanent drift, and the PATCH
+cannot fix either — `head` is not even in the PATCH body. A `responseTransform` on the get verb
+rewrites them back into the CR domain once, before status population and drift comparison:
+
+```jq
+. as $r
+| ((($r.head | type) == "object") and (($r.base | type) == "object")
+   and ((($r.head.repo.full_name) // "") != (($r.base.repo.full_name) // ""))) as $cross
+| (if (.head | type) == "object" then .head = (if $cross then .head.label else .head.ref end) else . end)
+| (if (.base | type) == "object" then .base = .base.ref else . end)
+```
+
+It is **better than the plugin it replaces**: `flattenPRRefs` always took `obj["ref"]`, so a PR
+opened from a fork — whose `spec.head` must be written `"owner:branch"` — flattened to the bare
+branch and drifted anyway. The cross-repo branch fixes that.
+
+`compareScope: updatable` ships with it, and is load-bearing rather than cosmetic. The kind
+previously shipped `fullSpec`, which also compares `draft` and `maintainer_can_modify` — both in
+the create body, both echoed by the GET, neither in the PATCH body. That was a latent defect
+independent of the plugin: mark a draft PR "ready for review" in the UI and a `draft: true` CR
+drifts forever. `identifiersAndStatus` was rejected outright — it would project the spec onto
+`number`/`html_url`/`state`, none of which are spec fields, leaving an empty set that compares
+equal unconditionally.
+
+No delete verb, the same shape as `Issue` and for the same reason: GitHub's REST API cannot delete
+a pull request. Unlike `Issue`, this kind cannot close one from its spec either — `state` lives in
+the PATCH body only, and the CRD spec is built from the create body plus path/query parameters.
+Merge or close the PR on GitHub, then delete the CR.
+
+The compareScope tally moves to 24 updatable, 2 unset, 1 explicit `fullSpec`,
+2 `identifiersAndStatus` = 29.
+
+Verified: `helm lint` clean; the chart renders exactly 29 ConfigMaps + 29 RestDefinitions and
+nothing else, with zero plugin references and no per-operation `servers` override anywhere in the
+rendered OAS; all 58 objects accepted by the **deployed** `restdefinitions.ogen.krateo.io` CRD at
+oasgen-provider 0.23.0 on krateo-057 via `kubectl apply --dry-run=server`, confirmed absent after.
+The transform was run under **gojq 0.12.19** — the engine in rest-dynamic-controller's `go.mod`,
+not `jq` — over all six cases in the design document, three passes each: every one idempotent,
+the live `octocat/Hello-World#2846` cross-repo body 48 keys in and 48 keys out, and the naive
+`.head.ref // .head` form failing on pass 2 exactly as predicted (`expected an object but got:
+string`). `GitRef` and `RepoContent` stay out; their design documents remain proposals.
+
+This kind has still never reconciled against GitHub. Verified by inspection, schema validation and
+engine-level replay, not by running.
 
 ## 2026-09-09 — 31 kinds become 28, and the plugin goes with them
 

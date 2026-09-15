@@ -1,7 +1,7 @@
 ---
 type: API
 title: github-provider-kog — API
-description: The CRDs this component brings into the cluster — the 28 resource kinds under github.krateo.io, all of them native, grouped by area, with their paths, identifiers, status fields and compareScope, the oasgen-generated <Kind>Configuration kind each one gets, and the CompositionDefinition the core-provider CDC derives from values.schema.json.
+description: The CRDs this component brings into the cluster — the 29 resource kinds under github.krateo.io, all of them native, grouped by area, with their paths, identifiers, status fields and compareScope, the oasgen-generated <Kind>Configuration kind each one gets, and the CompositionDefinition the core-provider CDC derives from values.schema.json.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, crd, compositiondefinition, github, oasgen-provider]
 timestamp: 2026-09-09T00:00:00Z
@@ -39,21 +39,21 @@ typed by `values.schema.json`, whose only knob is the scalar `resourceGroup`
 
 ## The generated `github.krateo.io` kinds
 
-oasgen-provider watches the **28** `RestDefinition`s and generates the CRDs below under
+oasgen-provider watches the **29** `RestDefinition`s and generates the CRDs below under
 `resourceGroup` (default `github.krateo.io`, group version `v1alpha1`), auto-deploying a
 `rest-dynamic-controller` per kind. Every resource CR carries a `spec.configurationRef`
 (added by oasgen from the OpenAPI `securityScheme`) naming the `<Kind>Configuration` that
 holds its token wiring.
 
-**oasgen-provider ≥ 0.23.0 is required.** 23 of the 28 kinds declare
+**oasgen-provider ≥ 0.23.0 is required.** 24 of the 29 kinds declare
 `compareScope: updatable`, which does not exist below that version
 ([configuration](./configuration.md)).
 
-**All 28 kinds are native.** Every verb goes straight to `api.github.com`, and the
+**All 29 kinds are native.** Every verb goes straight to `api.github.com`, and the
 normalizations GitHub's REST inconsistencies demand are expressed in the RestDefinition
 itself (static query parameters and headers, `fieldMapping` aliases, request/response jq
 transforms, `notFoundBody` predicates). The chart ships **no runtime component of its
-own**: it renders 28 ConfigMaps and 28 RestDefinitions and nothing else — no Deployment,
+own**: it renders 29 ConfigMaps and 29 RestDefinitions and nothing else — no Deployment,
 no Service, no image, no proxy. The only workloads involved are the
 `rest-dynamic-controller` deployments oasgen-provider creates per kind.
 
@@ -71,7 +71,7 @@ is recorded in [design-gitref](./design-gitref.md),
 
 One row per kind: the verbs and their paths, the `identifiers` the RestDefinition
 declares, the `compareScope`, and the `additionalStatusFields` that land under `status`.
-`configurationFields` is empty on all 28 — the token wiring comes from the
+`configurationFields` is empty on all 29 — the token wiring comes from the
 `<Kind>Configuration`, never from spec fields. The kinds with a trap worth reading before
 authoring one are written out in full below the tables.
 
@@ -116,6 +116,7 @@ authoring one are written out in full below the tables.
 | `Label` | create `POST /repos/{owner}/{repo}/labels`; get/update/delete `GET`/`PATCH`/`DELETE .../labels/{name}` | `name` | `updatable` | `id`, `node_id`, `url`, `default` |
 | `Milestone` | create `POST /repos/{owner}/{repo}/milestones`; get/update/delete `GET`/`PATCH`/`DELETE .../milestones/{milestone_number}` | `number` | `updatable` | `number`, `id`, `node_id`, `html_url`, `state`, `due_on`, `open_issues`, `closed_issues` |
 | `Issue` | create `POST /repos/{owner}/{repo}/issues`; get/update `GET`/`PATCH .../issues/{issue_number}` — **no delete verb** | `number` | `updatable` | `number`, `id`, `node_id`, `html_url`, `state`, `comments` |
+| `PullRequest` | create `POST /repos/{owner}/{repo}/pulls`; get/update `GET`/`PATCH .../pulls/{pull_number}` — **no delete verb**; the get verb carries a `responseTransform` | `number` | `updatable` | `number`, `html_url`, `state` |
 | `Release` | create `POST /repos/{owner}/{repo}/releases`; get/update/delete `GET`/`PATCH`/`DELETE .../releases/{release_id}` | `id` | `updatable` | `node_id`, `html_url`, `upload_url`, `created_at` |
 | `Deployment` | create `POST /repos/{owner}/{repo}/deployments`; get/delete `GET`/`DELETE .../deployments/{deployment_id}` — **no update verb** | `id` | `identifiersAndStatus` | `node_id`, `sha`, `url`, `statuses_url`, `original_environment`, `created_at` |
 
@@ -341,6 +342,13 @@ that survives the transform unchanged, which is why it is the identifier.
   **not** a rename: the next observe looks up the new name, 404s, and creates a *second*
   label, leaving the old one behind on GitHub, untracked. To rename, delete the CR (which
   deletes the label, and with it its issue associations) and create a new one.
+- **`PullRequest` has no delete verb, and cannot be closed from its spec either.** GitHub's
+  REST API has no endpoint that deletes a pull request. Unlike `Issue`, it also cannot close
+  one: `state` lives in the PATCH body only, and the CRD spec is built from the CREATE body
+  plus path/query parameters, so `state` never becomes a spec field. Merge or close the PR on
+  GitHub, then delete the CR. The get verb's `responseTransform` is what makes the kind native
+  — GitHub returns `head`/`base` as objects while the spec carries branch strings, and compared
+  raw that is permanent drift a PATCH cannot fix (`head` is not even in the PATCH body).
 - **`Issue` has no delete verb.** GitHub's REST API has no endpoint that deletes an issue
   (only the GraphQL `deleteIssue` mutation, unreachable from a RestDefinition). Deleting
   the CR only stops Krateo managing the issue; it stays where it is on GitHub. To close
@@ -448,14 +456,14 @@ that survives the transform unchanged, which is why it is the identifier.
 
 ## The `<Kind>Configuration` kinds
 
-For each of the 28 resource kinds, oasgen generates a `<Kind>Configuration` CRD from the
+For each of the 29 resource kinds, oasgen generates a `<Kind>Configuration` CRD from the
 OpenAPI bearer `securityScheme` — `RepositoryConfiguration`, `TeamConfiguration`,
 `LabelConfiguration`, and so on. Each carries the token wiring a resource CR references
 via `spec.configurationRef.name`:
 
 ```yaml
 apiVersion: github.krateo.io/v1alpha1
-kind: RepositoryConfiguration   # one per resource kind — 28 in total
+kind: RepositoryConfiguration   # one per resource kind — 29 in total
 metadata:
   name: github-blueprints-config
   namespace: krateo-system
@@ -472,8 +480,8 @@ The generated name is the kind name plus `Configuration`, so `CodeSecurityConfig
 that, not `CodeSecurityConfiguration` — yields `CodeSecurityConfigConfiguration` rather
 than a doubled `…ConfigurationConfiguration`.
 
-All 28 may share a single name — the kind is implied by the resource that references it.
-That is why `chart/samples/configurations.yaml` now ships all 28 under the same
+All 29 may share a single name — the kind is implied by the resource that references it.
+That is why `chart/samples/configurations.yaml` now ships all 29 under the same
 `github-blueprints-config`, and why **one PAT can drive the whole chart**. You only need
 the Configuration for the kinds you actually use; the rest are inert. The referenced
 `Secret` is provisioned out-of-band ([usage](./usage.md)); the chart ships none of this.

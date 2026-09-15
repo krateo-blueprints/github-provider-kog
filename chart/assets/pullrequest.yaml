@@ -1,0 +1,137 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - Pull Requests
+servers:
+  - url: https://api.github.com
+paths:
+  "/repos/{owner}/{repo}/pulls":
+    post:
+      summary: Create a pull request
+      operationId: pulls/create
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                head:
+                  type: string
+                base:
+                  type: string
+                title:
+                  type: string
+                body:
+                  type: string
+                draft:
+                  type: boolean
+                maintainer_can_modify:
+                  type: boolean
+              required:
+                - head
+                - base
+                - title
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PullRequest'
+  "/repos/{owner}/{repo}/pulls/{pull_number}":
+    get:
+      # The controller does NOT see this body as GitHub sends it: the get verb in
+      # rd-pullrequest.yaml carries a responseTransform that replaces head/base with their
+      # branch-name strings before status population and drift comparison. head/base are
+      # deliberately absent from the PullRequest schema below — they are neither identifiers
+      # nor additionalStatusFields, so nothing is generated from them.
+      summary: Get a pull request
+      operationId: pulls/get
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/pull_number'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PullRequest'
+    patch:
+      summary: Update a pull request
+      operationId: pulls/update
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - $ref: '#/components/parameters/pull_number'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                body:
+                  type: string
+                state:
+                  type: string
+                base:
+                  type: string
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PullRequest'
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    pull_number:
+      name: pull_number
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    PullRequest:
+      type: object
+      properties:
+        number:
+          type: integer
+        id:
+          type: integer
+        node_id:
+          type: string
+        html_url:
+          type: string
+        state:
+          type: string
+        title:
+          type: string
+        merged:
+          type: boolean
+security:
+  - accessToken: []

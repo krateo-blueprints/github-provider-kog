@@ -9,9 +9,15 @@ timestamp: 2026-09-09T00:00:00Z
 
 # Restoring `PullRequest` natively
 
-`PullRequest` is being removed from the chart with `GitRef` and `RepoContent`, and the proxy plugin
-with it. This is the design that brings it back **without** the plugin. It is a document, not a
-change: nothing here is implemented.
+`PullRequest` was removed from the chart with `GitRef` and `RepoContent`, and the proxy plugin with
+it. This is the design that brings it back **without** the plugin.
+
+> **IMPLEMENTED.** This design shipped as written — `chart/assets/pullrequest.yaml`,
+> `chart/templates/{configmap,rd}-pullrequest.yaml` and `chart/samples/test-pullrequest.yaml`. The
+> chart renders 29 ConfigMaps + 29 RestDefinitions and still ships no runtime component. The
+> idempotency table in §3 was re-run against the shipped program with gojq 0.12.19 and reproduces
+> exactly, including the live `octocat/Hello-World#2846` cross-repo body at 48 keys in and 48 out.
+> `GitRef` and `RepoContent` remain out; their design documents remain proposals.
 
 File references to the three removed kinds are to commit **`be409bc`** (`git show
 HEAD:chart/templates/rd-pullrequest.yaml`); the deletions are already staged in the working tree.

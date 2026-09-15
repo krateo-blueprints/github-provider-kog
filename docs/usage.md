@@ -1,7 +1,7 @@
 ---
 type: Usage
 title: github-provider-kog — usage
-description: How to run the provider — install it as a Krateo component, provision the GitHub token Secret and one Configuration CR per kind (all 28 may share a single name), create the destination repository with Repository, drive the other 27 kinds group by group (access, repository configuration, CI/CD, work tracking, governance), and verify the generated CRDs and controllers. The chart ships no runtime component of its own.
+description: How to run the provider — install it as a Krateo component, provision the GitHub token Secret and one Configuration CR per kind (all 29 may share a single name), create the destination repository with Repository, drive the other 29 kinds group by group (access, repository configuration, CI/CD, work tracking, governance), and verify the generated CRDs and controllers. The chart ships no runtime component of its own.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, install, oasgen-provider, github]
 timestamp: 2026-09-09T00:00:00Z
@@ -14,11 +14,11 @@ timestamp: 2026-09-09T00:00:00Z
 A Krateo cluster with `oasgen-provider` **≥ 0.23.0** running (it provides
 `restdefinitions.ogen.krateo.io` and generates the CRDs + a controller per kind).
 
-0.9.x carried the four kinds the chart started with, but 23 of the 28 that remain now set
+0.9.x carried the four kinds the chart started with, but 24 of the 29 that remain now set
 `compareScope: updatable`, a value older `RestDefinition` CRDs do not accept — below
 0.23.0 those RestDefinitions are rejected on apply and their kinds never appear.
 
-Nothing else is required. The chart renders 28 ConfigMaps and 28 RestDefinitions and
+Nothing else is required. The chart renders 29 ConfigMaps and 29 RestDefinitions and
 nothing more: there is no Deployment, no Service and no image of its own to pull. Every
 verb of every kind is a native call to `api.github.com`, made by the
 rest-dynamic-controller oasgen-provider generates.
@@ -66,12 +66,12 @@ A classic token needs `repo`; a fine-grained token needs the organization permis
 token scoped for one repository's settings drives those kinds and fails on `Repository`
 alone.
 
-The 28 kinds spread the same way: a single PAT can drive the whole chart, but the rights
+The 29 kinds spread the same way: a single PAT can drive the whole chart, but the rights
 it needs grow with the groups you actually use.
 
 | kinds | what the token must be allowed to do | classic scope |
 |---|---|---|
-| `Issue`, `Label`, `Milestone`, `Release`, `Deployment` | write issues, labels, releases and deployments on one repository | `repo` |
+| `Issue`, `PullRequest`, `Label`, `Milestone`, `Release`, `Deployment` | write issues, labels, releases and deployments on one repository | `repo` |
 | `RepoWebhook`, `DeployKey`, `Environment`, `DeploymentBranchPolicy`, `RepoRuleset`, `BranchProtection`, `Autolink`, `Collaborator`, `AutomatedSecurityFixes`, `ActionsVariableRepo`, `EnvironmentVariable`, `Workflow` | administer one repository's settings | `repo` |
 | `Repository` | create and delete repositories in the organization | `repo`, and the org must permit the token to create repositories |
 | `Team`, `TeamMembership`, `TeamRepo`, `OrgMembership`, `OrgWebhook`, `OrgRuleset`, `ActionsVariableOrg`, `RunnerGroup`, `CustomProperty`, `CodeSecurityConfig` | administer the organization | `admin:org`, on top of `repo` |
@@ -86,11 +86,11 @@ until it is widened.
 
 Then one Configuration per kind. They may all share a name — the kind is implied by the
 resource that references it — which is why `chart/samples/configurations.yaml` ships all
-28 under the same `github-blueprints-config`:
+29 under the same `github-blueprints-config`:
 
 ```yaml
 apiVersion: github.krateo.io/v1alpha1
-kind: RepositoryConfiguration    # one of 28: TeamConfiguration, RepoRulesetConfiguration,
+kind: RepositoryConfiguration    # one of 29: TeamConfiguration, RepoRulesetConfiguration,
                                  # LabelConfiguration, EnvironmentConfiguration,
                                  # CustomPropertyConfiguration, …
 metadata:
@@ -121,7 +121,7 @@ is created and stored by an operator, never handled by the browser or snowplow.
 ## Create the destination repository
 
 `Repository` creates the repo every other repository-scoped kind then configures, so it
-comes **first**. Like all 28 kinds it is fully native: create (`POST /orgs/{org}/repos`)
+comes **first**. Like all 29 kinds it is fully native: create (`POST /orgs/{org}/repos`)
 and get/update (`GET`/`PATCH /repos/{org}/{name}`) go straight to
 `api.github.com`. See `chart/samples/test-repository.yaml`:
 
@@ -198,17 +198,20 @@ Publishing is the frontend's job now, over an SCM-agnostic route:
 What each removed kind did, and exactly what it would take to bring it back natively, is
 written down, one document per kind: [GitRef](./design-gitref.md),
 [RepoContent](./design-repocontent.md), [PullRequest](./design-pullrequest.md).
-`PullRequest` and `RepoContent` could return today — a `responseTransform` for
-`PullRequest`'s head/base flattening; `status.sha` plus a `responseTransform` for
-`RepoContent`, now that 0.23.0 fixes the `%252F` double-escape. `GitRef` could too but
-for one thing: resolving the base HEAD sha on create is a pre-call dependent read
-oasgen-provider cannot express, tracked as oasgen-provider **#120**.
+**`PullRequest` has since returned** — natively, exactly as its design document
+predicted: one `responseTransform` on the get verb flattens GitHub's head/base objects back
+to the branch strings the spec carries, and `compareScope: updatable` drops the three
+create-only fields the PATCH can never fix. No plugin, no runtime component. `RepoContent`
+could return the same way — `status.sha` plus a `responseTransform`, now that 0.23.0 fixes
+the `%252F` double-escape. `GitRef` could too but for one thing: resolving the base HEAD sha
+on create is a pre-call dependent read oasgen-provider cannot express, tracked as
+oasgen-provider **#120**.
 
-What is left in the chart is 28 native kinds and no runtime component at all.
+What is left in the chart is 29 native kinds and no runtime component at all.
 
-## The other 27 kinds
+## The other 28 kinds
 
-`Repository` creates the destination; the other 27 kinds cover the rest of a repository's
+`Repository` creates the destination; the other 29 kinds cover the rest of a repository's
 and an organization's configuration. They share a shape — reference a
 `<Kind>Configuration`, name the target with GitHub's own path parameters (`owner`/`repo`,
 or `org`), set the fields, apply — and every verb of every one of them is native
@@ -406,6 +409,7 @@ spec:
 | `Label` | a repository label | `Repository` |
 | `Milestone` | a milestone; its number lands on `status.number` | `Repository` |
 | `Issue` | an issue; its number lands on `status.number` | `Repository` (+ `Label` / `Milestone` if referenced) |
+| `PullRequest` | a pull request; its number lands on `status.number` | `Repository` (+ the head branch must exist and differ from base) |
 | `Release` | a release, creating its tag if absent | `Repository` |
 | `Deployment` | an immutable deployment record | `Repository` (+ `Environment` if the target is gated) |
 
@@ -431,6 +435,8 @@ spec:
 - **Numbers are server-assigned.** `Issue` and `Milestone` get theirs from GitHub on
   create, and get/update/delete address the resource through `status.number` — there is
   no `issue_number` or `milestone_number` field to set.
+- **`PullRequest` has no delete verb and no close-from-spec.** `state` is PATCH-body-only,
+  so it never becomes a spec field. Merge or close the PR on GitHub, then delete the CR.
 - **`Issue` has no delete verb**, because GitHub's REST API cannot delete an issue.
   Deleting the CR only stops Krateo tracking it; to close the issue set `state: closed`
   (optionally with `state_reason`) and let the update run.
@@ -507,7 +513,7 @@ spec:
 
 ```console
 $ # oasgen should generate a CRD per kind, plus a <Kind>Configuration CRD for each
-$ kubectl get crd | grep -c github.krateo.io     # 56 = 28 kinds + 28 Configurations
+$ kubectl get crd | grep -c github.krateo.io     # 58 = 29 kinds + 29 Configurations
 $ kubectl get restdefinitions.ogen.krateo.io -n krateo-system
 $ # and a rest-dynamic-controller Deployment per kind it has reconciled
 $ kubectl get deploy -n krateo-system \
@@ -515,9 +521,9 @@ $ kubectl get deploy -n krateo-system \
 ```
 
 Every Deployment that shows up there was generated by oasgen-provider, because the chart
-ships none of its own: the release renders 28 ConfigMaps and 28 RestDefinitions and
+ships none of its own: the release renders 29 ConfigMaps and 29 RestDefinitions and
 nothing else.
 
 Set `krateo.io/connector-verbose: "true"` on a resource CR (as every sample does) and read
 that kind's own controller's logs. There is one log to check per kind and no second place
-to look: with all 28 kinds native, nothing sits in front of them.
+to look: with all 29 kinds native, nothing sits in front of them.

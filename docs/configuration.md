@@ -1,7 +1,7 @@
 ---
 type: Configuration
 title: github-provider-kog — configuration
-description: The whole config surface — the single chart value resourceGroup, the 28 RestDefinition mappings grouped by area, the compareScope tally and the reasoning behind each non-default choice, the native normalizations GitHub's REST inconsistencies demand, the OpenAPI ConfigMaps, and the invariants that must hold for a chart that ships no runtime component.
+description: The whole config surface — the single chart value resourceGroup, the 29 RestDefinition mappings grouped by area, the compareScope tally and the reasoning behind each non-default choice, the native normalizations GitHub's REST inconsistencies demand, the OpenAPI ConfigMaps, and the invariants that must hold for a chart that ships no runtime component.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, values, restdefinition, oasgen-provider]
 timestamp: 2026-09-09T00:00:00Z
@@ -19,7 +19,7 @@ The chart surface is deliberately tiny — one scalar. Everything else is fixed 
 
 | key | default | effect |
 |---|---|---|
-| `resourceGroup` | `github.krateo.io` | the API group every generated CRD lands under — 28 resource kinds plus a `<Kind>Configuration` auth kind for each. Referenced by every RestDefinition's `spec.resourceGroup`. |
+| `resourceGroup` | `github.krateo.io` | the API group every generated CRD lands under — 29 resource kinds plus a `<Kind>Configuration` auth kind for each. Referenced by every RestDefinition's `spec.resourceGroup`. |
 | `global` | `{}` (object) | Helm global values, injected by the chart-inspector / when used as a subchart. |
 
 The schema declares **only** a single top-level scalar on purpose: when the chart is
@@ -27,7 +27,7 @@ installed as a Krateo component the CDC derives the CompositionDefinition CRD fr
 schema, and a scalar default materializes cleanly in the component CR (nested-object
 toggles would not) ([api](./api.md)).
 
-There is **no per-kind toggle**. All 28 RestDefinitions are always installed; a
+There is **no per-kind toggle**. All 29 RestDefinitions are always installed; a
 RestDefinition costs nothing until a CR of its kind exists, and a per-kind switch would
 mean nested-object values the CDC cannot materialize.
 
@@ -35,7 +35,7 @@ mean nested-object values the CDC cannot materialize.
 
 Each `chart/templates/rd-<kind>.yaml` declares the API mapping oasgen-provider consumes;
 its in-file comments carry the reasoning behind every choice below. `configurationFields`
-is empty for all 28 — the token wiring comes from the oasgen-generated
+is empty for all 29 — the token wiring comes from the oasgen-generated
 `<Kind>Configuration` + `spec.configurationRef`, never from spec fields. The full
 per-kind verb, identifier, `compareScope` and status listing is in [api](./api.md); what
 follows is the mapping mechanics.
@@ -99,6 +99,7 @@ Three patterns recur across the set and are worth reading once:
 |---|---|---|
 | `Label` | `name` | one CR field serves identity, item path and create body. **Rename is not modelled**: GitHub's PATCH takes `new_name` while the path addresses the current name, which needs two names in one CR field and is not derivable by the controller's only request-side transform (`alias`). |
 | `Milestone` | `number` | `milestone_number` excluded, sourced from `status.number`. `due_on` is **create-only** — kept out of the update body because GitHub re-times it per token timezone; `status.due_on` shows what was stored. |
+| `PullRequest` | `number` | `pull_number` excluded, sourced from `status.number`. No delete verb (GitHub REST has none), and no close-from-spec either (`state` is PATCH-body-only, so it never reaches the spec). The get verb carries a `responseTransform` that rewrites GitHub's `head`/`base` objects to their branch strings — `base` always `.ref`, `head` `.label` for a cross-repo (fork) PR and `.ref` otherwise. |
 | `Issue` | `number` | `issue_number` excluded, sourced from `status.number`. No delete verb (GitHub REST has none). `labels`, `assignees` and `milestone` are create-only: GitHub returns them as objects where the request takes strings and an integer. |
 | `Release` | `id` | `release_id` excluded, sourced from `status.id`. `generate_release_notes` is create-only. |
 | `Deployment` | `id` | `deployment_id` excluded, sourced from `status.id`. No update verb. `auto_merge` is **defaulted `false`** in the asset, against GitHub's own default of `true`; `required_contexts` is create-only; GitHub's `oneOf`-typed `payload` is not modelled. Status carries `original_environment`, not `environment` — see [api](./api.md). |
@@ -120,11 +121,11 @@ Three patterns recur across the set and are worth reading once:
 ### `compareScope` across the chart
 
 `compareScope` takes one of three values — `fullSpec` (the default),
-`identifiersAndStatus`, or `updatable`. Across the 28 kinds:
+`identifiersAndStatus`, or `updatable`. Across the 29 kinds:
 
 | value | kinds | count |
 |---|---|---|
-| `updatable` | `Repository`, `Team`, `TeamRepo`, `TeamMembership`, `Collaborator`, `OrgMembership`, `RepoWebhook`, `OrgWebhook`, `Environment`, `RepoRuleset`, `OrgRuleset`, `BranchProtection`, `ActionsVariableRepo`, `ActionsVariableOrg`, `EnvironmentVariable`, `RunnerGroup`, `DeploymentBranchPolicy`, `Label`, `Milestone`, `Issue`, `Release`, `CustomProperty`, `CodeSecurityConfig` | 23 |
+| `updatable` | `Repository`, `Team`, `TeamRepo`, `TeamMembership`, `Collaborator`, `OrgMembership`, `RepoWebhook`, `OrgWebhook`, `Environment`, `RepoRuleset`, `OrgRuleset`, `BranchProtection`, `ActionsVariableRepo`, `ActionsVariableOrg`, `EnvironmentVariable`, `RunnerGroup`, `DeploymentBranchPolicy`, `Label`, `Milestone`, `Issue`, `PullRequest`, `Release`, `CustomProperty`, `CodeSecurityConfig` | 24 |
 | default `fullSpec` (unset) | `Workflow`, `AutomatedSecurityFixes` | 2 |
 | `fullSpec` (set explicitly) | `Autolink` | 1 |
 | `identifiersAndStatus` | `DeployKey`, `Deployment` | 2 |
@@ -257,7 +258,7 @@ silently never pushed — a real gap, and closing it is what the change was actu
 
 ### Normalization in the RestDefinition
 
-All 28 kinds are native: every verb goes straight to `api.github.com`, and where GitHub's
+All 29 kinds are native: every verb goes straight to `api.github.com`, and where GitHub's
 REST API needs normalizing, the RestDefinition expresses it rather than a hop through
 something the chart would have to run. The mechanisms, and where each is used:
 
@@ -267,7 +268,7 @@ something the chart would have to run. The mechanisms, and where each is used:
 | static `headers` on a verb | `TeamRepo` (get) | `Accept: application/vnd.github.v3.repository+json`; without it the same endpoint answers 204 with nothing to observe. |
 | `fieldMapping` with an `alias` valueMapping | `Collaborator` (findby) | translates GitHub's display vocabulary (`read`/`write`) into the request vocabulary (`pull`/`push`) and relocates the value onto `spec.permission`, where the comparison looks for it. A custom repository role has no alias pair and passes through unchanged, which is correct. |
 | `requestTransform` (jq) | `BranchProtection` (create, update) | turns omitted controls into the explicit `null` GitHub requires for four members that must be present even when off. |
-| `responseTransform` (jq) | `BranchProtection` (get), `TeamRepo` (get) | rewrites the response into the CR domain once, before status population and drift comparison — flattening `{"enabled": bool}` wrappers and sorting every list; deriving `permission` from cumulative booleans. |
+| `responseTransform` (jq) | `BranchProtection` (get), `TeamRepo` (get), `PullRequest` (get) | rewrites the response into the CR domain once, before status population and drift comparison — flattening `{"enabled": bool}` wrappers and sorting every list; deriving `permission` from cumulative booleans; replacing `PullRequest`'s `head`/`base` objects with the branch strings the spec carries. The last is what lets `PullRequest` be native at all: compared raw, a string spec field against an object response field is permanent drift, and the PATCH body does not even contain `head`. Every one of these programs is type-guarded rather than `//`-defaulted, because gojq does not swallow the indexing error of `.ref` on an already-normalized string — and a jq runtime error fails the reconcile outright rather than degrading. |
 | `notFoundBody` (jq predicate) | `Workflow` (get), `AutomatedSecurityFixes` (get) | reports a 200 response as *absent* when the raw body says the feature is off, so the controller re-runs create. Evaluated before any response normalization. |
 | declared response codes | `Team` (update) | rest-dynamic-controller accepts only the 2xx codes declared on the operation. `PATCH /orgs/{org}/teams/{team_slug}` answers **201** when it actually changes something and 200 only when the value already matched, so the asset declares both — a document listing 200 alone would turn every real update into `invalid status code: 201`. |
 
@@ -279,7 +280,7 @@ would consume the key and `status.role_name` would silently never populate.
 ## The OpenAPI specs
 
 Each RestDefinition references a trimmed OpenAPI 3.0 spec (`chart/assets/<kind>.yaml`)
-carried as a ConfigMap (`chart/templates/configmap-<kind>.yaml`). All **28** ConfigMaps
+carried as a ConfigMap (`chart/templates/configmap-<kind>.yaml`). All **29** ConfigMaps
 are a plain `.Files.Get`: the assets contain no template action, so nothing is
 `tpl`-rendered and each spec is copied verbatim. No operation anywhere in the set
 overrides `servers` — every verb of every kind keeps `https://api.github.com`.
@@ -307,7 +308,7 @@ are not secrets and are covered at all three scopes.
 
 ## No runtime component
 
-The chart renders 28 ConfigMaps and 28 RestDefinitions, and nothing else — no Deployment,
+The chart renders 29 ConfigMaps and 29 RestDefinitions, and nothing else — no Deployment,
 no Service, no image, no proxy, and no `_helpers.tpl` (it held only the two helpers the
 proxy needed). Installing the chart puts data in the cluster; the only workloads are the
 `rest-dynamic-controller` deployments oasgen-provider creates per kind.
@@ -333,7 +334,7 @@ is written down per kind:
 - **oasgen-provider must be ≥ 0.23.0.** 23 kinds declare `compareScope: updatable`,
   which does not exist below that version, and the CRD rejects it on a kind with no
   update verb.
-- **The chart stays free of a runtime component.** It renders 28 ConfigMaps and 28
+- **The chart stays free of a runtime component.** It renders 29 ConfigMaps and 29
   RestDefinitions and nothing else; every kind reaches `api.github.com` directly, no
   asset overrides `servers`, and every ConfigMap is a plain `.Files.Get` with nothing for
   `tpl` to resolve. A kind that needed a hop would reintroduce a Deployment, a Service and
@@ -347,13 +348,13 @@ is written down per kind:
 - **A RestDefinition's declared paths and methods must exist in its own asset.** Every
   verb resolves against the OpenAPI document the ConfigMap named by `oasPath` carries, so
   a path or method that is not in that document is a mapping the controller can never
-  execute. Every verb of all 28 was cross-checked against its own asset, and all 28
+  execute. Every verb of all 29 was cross-checked against its own asset, and all 29
   RestDefinitions were accepted by the deployed `restdefinitions.ogen.krateo.io` CRD at
   oasgen-provider 0.23.0 (`kubectl apply --dry-run=server`).
 - **The token is provisioned out-of-band, and its rights are the union of the kinds in
   use.** The chart holds no credential; the portal write-path only references the
-  `<Kind>Configuration` CRs ([usage](./usage.md)). One PAT can drive all 28 kinds, and
-  `chart/samples/configurations.yaml` ships all 28 Configuration CRs under a single name
+  `<Kind>Configuration` CRs ([usage](./usage.md)). One PAT can drive all 29 kinds, and
+  `chart/samples/configurations.yaml` ships all 29 Configuration CRs under a single name
   — but `Repository` needs repository creation in the org (classic `repo` scope, or a
   fine-grained token with org **Administration: read & write**), and the org-scoped kinds — `Team`, `TeamMembership`,
   `TeamRepo`, `OrgMembership`, `OrgWebhook`, `OrgRuleset`, `ActionsVariableOrg`,

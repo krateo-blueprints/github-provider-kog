@@ -1,7 +1,7 @@
 ---
 type: Component
 title: github-provider-kog — index
-description: The map of the github-provider-kog doc bundle — a Krateo KOG provider that exposes 28 GitHub resources (repository, access, repository configuration, CI/CD, work tracking, governance) as github.krateo.io Kubernetes kinds via oasgen-provider.
+description: The map of the github-provider-kog doc bundle — a Krateo KOG provider that exposes 29 GitHub resources (repository, access, repository configuration, CI/CD, work tracking, governance) as github.krateo.io Kubernetes kinds via oasgen-provider.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, kog, oasgen-provider, github, blueprint-authoring]
 timestamp: 2026-09-09T00:00:00Z
@@ -11,7 +11,7 @@ timestamp: 2026-09-09T00:00:00Z
 
 github-provider-kog is a Krateo **KOG** (Krateo OpenAPI Generation) provider,
 built on [`oasgen-provider`](https://github.com/krateo-platformops/oasgen-provider),
-that exposes **28 GitHub REST resources** as Kubernetes kinds under the
+that exposes **29 GitHub REST resources** as Kubernetes kinds under the
 `github.krateo.io` group.
 
 It started as the in-cluster git transport for **Krateo portal blueprint authoring** —
@@ -37,21 +37,21 @@ itself.
 | **Access** | `Team`, `TeamRepo`, `TeamMembership`, `Collaborator`, `OrgMembership` |
 | **Repository configuration** | `RepoWebhook`, `OrgWebhook`, `DeployKey`, `Environment`, `RepoRuleset`, `OrgRuleset`, `Autolink`, `BranchProtection` |
 | **CI/CD** | `ActionsVariableRepo`, `ActionsVariableOrg`, `EnvironmentVariable`, `RunnerGroup`, `DeploymentBranchPolicy`, `Workflow` |
-| **Work tracking** | `Label`, `Milestone`, `Issue`, `Release`, `Deployment` |
+| **Work tracking** | `Label`, `Milestone`, `Issue`, `PullRequest`, `Release`, `Deployment` |
 | **Governance** | `CustomProperty`, `CodeSecurityConfig`, `AutomatedSecurityFixes` |
 
 Four facts hold across the whole set:
 
-- **All 28 are always installed.** The chart has no per-kind toggle: a RestDefinition
+- **All 29 are always installed.** The chart has no per-kind toggle: a RestDefinition
   costs nothing until a CR of its kind exists.
-- **Every one of the 28 is native**, calling `api.github.com` directly. The chart renders
-  28 ConfigMaps + 28 RestDefinitions and ships **no runtime component** — no Deployment,
+- **Every one of the 29 is native**, calling `api.github.com` directly. The chart renders
+  29 ConfigMaps + 29 RestDefinitions and ships **no runtime component** — no Deployment,
   no Service, no image, no proxy ([overview](./overview.md)).
 - **One PAT can drive the whole chart.** Every kind gets its own `<Kind>Configuration`
   auth kind, but they may all share one name — `chart/samples/configurations.yaml`
-  ships all 28 under `github-blueprints-config`. The rights that token needs do differ
+  ships all 29 under `github-blueprints-config`. The rights that token needs do differ
   by kind ([usage](./usage.md)).
-- **oasgen-provider ≥ 0.23.0 is required.** 23 of the 28 declare
+- **oasgen-provider ≥ 0.23.0 is required.** 24 of the 29 declare
   `compareScope: updatable`, which earlier versions do not accept.
 
 Two GitHub surfaces are deliberately absent: Actions/Dependabot/Codespaces **secrets**,
@@ -62,15 +62,15 @@ covered.
 
 ## The bundle (start here)
 
-- [overview](./overview.md) — what the 28 kinds cover, how oasgen-provider turns the
+- [overview](./overview.md) — what the 29 kinds cover, how oasgen-provider turns the
   chart into live CRDs and controllers, how each kind decides drift (`compareScope`),
-  what keeps all 28 native, what the removed git-write kinds were, and where the coverage
+  what keeps all 29 native, what the removed git-write kinds were, and where the coverage
   stops.
 - [usage](./usage.md) — install as a Krateo component, provision the token and
   Configuration CRs, drive the kinds, and verify.
 - [configuration](./configuration.md) — the whole surface: the one chart value, the
   RestDefinition mappings, and the invariants that must hold.
-- [api](./api.md) — the generated CRDs (the 28 resource kinds + their
+- [api](./api.md) — the generated CRDs (the 29 resource kinds + their
   `<Kind>Configuration`) and the CompositionDefinition the CDC derives from
   `values.schema.json`.
 - [design-repocontent](./design-repocontent.md),
@@ -84,13 +84,13 @@ covered.
 
 ## Layout
 
-- `chart/` — the only first-class chart, and now the whole of what is shipped. It ships 28
+- `chart/` — the only first-class chart, and now the whole of what is shipped. It ships 29
   `RestDefinition`s (`ogen.krateo.io/v1alpha1`), the trimmed OpenAPI 3.0 spec each
   references (as a `ConfigMap`, copied in verbatim by `.Files.Get` — no kind needs a
   `tpl` pass), and `values.schema.json`. No `Deployment`, no `Service`, no image.
-- `chart/assets/` — the 28 trimmed OpenAPI specs, one per kind
+- `chart/assets/` — the 29 trimmed OpenAPI specs, one per kind
   (`repository.yaml`, `team.yaml`, `branchprotection.yaml`, and 25 more).
-- `chart/samples/` — the full `<Kind>Configuration` set (`configurations.yaml`, all 28)
+- `chart/samples/` — the full `<Kind>Configuration` set (`configurations.yaml`, all 29)
   and one test CR per kind.
 - `docs/design-*.md` — one restoration design per removed git-write kind, so what the
   deleted plugin did survives the deletion.
