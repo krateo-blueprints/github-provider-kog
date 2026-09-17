@@ -141,7 +141,7 @@ spec:
   auto_init: true
 ```
 
-Four things to know before you apply it:
+Five things to know before you apply it:
 
 - **Leave `auto_init: true`** (it is the OAS default). A repository created with
   `auto_init: false` has no commit and therefore no default branch, so everything that
@@ -157,13 +157,22 @@ Four things to know before you apply it:
 - **Editing an applied `Repository` reaches GitHub, but only for fields `PATCH` can
   send.** The RestDefinition sets `compareScope: updatable` rather than the default
   `fullSpec`, so Observe compares exactly the fields the update body can express:
-  `description`, `private`, `visibility` and the rest are compared and pushed. The three
-  create-only body fields — `auto_init`, `gitignore_template`, `license_template` — are
-  not reconciled under *any* scope, because GitHub never echoes them on `GET` and the
-  comparison skips a spec key the response does not carry. Set them at create time;
-  changing them afterwards does nothing. So `updatable` is defensive here rather than
-  load-bearing — it and `fullSpec` should agree today — and is kept because it states the
-  intent explicitly and stays correct if a field the `PATCH` cannot send is ever added
+  `description`, `homepage`, `has_issues`, `has_wiki`, `has_projects`, `default_branch`
+  and `archived` are compared and pushed. `auto_init`, `gitignore_template` and
+  `license_template` are not reconciled under *any* scope, because GitHub never echoes
+  them on `GET` and the comparison skips a spec key the response does not carry. Set them
+  at create time; changing them afterwards does nothing.
+- **`private` and `visibility` are honoured at create and ignored thereafter, on
+  purpose.** They are kept out of the `PATCH` body, so flipping a repository's exposure in
+  GitHub is *not* reverted by the next reconcile, and editing them on the applied CR does
+  nothing. Change exposure in GitHub. This is deliberate rather than an omission: consumers
+  render a `Repository` on every composition and core-provider's default `UpgradePolicy` is
+  `Automatic`, so while these were compared, a consumer changing its rendered value did not
+  only affect repositories created afterwards — it PATCHed the ones that already existed,
+  and a private→public flip is not undone by flipping back (forks, clones, caches and
+  search indexing survive it). That makes `updatable` **load-bearing** on this kind rather
+  than defensive: GitHub echoes both fields on every `GET`, so `fullSpec` — which is also
+  what you get by deleting the line — would compare them straight back in
   ([configuration](./configuration.md)).
 - **Only the org-scoped create is modelled.** GitHub's other create endpoint,
   `POST /user/repos` for user-owned repos, is deliberately absent: a RestDefinition has

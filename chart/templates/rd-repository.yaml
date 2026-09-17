@@ -35,11 +35,19 @@ spec:
     # is why several other kinds here genuinely need it (TeamRepo's owner, Issue's labels,
     # Milestone's due_on, Collaborator's effective role).
     #
-    # For Repository specifically, `updatable` is therefore defensive rather than load-bearing:
-    # every spec field the GET echoes is also in the PATCH body, so it and fullSpec should agree
-    # today. It is kept because it states the intent explicitly and stays correct if a
-    # non-updatable field is ever added to the create body. It requires an update verb, which this
-    # resource has, and oasgen-provider >= 0.23.0.
+    # For Repository, `updatable` is LOAD-BEARING. DO NOT set it to fullSpec, and do not delete the
+    # line — the DEFAULT is fullSpec, so removing it is the same mistake. This comment used to say
+    # the opposite, correctly, until #11.
+    #
+    # `private` and `visibility` are create-body fields that the PATCH body deliberately OMITS (see
+    # assets/repository.yaml for the full why). GitHub echoes both on every GET, so under fullSpec
+    # they would be compared again — and a consumer changing its rendered value would then flip the
+    # exposure of repositories that ALREADY EXIST, which forks, clones, caches and search indexing
+    # make irreversible. Nothing else encodes that guarantee: not the CRD, not a validation, not an
+    # error. The absence in the PATCH body plus this one word are the whole of it, which is why
+    # hack/assert-drift-invariants.py asserts both.
+    #
+    # It requires an update verb, which this resource has, and oasgen-provider >= 0.23.0.
     compareScope: updatable
     configurationFields: []
     verbsDescription:

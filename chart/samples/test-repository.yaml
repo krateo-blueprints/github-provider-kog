@@ -17,5 +17,8 @@ spec:
   org: krateo-blueprints
   name: demo-destination
   description: "Destination repository created by Krateo"
+  # CREATE-ONLY in effect: `private` is deliberately out of the PATCH body, so making this
+  # repository public in GitHub afterwards is NOT reverted by the next reconcile — and editing
+  # this field on the applied CR does nothing either. Change exposure in GitHub, not here (#11).
   private: true
   auto_init: true

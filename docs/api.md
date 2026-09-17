@@ -142,18 +142,24 @@ authoring one are written out in full below the tables.
 | `spec.org` | string | the organization — a path param on every verb |
 | `spec.name` | string | the repository name — the identifier, and the only required create-body field |
 | `spec.description` / `spec.homepage` | string | repository metadata |
-| `spec.private` | boolean | private repository |
-| `spec.visibility` | string | repository visibility; the asset declares no enum, so GitHub validates it |
+| `spec.private` | boolean | **create-only** — honoured at create, never reconciled; see below |
+| `spec.visibility` | string | **create-only**, same reason; the asset declares no enum, so GitHub validates it |
 | `spec.has_issues` / `spec.has_wiki` / `spec.has_projects` | boolean | feature toggles |
 | `spec.auto_init` | boolean | **default `true`** — create-only; see below |
 | `spec.gitignore_template` / `spec.license_template` | string | create-only |
-| `spec.default_branch` / `spec.archived` | string / boolean | update-only (they exist in the PATCH body, not the POST body) |
 | `status.id` / `status.node_id` / `status.full_name` / `status.html_url` | | observed after create |
 | `status.clone_url` / `status.ssh_url` / `status.default_branch` | string | what a git-write path or a CI job needs to reach the repo |
 
-Verbs: create on `/orgs/{org}/repos`, get/update/delete on `/repos/{org}/{name}`.
-`spec` is the union of both request bodies plus the path params, because oasgen unions
-the verbs into one CRD.
+Verbs: create on `/orgs/{org}/repos`, get/update on `/repos/{org}/{name}`. There is no
+delete verb.
+
+`spec` is the **create** request body plus the path/query params — *not* the union of
+both bodies. oasgen-provider builds it from the create action alone
+(`getBaseSchemaForSpec` hardcodes it) and then adds parameters. Two consequences worth
+stating, because both have been got wrong here before: `default_branch` and `archived`
+live in the PATCH body only, so they are **not** spec fields and cannot be set on the CR
+at all; and removing a field from the PATCH body does not remove it from the CRD, which
+is exactly what makes "create-only" expressible.
 
 The path parameters are named `org` and `name`, not GitHub's `owner`/`repo`, on
 purpose: the same two CR fields then serve the create path (`/orgs/{org}/repos`), the
@@ -171,12 +177,30 @@ removed kinds, described in [design-gitref](./design-gitref.md),
 [design-pullrequest](./design-pullrequest.md).
 
 Drift is compared with `compareScope: updatable`, not the default `fullSpec`: exactly
-the fields the `PATCH` body can express are compared. The three create-only fields
-(`auto_init`, `gitignore_template`, `license_template`) are never echoed on `GET`, and the
-comparison skips a spec key the response does not carry, so they could not have drifted
-under `fullSpec` either — here `updatable` is defensive, not a rescue: it states the
-intent and stays correct if a field the `GET` echoes and the `PATCH` cannot send is added
-later. The rule and its code evidence are in [configuration](./configuration.md).
+the fields the `PATCH` body can express are compared, which is `description`, `homepage`,
+`has_issues`, `has_wiki`, `has_projects`, `default_branch` and `archived`. Edit one of
+those on an applied CR and it is pushed to GitHub.
+
+**`private` and `visibility` are not in that set, deliberately.** They are create-body
+fields the `PATCH` body omits, so they are honoured when the repository is created and
+ignored from then on: flip a repository's exposure in GitHub and no reconcile reverts it.
+The reason is that consumers render a `Repository` on every composition and
+core-provider's default `UpgradePolicy` is `Automatic` — so while they were compared, a
+consumer changing its rendered value did not only affect repositories created afterwards,
+it PATCHed the ones that already existed. Exposure is the one field where that is
+unrecoverable: forks, clones, caches and search indexing survive a flip back. `name` is
+out of the same body for the same class of reason (it would reconcile a *rename*).
+
+`auto_init`, `gitignore_template` and `license_template` are create-only too, but for a
+different and weaker reason: GitHub never echoes them on `GET`, and the comparison skips
+a spec key the response does not carry, so they could not drift under `fullSpec` either.
+
+That difference is why **`updatable` is load-bearing on this kind, not defensive.** GitHub
+*does* echo `private` and `visibility` on every `GET`, so the default `fullSpec` would
+compare them straight back into the drift set even though the `PATCH` body omits them.
+Setting this kind to `fullSpec` — or deleting the line, since `fullSpec` is the default —
+silently restores the hazard. The rule and its code evidence are in
+[configuration](./configuration.md).
 
 GitHub's second create endpoint, `POST /user/repos` (user-owned repositories), is
 deliberately not modelled: a `RestDefinition` has one create verb and cannot choose
