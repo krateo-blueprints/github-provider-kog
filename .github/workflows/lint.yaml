@@ -9,3 +9,17 @@ on:
 jobs:
   lint-docs:
     uses: krateo-platformops/.github/.github/workflows/lint-docs.yaml@main
+
+  # Two fixes in this chart are ABSENCES — a field removed from an update body so drift can no
+  # longer act on it (0.2.2 `name`, 0.3.1 `private`/`visibility`). Nothing in the generated CRD
+  # records that, and re-adding one is silent: no error, no failure, just a controller that starts
+  # renaming or re-exposing live repositories again. This job is the only thing that notices.
+  drift-invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - run: python3 hack/assert-drift-invariants.py .

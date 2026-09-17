@@ -11,6 +11,85 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-09-17 — `Repository` exposure is create-only, and can no longer be flipped by a reconcile
+
+`private` and `visibility` are out of the PATCH body, so they leave the `updatable` compare set.
+Changing a repository's exposure is no longer something drift reconciliation can decide to do.
+
+**Caught before it shipped, not after.** `portal#227` flips `builder-publish`'s destination repos
+from private to public, on sound reasoning: a GHCR package inherits the visibility of the repo that
+published it, and there is no API to change org container-package visibility afterwards, so a
+private destination publishes a chart nobody outside the org can install. Its PR body said
+*"existing ones keep their visibility."* That was not true. `builder-publish` renders a `Repository`
+on every publish (`{{- if .Values.repository.create }}`, default `create: true`) with
+`private: {{ .Values.repository.private }}`, and core-provider's default `UpgradePolicy` is
+`Automatic` — so flipping the values default re-renders every live `Repository` CR, the GET echoes
+the real visibility, the difference reads as drift, and the PATCH goes out against repositories
+nobody was asked about. `portal#227`'s own table names a currently-private repo. That PR is on hold
+behind this change.
+
+The asymmetry is what makes this different from ordinary drift. For nearly every field,
+"reconcile the CR back onto reality" is exactly right. For an exposure control it inverts the safe
+default, and it inverts it in the direction that has no undo: a repository that was public for one
+reconcile stays forked, cloned, cached and search-indexed after it is made private again. Which
+repositories are public is a decision their owner makes, not one a chart version bump makes for
+them.
+
+`visibility` goes with `private` although #11 only names `private`. It is the same field by another
+name in the same two bodies, GitHub echoes it on every GET, and it is the *more* likely re-entry
+path — the product direction behind `portal#227` is a publish form offering repository visibility
+and package visibility as independent choices. Fixing one and leaving the other would have left the
+hazard fully live.
+
+Three things this change is careful about:
+
+- **It stops them being SENT, not merely compared.** The outgoing request body is filtered to the
+  fields the operation declares (`processFields` in rest-dynamic-controller's `builder.go`), so a
+  PATCH triggered by `description` drift now carries no visibility field at all. GitHub's PATCH is
+  partial, so omitting it leaves the repository alone. There is no residual path by which a
+  reconcile touches exposure.
+- **The CRD does not change.** oasgen-provider builds the spec schema from the CREATE body plus
+  path/query params only (`getBaseSchemaForSpec` hardcodes the create action), never from the
+  update body. `spec.private` and `spec.visibility` still exist and are still honoured at create.
+  Generated before and after the edit, the spec schema is byte-identical: no migration, no CR
+  rewrite, no immutability problem. Create-only is cheap here precisely because of that.
+- **`compareScope: updatable` is now LOAD-BEARING on this kind.** It was defensive until today and
+  this repo said so, in a comment and in three doc pages. It no longer is: GitHub echoes `private`
+  and `visibility` on every GET, so the default `fullSpec` compares every echoed spec key
+  regardless of the PATCH body and would restore the hazard in full. Setting `Repository` back to
+  `fullSpec`, or simply deleting the line, is the same regression as re-adding the fields — with
+  no error, no condition and nothing failing.
+
+That last point is why this change also adds `hack/assert-drift-invariants.py`, run by the `lint`
+workflow. The guarantee here lives entirely in two absences and one word, in two different files,
+and nothing in the CRD or the RestDefinition schema records it. The script asserts that `name`,
+`private` and `visibility` are absent from the PATCH body, that `private` and `visibility` are
+still present in the create body (a create-only field that leaves the create body stops being
+settable at all), and that `Repository` still declares `compareScope: updatable`. It covers the
+0.2.2 rename fix too, which was equally unguarded.
+
+**Status changes on existing CRs, expected and not a convergence.** Any live `Repository` whose
+`spec.private` disagreed with the real repository was reporting `Unavailable` with
+`Resource is not up-to-date due to …private…`. After this it reports `Available` *without*
+converging — the divergence is now ignored rather than fixed. Enumerate those CRs before rolling so
+nobody reads the status flip as the fix having changed something on GitHub.
+
+One upstream coupling worth recording, because nothing here would notice it breaking: this fix
+depends on oasgen-provider continuing to build the spec from the create body alone, and on
+rest-dynamic-controller continuing to derive `updatable` from the update body. If either ever
+unions create and update, the behaviour changes with no edit to this chart.
+
+Verified: the drift-compare set and the PATCH request body were computed by
+rest-dynamic-controller's own `UpdatableBodyPaths`/`RequestedBody` against this asset, before and
+after. Before — 9 compared fields, `private` and `visibility` both compared and both sent. After —
+7 compared fields (`archived`, `default_branch`, `description`, `has_issues`, `has_projects`,
+`has_wiki`, `homepage`), `private` and `visibility` neither compared nor sent, both still in the
+11-field create body. The CRD spec schema was generated through oasgen-provider 0.23.1's
+`BuildSpecSchema` from both versions of the asset and is byte-identical, 13 properties including
+`private` and `visibility`. `helm lint` clean; the chart renders 29 ConfigMaps + 29
+RestDefinitions. No live GitHub round trip — the create/flip/observe sequence in #11 is a bench
+step, not something this repo can run.
+
 ## 2026-09-15 — `PullRequest` comes back, natively
 
 `PullRequest` returns as the **29th kind**, and it returns without the plugin that carried it
