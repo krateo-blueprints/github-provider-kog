@@ -11,6 +11,24 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-09-28 — `PullRequest` reports `merged`; the group-B findby gap, documented (#14)
+
+`PullRequest.status` gains **`merged`** (a plain boolean, `additionalStatusFields`). `state` collapses
+a merged and a closed-but-unmerged PR into the single value `closed`; GitHub reports the difference
+only through `merged`, and nothing read it, so the publish chain could not tell an accepted change from
+a rejected one without inferring "closed?". `merged` is already in the OpenAPI schema, is safe where
+`head`/`base` are not (a boolean in all three responses, never a spec field, so it never enters drift),
+and was the option [design-pullrequest §6 note 7](./design-pullrequest.md) already flagged as safe.
+`appVersion` → `0.1.1` (mapping revision).
+
+The other half of #14 — a CR that never recorded `status.number` can never be re-observed — is **not**
+fixable in a RestDefinition, and [design-pullrequest §8](./design-pullrequest.md) now records why: the
+controller (`217ccd0`) matches raw findby list items *before* the `head`/`base` `responseTransform`
+runs, so a findby keyed on head/base can never match (object in the list, string in the spec). A
+correct findby needs the controller to normalize items before matching — the change the
+`isInResource` `TODO` anticipates. Left for that upstream change rather than papered over with a
+fragile title-keyed findby that would fall below this chart's correctness bar.
+
 ## 2026-09-15 — `PullRequest` comes back, natively
 
 `PullRequest` returns as the **29th kind**, and it returns without the plugin that carried it
