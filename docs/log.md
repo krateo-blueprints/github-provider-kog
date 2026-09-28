@@ -26,8 +26,10 @@ fixable in a RestDefinition, and [design-pullrequest §8](./design-pullrequest.m
 controller (`217ccd0`) matches raw findby list items *before* the `head`/`base` `responseTransform`
 runs, so a findby keyed on head/base can never match (object in the list, string in the spec). A
 correct findby needs the controller to normalize items before matching — the change the
-`isInResource` `TODO` anticipates. Left for that upstream change rather than papered over with a
-fragile title-keyed findby that would fall below this chart's correctness bar.
+`isInResource` `TODO` anticipates, filed as
+[krateoplatformops/rest-dynamic-controller#65](https://github.com/krateoplatformops/rest-dynamic-controller/issues/65).
+Left for that upstream change rather than papered over with a fragile title-keyed findby that would
+fall below this chart's correctness bar.
 
 ## 2026-09-15 — `PullRequest` comes back, natively
 

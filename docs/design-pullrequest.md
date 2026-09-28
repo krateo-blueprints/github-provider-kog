@@ -515,7 +515,9 @@ changing `identifiers` is an immutable, breaking change besides). Existing group
 **What it would take.** A correct findby needs the controller to normalize findby list items
 **before** matching — either by applying the findby verb's `responseTransform`/`fieldMapping` to each
 item ahead of `findItemInList`, or by adding a findby-specific match transform. That is the change the
-`isInResource` `TODO` (`clienttools.go:122`) anticipates. Until then, group-B recovery is not
+`isInResource` `TODO` (`clienttools.go:122`) anticipates, and it is filed upstream as
+[krateoplatformops/rest-dynamic-controller#65](https://github.com/krateoplatformops/rest-dynamic-controller/issues/65).
+Until then, group-B recovery is not
 expressible in a RestDefinition, and the honest posture for such a CR is unchanged: the PR still
 exists on GitHub; reconcile it by recreating the CR against a live PR, or (once the PR is
 merged/closed) leave it — deleting the CR only stops Krateo tracking it (§7).
