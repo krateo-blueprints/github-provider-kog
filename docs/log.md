@@ -27,7 +27,7 @@ controller (`217ccd0`) matches raw findby list items *before* the `head`/`base` 
 runs, so a findby keyed on head/base can never match (object in the list, string in the spec). A
 correct findby needs the controller to normalize items before matching — the change the
 `isInResource` `TODO` anticipates, filed as
-[krateoplatformops/rest-dynamic-controller#65](https://github.com/krateoplatformops/rest-dynamic-controller/issues/65).
+[krateo-platformops/oasgen-provider#145](https://github.com/krateo-platformops/oasgen-provider/issues/145).
 Left for that upstream change rather than papered over with a fragile title-keyed findby that would
 fall below this chart's correctness bar.
 
