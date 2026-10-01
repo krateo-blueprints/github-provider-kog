@@ -133,5 +133,9 @@ components:
           type: string
         merged:
           type: boolean
+        # RFC3339 timestamp of the merge, or null for an open or closed-but-unmerged PR. GitHub
+        # returns it on the same create 201 / get 200 / update 200 responses as `merged`.
+        merged_at:
+          type: string
 security:
   - accessToken: []

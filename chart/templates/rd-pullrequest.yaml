@@ -15,12 +15,31 @@ spec:
     # head/base are deliberately NOT here. Status is populated from the create and update
     # responses too, and those run with actions {"create"}/{"update"} — the get verb's
     # responseTransform does not apply to them — so a `head` in status would be a string after
-    # observe and an object after update. `merged` would be safe (a plain boolean in all three
-    # responses, and not a spec field) but nothing needs it yet.
+    # observe and an object after update.
+    #
+    # `merged` and `merged_at` ARE here (#14). They are safe exactly where head/base are not: both
+    # ride the same create 201 / get 200 / update 200 responses, neither is a spec field, so neither
+    # can enter drift comparison (`merged` a plain boolean, `merged_at` an RFC3339 string or null).
+    # `merged` is the ONLY thing that tells a merged PR from a closed-but-unmerged one: `state`
+    # collapses both to `closed`, and GitHub reports the distinction through this field alone;
+    # `merged_at` carries WHEN it merged. Consumers of the publish chain that need to know whether a
+    # change was accepted read these here instead of inferring "closed?".
+    #
+    # Both only reflect reality while the CR keeps being re-observed: the get verb repopulates them
+    # on each reconcile, so a long-lived PR CR flips `merged` to true (and fills `merged_at`) on the
+    # first reconcile after the merge. A CR that lost status.number cannot re-fetch — see below.
+    #
+    # What `merged` does NOT do: give a CR that never recorded `status.number` a read path. That
+    # recovery would need a findby, and this kind cannot have a working one — the controller matches
+    # raw list items BEFORE the responseTransform runs, so head/base (objects in the list, strings
+    # in the spec) can never match. See docs/design-pullrequest.md §8 for the full analysis and the
+    # upstream change it would take.
     additionalStatusFields:
       - number
       - html_url
       - state
+      - merged
+      - merged_at
     # pull_number is assigned by GitHub on create, so it must NOT be a (required) spec field;
     # get/update source it from status.number via the requestFieldMapping below. Same shape as
     # Issue's issue_number.

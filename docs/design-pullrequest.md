@@ -434,9 +434,10 @@ Traps specific to this kind, in the order they bite:
    update responses too (`restResources.go:561`, `:725`) — and those run with `actions =
    {"create"}` / `{"update"}` (`fieldmapping.go:113-124`), so the get verb's transform does **not**
    apply to them. A `head` in status would be a string after observe and an object after update.
-   This is the same trap `rd-branchprotection.yaml:16-22` documents. (If someone wants `merged` in
-   status, that one is safe — a plain boolean in all three responses, and not a spec field, so it
-   cannot affect drift.)
+   This is the same trap `rd-branchprotection.yaml:16-22` documents. (Since **#14**, `merged` **is**
+   in `additionalStatusFields` — safe exactly as noted here: a plain boolean in all three responses,
+   not a spec field, so it cannot affect drift. It is what makes a merged PR distinguishable from a
+   closed-but-unmerged one; see §8.)
 8. **If you document the normalized shape in the OAS response schema, do it for one verb only and
    expect a warning.** `ValidateSchemas` compares the create/update response schemas against the get
    one (`oas2jsonschema/validator.go:17-37`); divergence is a non-fatal warning
@@ -468,3 +469,55 @@ GitHub, then delete the CR.** If closing from the cluster is ever wanted, it is 
 change — add `state` (and only `state`) to the **create** body as an `enum: [open, closed]` so it
 reaches the spec, keep it in the PATCH body so `updatable` still compares it, and accept that a
 merged PR whose CR says `open` will PATCH-422 on every reconcile.
+
+## 8. Observability, and why there is no findby (#14)
+
+Two problems were reported against a real cluster, and they are not the same problem.
+
+**8.1 The outcome of a PR was not observable — fixed.** `status` carried `number`, `html_url` and
+`state`, and `state` collapses *merged* and *closed-unmerged* into the single value `closed`. GitHub
+reports the difference only through a separate boolean, `merged`, and nothing in this kind read it, so
+a consumer of the publish chain could not tell an accepted change from a rejected one without
+inferring "closed?". This is closed by adding **`merged` to `additionalStatusFields`** — the option
+§6 note 7 already flagged as safe (a plain boolean in the create, get and update responses; never a
+spec field, so it cannot enter drift). `merged` is already a property of the `PullRequest` schema in
+`assets/pullrequest.yaml`, so nothing else changes. After this, a merged PR reports `state: closed`
++ `merged: true`; a closed-unmerged one reports `state: closed` + `merged: false`.
+
+**8.2 A CR that never recorded `status.number` can never be re-observed — NOT fixable here.** Both
+read paths (`get`, `update`) are keyed on `pull_number`, sourced from `status.number`
+(`requestFieldMapping`, §1). A CR that never recorded a number therefore has no way to reach its PR:
+`IsResourceKnown` cannot build the get call, the observe falls through to the findby branch, finds no
+findby verb, and reports `Available` with *"Resource is assumed to be up-to-date. API call not found
+for FindBy."* (`restResources.go:237`, controller `217ccd0`). The reported cause is exactly this: a
+create whose response never yielded a `number` (a 422 "a pull request already exists", an async/no-body
+create) leaves a CR with intact `spec` and empty `status`, and there is no recovery path.
+
+The obvious suggestion — add a findby resolving `owner`/`repo`/`head`/`base` → the PR via
+`GET /repos/{owner}/{repo}/pulls?head=…&base=…&state=all` — **does not work with the controller as
+built**, and it is worth writing down why so nobody ships it and makes things worse:
+
+| step | citation | consequence |
+|---|---|---|
+| findby does the list call **and matches an item inside the client**, returning the single matched item | `restResources.go:263` → `restclient.go:253` `FindBy` → `:572` `findItemInList` → `:607` `isItemMatch` | matching sees the **raw** GitHub items |
+| an item matches when an identifier's value equals `spec.<field>` (then `status.<field>`) by `DeepEqual` | `clienttools.go:123` `isInResource` (note its own `TODO`: no response mapping is applied here) | the compared value is raw |
+| `NormalizeResponseBody` (the `head`/`base` → string `responseTransform`) runs **only afterwards**, on the already-matched item | `restResources.go:346` | too late to help matching |
+
+So a findby keyed on `head`/`base` can never match: the raw list item carries them as **objects**
+(`{ref,label,repo,…}`) while `spec.head`/`spec.base` are branch **strings**, and
+`DeepEqual(string, object)` is always false. The `responseTransform` that reconciles the two shapes
+for the get verb is applied one step too late to be usable as a match key. The only raw-item scalars
+that equal a spec field are `title`, `body` and `draft` — none unique, and `title`/`body` are
+user-editable, so keying on them would break recovery precisely when the spec has drifted (and
+changing `identifiers` is an immutable, breaking change besides). Existing group-B CRs also have empty
+`status`, so there is no create-time fallback to match against.
+
+**What it would take.** A correct findby needs the controller to normalize findby list items
+**before** matching — either by applying the findby verb's `responseTransform`/`fieldMapping` to each
+item ahead of `findItemInList`, or by adding a findby-specific match transform. That is the change the
+`isInResource` `TODO` (`clienttools.go:122`) anticipates, and it is filed upstream as
+[krateo-platformops/oasgen-provider#145](https://github.com/krateo-platformops/oasgen-provider/issues/145)
+(the `rest-dynamic-controller` module, after the monorepo migration). Until then, group-B recovery is not
+expressible in a RestDefinition, and the honest posture for such a CR is unchanged: the PR still
+exists on GitHub; reconcile it by recreating the CR against a live PR, or (once the PR is
+merged/closed) leave it — deleting the CR only stops Krateo tracking it (§7).

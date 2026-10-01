@@ -11,6 +11,28 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-09-28 — `PullRequest` reports `merged` and `merged_at`; the group-B findby gap, documented (#14)
+
+`PullRequest.status` gains **`merged`** (a plain boolean) and **`merged_at`** (an RFC3339 string, null
+until merged), both via `additionalStatusFields`. `state` collapses
+a merged and a closed-but-unmerged PR into the single value `closed`; GitHub reports the difference
+only through `merged`, and nothing read it, so the publish chain could not tell an accepted change from
+a rejected one without inferring "closed?"; `merged_at` carries when it merged. Both are safe where
+`head`/`base` are not (scalars in all three responses, never spec fields, so they never enter drift),
+and `merged` was the option [design-pullrequest §6 note 7](./design-pullrequest.md) already flagged as safe.
+Both populate only while the CR keeps being re-observed (the get verb repopulates them each reconcile).
+`appVersion` → `0.1.1` (mapping revision).
+
+The other half of #14 — a CR that never recorded `status.number` can never be re-observed — is **not**
+fixable in a RestDefinition, and [design-pullrequest §8](./design-pullrequest.md) now records why: the
+controller (`217ccd0`) matches raw findby list items *before* the `head`/`base` `responseTransform`
+runs, so a findby keyed on head/base can never match (object in the list, string in the spec). A
+correct findby needs the controller to normalize items before matching — the change the
+`isInResource` `TODO` anticipates, filed as
+[krateo-platformops/oasgen-provider#145](https://github.com/krateo-platformops/oasgen-provider/issues/145).
+Left for that upstream change rather than papered over with a fragile title-keyed findby that would
+fall below this chart's correctness bar.
+
 ## 2026-09-17 — `Repository` exposure is create-only, and can no longer be flipped by a reconcile
 
 `private` and `visibility` are out of the PATCH body, so they leave the `updatable` compare set.
