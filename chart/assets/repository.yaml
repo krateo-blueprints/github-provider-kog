@@ -110,10 +110,34 @@ paths:
                   type: string
                 homepage:
                   type: string
-                private:
-                  type: boolean
-                visibility:
-                  type: string
+                # `private` and `visibility` ARE accepted by GitHub's PATCH — and are DELIBERATELY
+                # NOT MODELLED HERE. Exposure is honoured at CREATE and ignored afterwards.
+                #
+                # In the PATCH body they sit in the `updatable` compare set, which makes "change
+                # this repository's exposure" something drift reconciliation decides on its own.
+                # Consumers render a Repository on every composition and core-provider's default
+                # UpgradePolicy is Automatic, so a consumer changing its rendered value does not
+                # only affect repositories created afterwards — the next reconcile PATCHes the ones
+                # that already exist.
+                #
+                # Caught in review of portal#227 (this repo's #11), which flips builder-publish's
+                # destination repos public because a GHCR package inherits the visibility of the
+                # repo that published it. Its PR body said "existing ones keep their visibility";
+                # with these two fields compared that was false, and merging it would have flipped
+                # live private repositories public on the next reconcile. There is no undo — forks,
+                # clones, caches and search indexing survive a flip back.
+                #
+                # Dropping them from the body does more than un-compare them. The outgoing body is
+                # filtered to the fields the operation declares (rest-dynamic-controller,
+                # builder.go processFields), so a PATCH triggered by `description` drift carries no
+                # visibility field either, and GitHub's PATCH is partial — omitting it leaves the
+                # repository as it is.
+                #
+                # Both remain CREATE-body fields, so `spec.private`/`spec.visibility` still exist on
+                # the CRD — oasgen builds the spec from the create body plus path/query params,
+                # never from the update body — and are still honoured at create. The CRD does not
+                # change. Which repositories are public is a decision their owner makes, not one a
+                # chart version bump makes for them.
                 has_issues:
                   type: boolean
                 has_wiki:

@@ -237,24 +237,41 @@ an edited `spec.permission` was never pushed at all. Full account in [api](./api
 
 ### `compareScope` on `Repository`
 
-`Repository` is the **defensive** case above, and it is written out here because the
-rationale attached to it was wrong first and was copied from here into other kinds. The
-three create-only fields in its create body — `auto_init`, `gitignore_template`,
-`license_template` — are accepted on `POST` and never echoed on `GET`, so the comparison
-skips them under `fullSpec` as well. They do not cause a drift loop, and never did.
+`Repository` is written out here because the rationale attached to it was wrong twice, and
+the wrong version was copied from here into other kinds.
 
 `updatable` compares exactly the fields the `PATCH` body can express, derived from the OAS
-rather than declared by hand: `description`, `homepage`, `private`, `visibility`,
-`has_issues`, `has_wiki`, `has_projects`, `default_branch` and `archived`. Every spec
-field the GET echoes is also in that PATCH body, so `updatable` and `fullSpec` should
-agree today. It is set because it states the intent explicitly and stays correct if a
-field the response carries and the PATCH cannot send is ever added. It requires an update
-verb, which `Repository` has.
+rather than declared by hand: `description`, `homepage`, `has_issues`, `has_wiki`,
+`has_projects`, `default_branch` and `archived`. It requires an update verb, which
+`Repository` has.
+
+Three fields are create-only because GitHub simply never echoes them — `auto_init`,
+`gitignore_template`, `license_template`. The comparison skips a spec key the response does
+not carry, so they are equally inert under `fullSpec`. They do not cause a drift loop and
+never did.
+
+**Three more are create-only because the asset deliberately keeps them out of the `PATCH`
+body**, and those are the load-bearing ones:
+
+- `private` and `visibility` (#11, 0.3.1). Compared, they made a consumer's rendered value
+  retroactive: consumers render a `Repository` on every composition and core-provider's
+  default `UpgradePolicy` is `Automatic`, so changing the value re-rendered every live CR
+  and the next reconcile PATCHed repositories that already existed. For exposure that is
+  unrecoverable — forks, clones, caches and search indexing survive a flip back.
+- `name` (0.2.2). Compared, it made drift reconciliation willing to *rename* a live
+  repository, which GitHub's rename redirect surfaced as a 307.
+
+GitHub echoes all three on every `GET`. So for this kind `updatable` is **load-bearing, not
+defensive**: under the default `fullSpec` they would be compared back into the drift set
+regardless of the `PATCH` body, and the hazard would return in full. Setting `Repository`
+to `fullSpec`, or deleting the `compareScope` line at all, is the same regression as
+re-adding the fields — silent, with nothing failing. `hack/assert-drift-invariants.py`
+(run by the `lint` workflow) asserts both halves for exactly that reason.
 
 This was `identifiersAndStatus` when the kind was first written, because `updatable` did
 not exist below oasgen-provider **0.23.0**. That setting compared only `name` plus the
-`additionalStatusFields`, so editing `description` or `private` on an existing CR was
-silently never pushed — a real gap, and closing it is what the change was actually for.
+`additionalStatusFields`, so editing `description` on an existing CR was silently never
+pushed — a real gap, and closing it is what the change was actually for.
 
 ### Normalization in the RestDefinition
 

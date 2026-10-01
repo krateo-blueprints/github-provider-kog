@@ -33,9 +33,11 @@ timestamp: 2026-09-09T00:00:00Z
   finalizer would otherwise run (oasgen-provider #125). Still point the sample at a
   scratch org. And editing the applied CR is pushed to
   GitHub only for fields `PATCH` can send — `Repository` compares with
-  `compareScope: updatable`, so `description` or `private` reconcile while the
-  create-only `auto_init`, `gitignore_template` and `license_template` do not
-  ([usage](./usage.md), [configuration](./configuration.md)).
+  `compareScope: updatable`, so `description` reconciles while `auto_init`,
+  `gitignore_template`, `license_template` and — deliberately — `private` and
+  `visibility` do not. The sample creates a **private** repo; flipping it public in GitHub
+  afterwards is not reverted, because exposure is honoured at create and ignored from then
+  on ([usage](./usage.md), [configuration](./configuration.md)).
 
 There is no git-write example any more. `GitRef`, `RepoContent` and `PullRequest` have
 been removed along with the proxy plugin that served them, and publishing now runs through
