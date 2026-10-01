@@ -17,12 +17,17 @@ spec:
     # responseTransform does not apply to them — so a `head` in status would be a string after
     # observe and an object after update.
     #
-    # `merged` IS here (#14). It is safe exactly where head/base are not: a plain boolean in all
-    # three responses (create 201 / get 200 / update 200), never a spec field, so it cannot enter
-    # drift comparison. It is the ONLY thing that tells a merged PR from a closed-but-unmerged one:
-    # `state` collapses both to `closed`, and GitHub reports the distinction through this field
-    # alone. Consumers of the publish chain that need to know whether a change was accepted read it
-    # here instead of inferring "closed?".
+    # `merged` and `merged_at` ARE here (#14). They are safe exactly where head/base are not: both
+    # ride the same create 201 / get 200 / update 200 responses, neither is a spec field, so neither
+    # can enter drift comparison (`merged` a plain boolean, `merged_at` an RFC3339 string or null).
+    # `merged` is the ONLY thing that tells a merged PR from a closed-but-unmerged one: `state`
+    # collapses both to `closed`, and GitHub reports the distinction through this field alone;
+    # `merged_at` carries WHEN it merged. Consumers of the publish chain that need to know whether a
+    # change was accepted read these here instead of inferring "closed?".
+    #
+    # Both only reflect reality while the CR keeps being re-observed: the get verb repopulates them
+    # on each reconcile, so a long-lived PR CR flips `merged` to true (and fills `merged_at`) on the
+    # first reconcile after the merge. A CR that lost status.number cannot re-fetch — see below.
     #
     # What `merged` does NOT do: give a CR that never recorded `status.number` a read path. That
     # recovery would need a findby, and this kind cannot have a working one — the controller matches
@@ -34,6 +39,7 @@ spec:
       - html_url
       - state
       - merged
+      - merged_at
     # pull_number is assigned by GitHub on create, so it must NOT be a (required) spec field;
     # get/update source it from status.number via the requestFieldMapping below. Same shape as
     # Issue's issue_number.
