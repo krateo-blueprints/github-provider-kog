@@ -8,32 +8,33 @@ spec:
   resourceGroup: {{ .Values.resourceGroup }}
   resource:
     kind: PullRequest
-    # `number` is the PR's identity (titles are not unique) and a property of the GET response,
-    # so status populates and the item path can be keyed off it.
+    # IDENTITY is head+base (#14). A PR is uniquely identified within a repo by the branches it
+    # joins, and both are intact in every CR's spec — so a findby can locate the pull request from
+    # spec alone, which is the recovery path group-B CRs (created but with no status.number) need.
+    #
+    # Why NOT `number`: number is server-assigned and lives only in status. Keying identity on it
+    # leaves a CR that never recorded a number with no way back to its PR — exactly issue #14. number
+    # stays in additionalStatusFields below, and get/update still bind {pull_number} from
+    # status.number via requestFieldMapping — identifiers drive findby MATCHING, not the get path, so
+    # group-A (number present) keeps observing via get unchanged. Identifiers are NOT projected into
+    # the spec schema (oasgen IncludeIdentifiersInSpec defaults off), so this is not a spec change;
+    # they ARE appended to the status schema, so head/base now also appear in status (as strings —
+    # see the responseTransform note below), which is additive and non-breaking.
     identifiers:
-      - number
-    # head/base are deliberately NOT here. Status is populated from the create and update
-    # responses too, and those run with actions {"create"}/{"update"} — the get verb's
-    # responseTransform does not apply to them — so a `head` in status would be a string after
-    # observe and an object after update.
+      - head
+      - base
+    # head/base in status are kept CONSISTENT across every verb that populates status. status is
+    # written from the create (201), get (200), update (200) AND findby (200) responses, and
+    # NormalizeResponseBody applies only the responseTransform of the verb that produced the body —
+    # so the head/base object→string flatten is declared on ALL FOUR verbs below. Without it on
+    # create/update, status.head would be an object after a create and a string after an observe,
+    # and the string-typed status schema would reject the object. The four copies MUST stay
+    # byte-identical; they are the same program by necessity, not by accident.
     #
-    # `merged` and `merged_at` ARE here (#14). They are safe exactly where head/base are not: both
-    # ride the same create 201 / get 200 / update 200 responses, neither is a spec field, so neither
-    # can enter drift comparison (`merged` a plain boolean, `merged_at` an RFC3339 string or null).
-    # `merged` is the ONLY thing that tells a merged PR from a closed-but-unmerged one: `state`
-    # collapses both to `closed`, and GitHub reports the distinction through this field alone;
-    # `merged_at` carries WHEN it merged. Consumers of the publish chain that need to know whether a
-    # change was accepted read these here instead of inferring "closed?".
-    #
-    # Both only reflect reality while the CR keeps being re-observed: the get verb repopulates them
-    # on each reconcile, so a long-lived PR CR flips `merged` to true (and fills `merged_at`) on the
-    # first reconcile after the merge. A CR that lost status.number cannot re-fetch — see below.
-    #
-    # What `merged` does NOT do: give a CR that never recorded `status.number` a read path. That
-    # recovery would need a findby, and this kind cannot have a working one — the controller matches
-    # raw list items BEFORE the responseTransform runs, so head/base (objects in the list, strings
-    # in the spec) can never match. See docs/design-pullrequest.md §8 for the full analysis and the
-    # upstream change it would take.
+    # `merged` and `merged_at` tell a merged PR from a closed-but-unmerged one (`state` collapses
+    # both to `closed`) and carry when it merged. Both are plain scalars on every response and never
+    # spec fields, so they never enter drift. They, and now head/base, only reflect reality while the
+    # CR keeps being re-observed — the get verb repopulates them each reconcile.
     additionalStatusFields:
       - number
       - html_url
@@ -49,7 +50,8 @@ spec:
     # plus the path/query parameters of every verb, so of the PATCH's four properties only
     # title/body/base are spec fields — `state` is not — and the effective compared set is
     # {title, body, base}: all three are properties of the GET response and all three are fixable
-    # by the PATCH.
+    # by the PATCH. head is a spec field but not in the PATCH body, so `updatable` never compares it
+    # (a PR's head cannot be changed after creation anyway).
     #
     # `fullSpec` is what this kind shipped with before 0.2.2, and it is what made the plugin
     # necessary; even WITH the responseTransform below it stays wrong, because it also compares
@@ -58,9 +60,9 @@ spec:
     # CR drifts forever against an update that cannot carry `draft`.
     #
     # `identifiersAndStatus` would be actively dangerous: it projects the SPEC onto identifiers +
-    # additionalStatusFields, and number/html_url/state are NONE of them spec fields, so the
-    # projected set is EMPTY and CompareExisting returns equal unconditionally. The CR would
-    # report Available whatever the PR's title, body or base said.
+    # additionalStatusFields; head/base ARE spec fields now, but html_url/number/state are not, so
+    # the projected set would be {head, base} — which the PATCH cannot change — and a title/body
+    # edit would never be seen. `updatable` stays the correct scope.
     compareScope: updatable
     configurationFields: []
     #
@@ -73,30 +75,59 @@ spec:
       - action: create
         method: POST
         path: /repos/{owner}/{repo}/pulls
+        # Flatten head/base before the create response populates status (see identity note). Same
+        # program as get/update/findby — keep byte-identical.
+        responseTransform:
+          inline: |
+            . as $r
+            | ((($r.head | type) == "object") and (($r.base | type) == "object")
+               and ((($r.head.repo.full_name) // "") != (($r.base.repo.full_name) // ""))) as $cross
+            | (if (.head | type) == "object" then .head = (if $cross then .head.label else .head.ref end) else . end)
+            | (if (.base | type) == "object" then .base = .base.ref else . end)
+      # OBSERVE for group-B (no status.number): find the PR by head/base. IsResourceKnown cannot
+      # build the get call without status.number, so observe falls through to this findby, which
+      # lists the repo's PRs and matches the one whose head AND base equal spec.head/spec.base.
+      #
+      # Requires the controller to normalize list items BEFORE matching (krateo-platformops/
+      # oasgen-provider#145, released in oasgen-provider >= 0.25.0): the raw list item carries
+      # head/base as objects, spec carries branch strings, and the match is DeepEqual(spec, item).
+      # The responseTransform below is applied to each item first, so the comparison is string vs
+      # string. On a controller older than 0.25.0 this match can never succeed and observe would
+      # re-create — hence the chart's oasgen-provider >= 0.25.0 requirement (Chart.yaml).
+      - action: findby
+        method: GET
+        path: /repos/{owner}/{repo}/pulls
+        identifiersMatchPolicy: AND
+        queries:
+          # state=all so a merged/closed PR is still found (group B is reported precisely because the
+          # PR's state changed after creation). per_page=100 is GitHub's max; no pagination strategy
+          # is configured (the controller's continuationToken scheme does not fit GitHub's Link
+          # header), so a repo with >100 PRs observes only the first page — far beyond any blueprint
+          # publish repo, but stated rather than hidden.
+          - name: state
+            value: all
+          - name: per_page
+            value: "100"
+        responseTransform:
+          inline: |
+            . as $r
+            | ((($r.head | type) == "object") and (($r.base | type) == "object")
+               and ((($r.head.repo.full_name) // "") != (($r.base.repo.full_name) // ""))) as $cross
+            | (if (.head | type) == "object" then .head = (if $cross then .head.label else .head.ref end) else . end)
+            | (if (.base | type) == "object" then .base = .base.ref else . end)
       - action: get
         method: GET
         path: /repos/{owner}/{repo}/pulls/{pull_number}
         requestFieldMapping:
           - inPath: pull_number
             inCustomResource: status.number
-        # THE reason this kind needs no plugin. GitHub returns head/base as OBJECTS
-        # ({ref,label,sha,repo,user}) while spec.head/spec.base are the branch STRINGS the create
-        # body carried; compared raw, both read as permanent drift and the PATCH cannot fix either
-        # (head is not even in the PATCH body). This rewrites them back into the CR domain once,
-        # before status population and drift comparison.
-        #
-        # `base` is always .ref — GitHub requires base to be a branch of the base repository, so
-        # spec.base is never the "owner:branch" form; .label ("octocat:master") would be permanent
-        # drift. `head` is .ref for a same-repo PR and .label for a cross-repo one, because that is
-        # the form the create body must use; the old plugin always took .ref and therefore drifted
-        # on every fork PR. A deleted fork leaves head.repo null, which `// ""` turns into the
-        # cross-repo branch — still .label, still right.
-        #
-        # Type-guarded rather than `.head.ref // .head`: gojq does NOT swallow the indexing error
-        # of `.ref` on a string, so the naive form fails the reconcile the second time it sees an
-        # already-normalized body — and a jq runtime error stops the CR reconciling outright. This
-        # form is idempotent (verified over three passes on a live PR body) and total: an absent
-        # head/base is left absent rather than created as null, which would itself be drift.
+        # GitHub returns head/base as OBJECTS ({ref,label,sha,repo,user}) while spec.head/spec.base
+        # are the branch STRINGS the create body carried; compared raw, both read as permanent drift.
+        # This rewrites them back into the CR domain before status population and drift comparison.
+        # `base` is always .ref. `head` is .ref for a same-repo PR and .label ("owner:branch") for a
+        # cross-repo (fork) one — the form the create body used, so it round-trips. Type-guarded so a
+        # second pass over an already-normalized body is a no-op rather than a reconcile-stopping jq
+        # error. Keep byte-identical with create/update/findby.
         responseTransform:
           inline: |
             . as $r
@@ -110,3 +141,12 @@ spec:
         requestFieldMapping:
           - inPath: pull_number
             inCustomResource: status.number
+        # The PATCH response also carries head/base as objects and also populates status. Same
+        # flatten as the other three verbs — keep byte-identical.
+        responseTransform:
+          inline: |
+            . as $r
+            | ((($r.head | type) == "object") and (($r.base | type) == "object")
+               and ((($r.head.repo.full_name) // "") != (($r.base.repo.full_name) // ""))) as $cross
+            | (if (.head | type) == "object" then .head = (if $cross then .head.label else .head.ref end) else . end)
+            | (if (.base | type) == "object" then .base = .base.ref else . end)
