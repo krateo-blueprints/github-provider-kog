@@ -484,18 +484,20 @@ spec field, so it cannot enter drift). `merged` is already a property of the `Pu
 `assets/pullrequest.yaml`, so nothing else changes. After this, a merged PR reports `state: closed`
 + `merged: true`; a closed-unmerged one reports `state: closed` + `merged: false`.
 
-**8.2 A CR that never recorded `status.number` can never be re-observed — NOT fixable here.** Both
+**8.2 A CR that never recorded `status.number` can never be re-observed — FIXED (requires oasgen-provider >= 0.25.0).** Both
 read paths (`get`, `update`) are keyed on `pull_number`, sourced from `status.number`
-(`requestFieldMapping`, §1). A CR that never recorded a number therefore has no way to reach its PR:
-`IsResourceKnown` cannot build the get call, the observe falls through to the findby branch, finds no
-findby verb, and reports `Available` with *"Resource is assumed to be up-to-date. API call not found
+(`requestFieldMapping`, §1). A CR that never recorded a number therefore had no way to reach its PR:
+`IsResourceKnown` cannot build the get call, the observe falls through to the findby branch, found no
+findby verb, and reported `Available` with *"Resource is assumed to be up-to-date. API call not found
 for FindBy."* (`restResources.go:237`, controller `217ccd0`). The reported cause is exactly this: a
 create whose response never yielded a `number` (a 422 "a pull request already exists", an async/no-body
-create) leaves a CR with intact `spec` and empty `status`, and there is no recovery path.
+create) leaves a CR with intact `spec` and empty `status`, and there was no recovery path.
 
-The obvious suggestion — add a findby resolving `owner`/`repo`/`head`/`base` → the PR via
-`GET /repos/{owner}/{repo}/pulls?head=…&base=…&state=all` — **does not work with the controller as
-built**, and it is worth writing down why so nobody ships it and makes things worse:
+A findby resolving `owner`/`repo`/`head`/`base` → the PR via `GET /repos/{owner}/{repo}/pulls` is now
+declared, keyed on `identifiers: [head, base]` with `identifiersMatchPolicy: AND`; observe falls
+through to it exactly when `status.number` is absent (group B), while group A keeps observing via
+`get`. It could **not** have been shipped against the controller as originally built, and the reason
+is worth keeping because it is precisely what the upstream fix changed:
 
 | step | citation | consequence |
 |---|---|---|
@@ -508,16 +510,37 @@ So a findby keyed on `head`/`base` can never match: the raw list item carries th
 `DeepEqual(string, object)` is always false. The `responseTransform` that reconciles the two shapes
 for the get verb is applied one step too late to be usable as a match key. The only raw-item scalars
 that equal a spec field are `title`, `body` and `draft` — none unique, and `title`/`body` are
-user-editable, so keying on them would break recovery precisely when the spec has drifted (and
-changing `identifiers` is an immutable, breaking change besides). Existing group-B CRs also have empty
-`status`, so there is no create-time fallback to match against.
+user-editable, so keying on them would break recovery precisely when the spec has drifted. head/base
+are the only stable, unique match keys, and they are the ones the raw-shape mismatch defeated.
 
-**What it would take.** A correct findby needs the controller to normalize findby list items
-**before** matching — either by applying the findby verb's `responseTransform`/`fieldMapping` to each
-item ahead of `findItemInList`, or by adding a findby-specific match transform. That is the change the
-`isInResource` `TODO` (`clienttools.go:122`) anticipates, and it is filed upstream as
+(A note on the earlier worry that moving identity to `head`/`base` is a breaking CRD change: it is
+not, in current oasgen. `IncludeIdentifiersInSpec` defaults off, so identifiers are not projected
+into the **spec** schema; they are appended to the **status** schema, which is additive. There are no
+immutability markers on identifiers and they are not used in naming or printer columns. `number`
+stays in `additionalStatusFields`, so group-A status is unchanged and get/update still bind
+`{pull_number}` from `status.number`.)
+
+**What shipped.** The upstream fix — the controller normalizes each findby list item with the findby
+verb's own `responseTransform` **before** `findItemInList` — landed as
 [krateo-platformops/oasgen-provider#145](https://github.com/krateo-platformops/oasgen-provider/issues/145)
-(the `rest-dynamic-controller` module, after the monorepo migration). Until then, group-B recovery is not
-expressible in a RestDefinition, and the honest posture for such a CR is unchanged: the PR still
-exists on GitHub; reconcile it by recreating the CR against a live PR, or (once the PR is
-merged/closed) leave it — deleting the CR only stops Krateo tracking it (§7).
+(merged via PR #155, released in **oasgen-provider >= 0.25.0**). With that in place this kind now
+declares:
+
+- `identifiers: [head, base]`, `identifiersMatchPolicy: AND` — a PR is identified by the branches it
+  joins, both always present in spec, so a findby locates it from spec alone.
+- a `findby` verb (`GET /repos/{owner}/{repo}/pulls`, `state=all`, `per_page=100`) carrying the same
+  `head`/`base` object→string `responseTransform` as `get`; applied per item before matching, it
+  makes the compare string-vs-string and selects the right PR.
+- that same `responseTransform` **on create, get, update AND findby** — status is written from all
+  four responses and `NormalizeResponseBody` only runs the producing verb's transform, so without it
+  on every verb `status.head` would be an object after a create and a string after an observe, and
+  the string-typed status schema would reject the object. The four copies are byte-identical by
+  necessity.
+- `head`/`base` declared as `string` in `assets/pullrequest.yaml` so the status projection types
+  them correctly.
+
+A group-B CR (intact `spec`, empty `status`) now recovers on its next reconcile: observe finds no
+`status.number`, runs the findby, matches its PR by head/base, and populates `status` — including
+`number`, so subsequent reconciles use the cheap `get` path and `merged`/`merged_at` (§8.1) start
+reporting. The chart therefore requires `oasgen-provider >= 0.25.0`; on an older controller the
+findby match can never succeed and observe would re-create, so the requirement is load-bearing.

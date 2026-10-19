@@ -11,6 +11,31 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-10-19 — `PullRequest` group-B recovery: a findby keyed on head/base (#14 closed)
+
+The other half of #14 is now fixable, because the upstream dependency shipped. The controller
+normalizes each findby list item with the verb's own `responseTransform` **before** matching
+([krateo-platformops/oasgen-provider#145](https://github.com/krateo-platformops/oasgen-provider/issues/145),
+merged via PR #155, released in **oasgen-provider >= 0.25.0**) — the exact change §8.2 said it would
+take. So `PullRequest` identity moves to **`identifiers: [head, base]`** (`identifiersMatchPolicy: AND`)
+and a **`findby`** verb (`GET /repos/{owner}/{repo}/pulls`, `state=all`, `per_page=100`) is added.
+
+A CR created without a `status.number` (the group-B case: a 422 "already exists", an async/no-body
+create) now recovers on its next reconcile — observe finds no number, runs the findby, matches the PR
+by head/base, and populates `status` (number included, so later reconciles use `get` and
+`merged`/`merged_at` start reporting). Group A (number present) is unchanged: it still observes via
+`get`; identifiers drive findby MATCHING only, not the get path.
+
+Mechanics worth noting: moving identity to head/base is **not** a breaking CRD change —
+`IncludeIdentifiersInSpec` is off by default so identifiers are not in the spec schema; they are
+appended to the (additive) status schema, so `head`/`base` now appear in `status` as strings. That
+forced the `head`/`base` object→string `responseTransform` onto **all four** verbs (create, get,
+update, findby), since status is written from every response and only the producing verb's transform
+runs — the four copies are byte-identical by necessity. `head`/`base` are declared `string` in
+`assets/pullrequest.yaml` so the status projection types them. Chart now requires
+**oasgen-provider >= 0.25.0** (load-bearing: on an older controller the findby match cannot succeed
+and observe would re-create). `appVersion` → `0.1.2`.
+
 ## 2026-09-28 — `PullRequest` reports `merged` and `merged_at`; the group-B findby gap, documented (#14)
 
 `PullRequest.status` gains **`merged`** (a plain boolean) and **`merged_at`** (an RFC3339 string, null

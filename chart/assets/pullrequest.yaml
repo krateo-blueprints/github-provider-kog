@@ -42,13 +42,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PullRequest'
+    get:
+      # List PRs — the findby target (#14). The controller lists this and matches the item whose
+      # head AND base equal spec.head/spec.base, after the findby verb's responseTransform flattens
+      # each item's head/base objects to branch strings (rd-pullrequest.yaml). state/per_page are
+      # injected by the findby verb's static queries, not required here.
+      summary: List pull requests
+      operationId: pulls/list
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PullRequest'
   "/repos/{owner}/{repo}/pulls/{pull_number}":
     get:
       # The controller does NOT see this body as GitHub sends it: the get verb in
       # rd-pullrequest.yaml carries a responseTransform that replaces head/base with their
-      # branch-name strings before status population and drift comparison. head/base are
-      # deliberately absent from the PullRequest schema below — they are neither identifiers
-      # nor additionalStatusFields, so nothing is generated from them.
+      # branch-name strings before status population and drift comparison. head/base are declared
+      # as strings in the PullRequest schema below because they are identifiers (#14) and so are
+      # projected into the status schema.
       summary: Get a pull request
       operationId: pulls/get
       parameters:
@@ -130,6 +149,15 @@ components:
         state:
           type: string
         title:
+          type: string
+        # head/base are branch STRINGS in the CR domain. GitHub returns them as objects on every
+        # response; every verb's responseTransform (rd-pullrequest.yaml) flattens them to .ref
+        # (or .label for a cross-repo head) BEFORE status is written, so the string type here is
+        # what status actually carries. They are identifiers (#14), so the generator projects them
+        # into the status schema from this declaration.
+        head:
+          type: string
+        base:
           type: string
         merged:
           type: boolean
