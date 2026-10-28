@@ -45,10 +45,11 @@ oasgen-provider watches the **30** `RestDefinition`s and generates the CRDs belo
 (added by oasgen from the OpenAPI `securityScheme`) naming the `<Kind>Configuration` that
 holds its token wiring.
 
-**oasgen-provider ≥ 0.36.0 is required.** `GitRef`'s create resolves its base sha with a
-`dependentLookups` chain that older versions cannot express; the `compareScope: updatable`
-that 24 of the 30 kinds declare needs ≥ 0.23.0, a floor now subsumed by 0.36.0
-([configuration](./configuration.md)).
+**oasgen-provider ≥ 0.38.0 is required.** 0.38.0 is where the `GitRef` pattern admission
+guard reaches the generated CRD ([#249](https://github.com/krateo-platformops/oasgen-provider/issues/249)/#250);
+`GitRef`'s create resolves its base sha with a `dependentLookups` chain that landed in
+0.36.0; the `compareScope: updatable` that 24 of the 30 kinds declare needs ≥ 0.23.0, a
+floor now subsumed by 0.38.0 ([configuration](./configuration.md)).
 
 **All 30 kinds are native.** Every verb goes straight to `api.github.com`, and the
 normalizations GitHub's REST inconsistencies demand are expressed in the RestDefinition

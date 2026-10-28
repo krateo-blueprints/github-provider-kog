@@ -11,14 +11,15 @@ timestamp: 2026-09-09T00:00:00Z
 
 ## Prerequisite
 
-A Krateo cluster with `oasgen-provider` **≥ 0.36.0** running (it provides
+A Krateo cluster with `oasgen-provider` **≥ 0.38.0** running (it provides
 `restdefinitions.ogen.krateo.io` and generates the CRDs + a controller per kind).
 
-0.9.x carried the four kinds the chart started with, but the floor is now **0.36.0**:
-`GitRef`'s create resolves its base sha with `dependentLookups`, a primitive older
-versions cannot express. 24 of the 30 kinds also set `compareScope: updatable`, a value
+0.9.x carried the four kinds the chart started with, but the floor is now **0.38.0**:
+0.38.0 is where the `GitRef` pattern admission guard reaches the generated CRD. `GitRef`'s
+create resolves its base sha with `dependentLookups`, a primitive that landed in 0.36.0.
+24 of the 30 kinds also set `compareScope: updatable`, a value
 `RestDefinition` CRDs below 0.23.0 reject on apply so their kinds never appear — the
-earlier floor, now subsumed by 0.36.0.
+earlier floor, now subsumed by 0.38.0.
 
 Nothing else is required. The chart renders 30 ConfigMaps and 30 RestDefinitions and
 nothing more: there is no Deployment, no Service and no image of its own to pull. Every

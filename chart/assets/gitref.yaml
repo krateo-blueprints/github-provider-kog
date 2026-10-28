@@ -57,14 +57,13 @@ paths:
                   # — a silent create->422 loop. RE2 has no lookahead, so this is an allow-list, not a
                   # negation of "refs/", and it is RE2-clean so the apiserver can compile it.
                   #
-                  # CURRENTLY NOT ENFORCED BY THE GENERATED CRD. oasgen drops ALL validation keywords
-                  # (pattern, min/maxLength, min/max, multipleOf, min/maxItems, uniqueItems) at its
-                  # OpenAPI->Schema adapter boundary, so this never reaches spec.ref — verified live on
-                  # oasgen 0.36.0 (generated gitrefs CRD had no spec.ref.pattern). Fixed upstream in
-                  # krateo-platformops/oasgen-provider#249 (PR #250), not yet in a release. Until the
-                  # chart runs an oasgen that carries #250 this guard is DOCUMENTED-ONLY: a full-form
-                  # spec.ref yields a wedged CR (observe 404 -> recreate -> 422), not data loss. Kept on
-                  # BOTH this body field and the `ref` path parameter so it survives once propagation lands.
+                  # ENFORCED by the generated CRD on oasgen-provider >= 0.38.0 (the chart floor), which
+                  # carries krateo-platformops/oasgen-provider#249 / PR #250 — validation keywords now
+                  # reach the CRD. It MUST live on this create-body `ref` (not the path parameter):
+                  # verified live on 0.38.0 that `spec.ref` is built from the body schema, so a pattern
+                  # on the path parameter alone does NOT reach `spec.ref`. (On < 0.38.0 the whole keyword
+                  # set was dropped at the OpenAPI->Schema adapter, so this was documented-only; 0.38.0
+                  # fixed that.)
                   pattern: '^(heads|tags)/.+'
                 sha:
                   type: string
@@ -165,11 +164,14 @@ components:
       required: true
       schema:
         type: string
-        # Same guard as the create body's `ref` (short form only, "heads/<branch>" / "tags/<tag>").
-        # `ref` is BOTH the create body field and this path parameter, so the pattern is kept on both
-        # to survive the generator's by-name merge once validation keywords propagate. See the body
-        # `ref` comment above: NOT enforced by the generated CRD until oasgen carries
-        # krateo-platformops/oasgen-provider#249 (PR #250); documented-only until then.
+        # The same short-form guard as the create body's `ref`. On oasgen >= 0.38.0 the actual
+        # enforcement comes from the BODY `ref` pattern: the generator gives create-body properties
+        # precedence over path parameters (addParametersToSpec), so for a name that is in both, the
+        # parameter's schema is discarded whole and `spec.ref` is body-derived — verified live on
+        # 0.38.0 (a param-only pattern does not reach spec.ref). This copy is therefore redundant
+        # today, but kept deliberately: it correctly declares what this read path accepts, and a
+        # planned upstream change to that precedence (fill-unset + warn-on-disagreement) would make a
+        # non-colliding parameter carry its own constraints, at which point this stops being inert.
         pattern: '^(heads|tags)/.+'
   schemas:
     GitRef:

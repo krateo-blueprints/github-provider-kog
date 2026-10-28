@@ -3,7 +3,7 @@
 ## What is this
 
 A Krateo **KOG** (Krateo OpenAPI Generation) provider, built on
-[`oasgen-provider`](https://github.com/krateo-platformops/oasgen-provider) **≥ 0.36.0**,
+[`oasgen-provider`](https://github.com/krateo-platformops/oasgen-provider) **≥ 0.38.0**,
 that exposes 30 GitHub REST resources as Kubernetes kinds under the `github.krateo.io`
 group. Each kind is listed by its create endpoint; get/update/delete sit on the matching
 item path.
@@ -96,7 +96,7 @@ proxy plugin, so it went when they left `github.krateo.io`.
 Two have since returned **natively**, without the plugin: `PullRequest` (a
 `responseTransform` flattening `head`/`base`) and `GitRef` (a `requestTransform` for the
 `refs/` prefix plus a `dependentLookups` chain that resolves the base sha, needing
-oasgen-provider **≥ 0.36.0**). **`RepoContent` is the one still out** — returnable the
+oasgen-provider **≥ 0.38.0**). **`RepoContent` is the one still out** — returnable the
 same way, `status.sha` plus a `responseTransform`, now that the `%252F` double-escape is
 fixed in 0.23.0. What each did, and what its native restoration took, is recorded per
 kind: [docs/design-gitref.md](docs/design-gitref.md),
@@ -118,10 +118,11 @@ CRDs under `github.krateo.io`, and auto-deploys a `rest-dynamic-controller` per 
 
 ## Install
 
-Prerequisite: a Krateo cluster with `oasgen-provider` **≥ 0.36.0** — it provides
-`restdefinitions.ogen.krateo.io`, and 0.36.0 is where `GitRef`'s base-sha
-`dependentLookups` arrive. 0.23.0 is where `compareScope: updatable` arrives, which 24 of
-the 30 kinds declare — a floor now subsumed by 0.36.0.
+Prerequisite: a Krateo cluster with `oasgen-provider` **≥ 0.38.0** — it provides
+`restdefinitions.ogen.krateo.io`, and 0.38.0 is where the `GitRef` pattern admission guard
+reaches the CRD. `GitRef`'s base-sha `dependentLookups` landed in 0.36.0; 0.23.0 is where
+`compareScope: updatable` arrives, which 24 of the 30 kinds declare — a floor now subsumed
+by 0.38.0.
 
 Per the Krateo "everything is a Composition" rule, this chart is installed as a
 **component** — a `component-pins` entry that the core-provider CDC turns into a

@@ -20,7 +20,7 @@ it. This is the design that brings it back **without** the plugin.
 > `GitRef` and `RepoContent` remain out; their design documents remain proposals.
 >
 > _Update (2026-10-28): `GitRef` has since also returned natively — the chart is now 30 kinds and
-> requires oasgen-provider ≥ 0.36.0, whose dependent lookups resolve the base sha that blocked it.
+> requires oasgen-provider ≥ 0.38.0, where the pattern admission guard reaches the CRD; its dependent lookups (0.36.0) resolve the base sha that blocked it.
 > `RepoContent` is the one still out. See [log](./log.md) and [design-gitref](./design-gitref.md)._
 
 File references to the three removed kinds are to commit **`be409bc`** (`git show

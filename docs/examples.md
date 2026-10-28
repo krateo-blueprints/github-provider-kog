@@ -158,7 +158,7 @@ commit `.github/workflows/release.yaml` by some other route first, or point
 | `test-label.yaml` | the `krateo/blueprint` label |
 | `test-milestone.yaml` | the `v1.0` milestone |
 | `test-issue.yaml` | a follow-up issue carrying that label |
-| `test-gitref.yaml` | the `builder/demo` branch ref on `demo-destination` — base sha resolved from the default branch when `sha` is omitted (needs oasgen-provider ≥ 0.36.0) |
+| `test-gitref.yaml` | the `builder/demo` branch ref on `demo-destination` — base sha resolved from the default branch when `sha` is omitted (needs oasgen-provider ≥ 0.38.0) |
 | `test-pullrequest.yaml` | a PR from `builder/demo-branch` into `main` |
 | `test-release.yaml` | release `1.0.0`, creating the tag from `main` |
 | `test-deployment.yaml` | a deployment record of `main` to `staging` |

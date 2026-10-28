@@ -52,8 +52,9 @@ Four facts hold across the whole set:
   auth kind, but they may all share one name — `chart/samples/configurations.yaml`
   ships all 30 under `github-blueprints-config`. The rights that token needs do differ
   by kind ([usage](./usage.md)).
-- **oasgen-provider ≥ 0.36.0 is required.** `GitRef`'s create resolves its base sha with
-  a dependent-lookup chain that earlier versions cannot express; the
+- **oasgen-provider ≥ 0.38.0 is required.** 0.38.0 is where the `GitRef` pattern
+  admission guard reaches the generated CRD; `GitRef`'s create resolves its base sha with
+  a dependent-lookup chain that landed in 0.36.0; the
   `compareScope: updatable` that 24 of the 30 declare needs ≥ 0.23.0, now subsumed.
 
 Two GitHub surfaces are deliberately absent: Actions/Dependabot/Codespaces **secrets**,

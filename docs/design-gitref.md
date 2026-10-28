@@ -9,10 +9,13 @@ timestamp: 2026-09-09T00:00:00Z
 
 # GitRef — restoration design
 
-> **Update 2026-10-28 — SHIPPED natively (chart appVersion 0.1.3, requires oasgen-provider ≥ 0.36.0).**
+> **Update 2026-10-28 — SHIPPED natively (chart appVersion 0.1.3, requires oasgen-provider ≥ 0.38.0).**
 > The one thing §3.2/§4 said was "NOT expressible" at 0.23.0 — the pre-call base-sha dependent read —
 > is now a first-class RestDefinition primitive: **dependent lookups**, released in oasgen-provider
 > **0.36.0** ([#120](https://github.com/krateo-platformops/oasgen-provider/issues/120), merged as #239).
+> The chart floor is **0.38.0** (not 0.36.0) because that is where the `spec.ref` admission `pattern`
+> actually reaches the generated CRD — validation keywords did not propagate before it
+> ([#249](https://github.com/krateo-platformops/oasgen-provider/issues/249) / PR #250, in 0.38.0).
 > So the kind returns in the form §4 ranked last and best: **Shape B + dependent lookups**, with
 > `spec.sha` **optional** (not required). `chart/assets/gitref.yaml` + `chart/templates/rd-gitref.yaml`
 > implement it: short-form `spec.ref` with a create `requestTransform` for the `refs/` prefix; a
@@ -223,11 +226,11 @@ paths:
                   # at ADMISSION instead of creating a branch the observe verb can never address (a
                   # silent create->422 loop). RE2 has no lookahead, so it is an allow-list, not a
                   # negation of "refs/". NOTE (corrected 2026-10-28): this doc previously claimed
-                  # `pattern` "survives CRD generation verbatim" — it does NOT. oasgen drops every
-                  # validation keyword at its OpenAPI->Schema adapter (crdgen would carry it, but the
-                  # adapter never hands it one), so the guard does not reach spec.ref. Fixed upstream in
-                  # oasgen-provider #249 (PR #250), unreleased; documented-only until the chart runs a
-                  # release carrying it. Verified live on 0.36.0 — see the §4 validation note.
+                  # `pattern` "survives CRD generation verbatim". It did NOT until oasgen 0.38.0: before
+                  # that, every validation keyword was dropped at the OpenAPI->Schema adapter (crdgen
+                  # would carry it, but the adapter never handed it one). Fixed in oasgen-provider #249
+                  # (PR #250), released in 0.38.0 — the chart floor. On >= 0.38.0 the guard is ENFORCED;
+                  # verified live (spec.ref.pattern reaches the CRD, from the body declaration). See §4.
                   pattern: '^(heads|tags)/.+'
                 sha:
                   type: string
@@ -497,8 +500,9 @@ never compared under any scope; default it to `false` in the OAS.
 > `spec.sha` is **optional** and the create resolves the base sha itself. The analysis below is kept
 > as the record of why the other options were rejected.
 
-> **Validation (2026-10-28, live on kind + published oasgen-provider 0.36.0).** The kind was
-> validated end-to-end against the real GitHub API (throwaway repo `krateo-blueprints/kog-gitref-val`):
+> **Validation (2026-10-28, live on kind — lookup mechanics on published oasgen-provider 0.36.0, then
+> the admission guard re-verified on 0.38.0).** The kind was validated end-to-end against the real
+> GitHub API (throwaway repo `krateo-blueprints/kog-gitref-val`):
 >
 > - **CRD generates** and `spec.required` is `[configurationRef, owner, ref, repo]` — **`sha` absent**
 >   (optional), so the `when.customResourceFieldAbsent: spec.sha` guard can fire.
@@ -518,8 +522,11 @@ never compared under any scope; default it to `false` in the OAS.
 >   to exist in the document — a dependent lookup resolves against a declared path exactly as a verb
 >   does — which the first draft omitted (create failed `path not found: /repos/{owner}/{repo}`); the
 >   plain repo GET was added to the asset.
-> - **Known gap (oasgen #249/#250):** the `pattern` admission guard does not reach the CRD; documented-only
->   until the chart runs an oasgen release carrying #250. §5 trap 2.
+> - **Admission guard (oasgen #249/#250):** on **0.36.0** the `pattern` did NOT reach the CRD (`spec.ref.pattern`
+>   absent) — the chart floor is **0.38.0** precisely because #250 (in 0.38.0) fixes that. Re-verified on
+>   0.38.0: `spec.ref.pattern = ^(heads|tags)/.+` reaches the CRD, so a full-form `refs/heads/x` is now
+>   rejected at admission. It lands from the **body** declaration (not the path parameter — generator
+>   precedence gives body properties priority over a colliding parameter). §5 trap 2.
 
 **Back today, with one caveat — and the caveat is a CR-contract change, not a workaround.**
 
@@ -551,14 +558,16 @@ Traps specific to this kind, in the order they bite:
    `fieldMapping` writing a root-level `sha`. If one exists, the controller will PATCH the
    branch backwards. This is the highest-severity defect available in this file (§3.3).
 2. **Which ref form is `spec.ref`?** Shape B's `pattern: '^(heads|tags)/.+'` is present in the
-   OAS (on both the create body `ref` and the `ref` path parameter). It does **not** currently
-   reach the generated CRD: oasgen drops all validation keywords at its OpenAPI→Schema adapter
-   (oasgen-provider **#249**, PR **#250**, unreleased), confirmed live on 0.36.0 (`kubectl get crd
-   gitrefs… -o jsonpath` on `spec.properties.ref.pattern` → absent). So until the chart runs an
-   oasgen release carrying #250 the guard is **documented-only**: an author writing `refs/heads/x`
-   gets a green create then a permanent create→422 loop with no error pointing at the cause. The
-   pattern is kept in the OAS (RE2-clean, so install-safe once #250 lands) so it becomes a real
-   admission guard automatically on that bump.
+   OAS (on both the create body `ref` and the `ref` path parameter) and, on the chart floor of
+   **oasgen-provider ≥ 0.38.0**, reaches the generated CRD — verified live (`kubectl get crd
+   gitrefs… -o jsonpath` on `spec.properties.ref.pattern` → `^(heads|tags)/.+`), so a full-form
+   `refs/heads/x` is rejected at admission rather than looping create→422. It lands from the **body**
+   declaration: for a name that is both a body field and a path parameter, the generator gives the
+   body property precedence and discards the colliding parameter schema whole, so a param-only
+   pattern would not reach `spec.ref` (the param copy is kept as a correct, currently-redundant
+   declaration). Below 0.38.0 oasgen dropped all validation keywords at its OpenAPI→Schema adapter
+   (oasgen-provider **#249**, fixed by PR **#250** in 0.38.0), so on an older oasgen the guard was
+   silently absent — which is why the floor is 0.38.0, not 0.36.0.
 3. **Every response-side `ref` mapping needs its identity pin.** `ref` is the identifier; a
    `fieldMapping` that reads it without another entry writing to `ref` deletes it from the
    body, breaking both `populateStatusFields` and the comparison (§3, fact 3). Shape B avoids

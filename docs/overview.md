@@ -123,10 +123,11 @@ until a CR of its kind exists.
 3. **auto-deploys a `rest-dynamic-controller` Deployment per kind**, which reconciles
    each CR by calling the mapped HTTP verbs (create/get/update/delete).
 
-The required version is **≥ 0.36.0**: `GitRef`'s create resolves its base sha with a
-`dependentLookups` chain, a primitive older oasgen-provider cannot express. The earlier
+The required version is **≥ 0.38.0**: 0.38.0 is where the `GitRef` pattern admission guard
+reaches the generated CRD. `GitRef`'s create resolves its base sha with a
+`dependentLookups` chain, a primitive that landed in 0.36.0. The earlier
 floor was 0.23.0 — 24 of the 30 RestDefinitions declare `compareScope: updatable`, the
-field 0.23.0 added — and that requirement still holds, now subsumed by 0.36.0.
+field 0.23.0 added — and that requirement still holds, now subsumed by 0.38.0.
 
 Because every RestDefinition's OpenAPI declares a bearer `securityScheme`,
 oasgen-provider also generates a per-kind **`<Kind>Configuration`** CRD — 30 of them,

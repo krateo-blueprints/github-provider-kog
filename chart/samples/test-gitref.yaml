@@ -5,8 +5,9 @@
 # is rejected at apply time by the CRD pattern — on purpose, so a mis-typed ref fails loudly instead of
 # creating a branch the controller can never observe. See docs/design-gitref.md §3.1.
 #
-# `sha` (the base commit the branch is cut from) is OPTIONAL: omit it and oasgen-provider (>= 0.36.0)
-# resolves the repo's default-branch head commit for you via a dependent lookup. Set it explicitly to
+# `sha` (the base commit the branch is cut from) is OPTIONAL: omit it and oasgen-provider resolves the
+# repo's default-branch head commit for you via a dependent lookup (the chart needs oasgen >= 0.38.0;
+# the lookup itself landed in 0.36.0, the admission guard on spec.ref in 0.38.0). Set it explicitly to
 # branch from a specific commit — an explicit value always wins and skips the lookup.
 #
 # Editing spec.ref on a live CR is NOT a rename: the observe addresses the ref by that value, so a

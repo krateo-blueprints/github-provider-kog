@@ -34,7 +34,7 @@ What shipped (`chart/assets/gitref.yaml`, `chart/templates/rd-gitref.yaml`):
   set to `{ref}`, so the base `sha` is excluded structurally and can never drive a branch-rewinding
   PATCH; the head commit is read-only under `status.object.sha`.
 
-Chart requirement bumped to **oasgen-provider ≥ 0.36.0** (dependent lookups are load-bearing).
+Chart requirement bumped to **oasgen-provider ≥ 0.38.0** (0.38.0 is where the `GitRef` pattern admission guard reaches the CRD; dependent lookups landed in 0.36.0 and are load-bearing).
 appVersion → `0.1.3`. `RepoContent` is still out; nothing in the active publish path needs `GitRef`
 (the frontend defaults to `BuilderPublish` over `git-provider`), so this is parity/completeness —
 "the knowledge outlives the code" — not a revived dependency.

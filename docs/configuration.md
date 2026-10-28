@@ -351,11 +351,13 @@ What each did, and what a native return takes, is written down per kind:
 
 ## Invariants
 
-- **oasgen-provider must be ≥ 0.36.0.** `GitRef`'s create resolves its base sha with
-  **dependent lookups**, a primitive that landed in 0.36.0 ([#120](https://github.com/krateo-platformops/oasgen-provider/issues/120),
-  merged as #239); the CRD rejects a RestDefinition that declares them below that version.
-  The prior floor was 0.23.0 — for the `compareScope: updatable` that 24 kinds declare and
-  which does not exist below it — and that requirement still holds, now subsumed by 0.36.0.
+- **oasgen-provider must be ≥ 0.38.0.** 0.38.0 is where the `GitRef` pattern admission
+  guard reaches the generated CRD — the fix that makes the OpenAPI validation keywords
+  land on the CRD ([#249](https://github.com/krateo-platformops/oasgen-provider/issues/249),
+  merged as #250). `GitRef`'s create resolves its base sha with **dependent lookups**, a
+  primitive that landed in 0.36.0 ([#120](https://github.com/krateo-platformops/oasgen-provider/issues/120),
+  merged as #239), and the `compareScope: updatable` that 24 kinds declare does not exist
+  below 0.23.0 — both floors still hold, now subsumed by 0.38.0.
 - **The chart stays free of a runtime component.** It renders 30 ConfigMaps and 30
   RestDefinitions and nothing else; every kind reaches `api.github.com` directly, no
   asset overrides `servers`, and every ConfigMap is a plain `.Files.Get` with nothing for
@@ -372,9 +374,10 @@ What each did, and what a native return takes, is written down per kind:
   a path or method that is not in that document is a mapping the controller can never
   execute. Every verb of the original 29 was cross-checked against its own asset and
   accepted by the deployed `restdefinitions.ogen.krateo.io` CRD at oasgen-provider 0.23.0
-  (`kubectl apply --dry-run=server`); `GitRef`, the 30th, is cross-checked the same way,
-  and its `dependentLookups` + `dependentLookup` resolver shape is pending acceptance by
-  the 0.36.0 CRD plus an end-to-end check (those primitives post-date 0.23.0).
+  (`kubectl apply --dry-run=server`); `GitRef`, the 30th, was validated live end-to-end on
+  oasgen-provider 0.36.0 (lookup mechanics) and 0.38.0 (the `spec.ref.pattern` admission guard),
+  its `dependentLookups` + `dependentLookup` resolver shape accepted and the sha-less/explicit-sha
+  paths and delete round-trip all confirmed against the real GitHub API.
 - **The token is provisioned out-of-band, and its rights are the union of the kinds in
   use.** The chart holds no credential; the portal write-path only references the
   `<Kind>Configuration` CRs ([usage](./usage.md)). One PAT can drive all 30 kinds, and
