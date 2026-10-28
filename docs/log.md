@@ -11,6 +11,34 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-10-28 — `GitRef` restored natively: dependent lookups make a sha-less create work (30 kinds)
+
+`GitRef` is back — the chart's 30th kind — and the plugin stays gone. The one blocker
+[design-gitref §3.2/§4](./design-gitref.md) recorded as "NOT expressible" at 0.23.0, the pre-call
+base-sha dependent read, shipped upstream as **dependent lookups** in **oasgen-provider 0.36.0**
+([krateo-platformops/oasgen-provider#120](https://github.com/krateo-platformops/oasgen-provider/issues/120),
+merged as #239). So the kind returns in the form the design ranked best and last: **Shape B +
+dependent lookups**.
+
+What shipped (`chart/assets/gitref.yaml`, `chart/templates/rd-gitref.yaml`):
+
+- **Short-form `spec.ref`** (`heads/<branch>` / `tags/<tag>`), guarded by an OAS `pattern:
+  '^(heads|tags)/.+'` so a full `refs/...` form is rejected at admission instead of looping
+  create→422. The create verb's `requestTransform` adds the `refs/` prefix the POST body wants;
+  create/get/update carry a `responseTransform` (`ltrimstr("refs/")`) so `status.ref` never flaps.
+- **`spec.sha` is OPTIONAL.** A two-step `dependentLookups` chain (repo → `default_branch` → that
+  branch's `git/ref/{ref}` → `object.sha`) fills the create body's `sha` **only when the CR omits
+  it** (`when.customResourceFieldAbsent: spec.sha`); an explicit `spec.sha` wins and skips the
+  lookups. This is exactly what the retired plugin's `createGitRef` did, now native.
+- **Branch-creation semantics (§3.3):** `compareScope: identifiersAndStatus` projects the compared
+  set to `{ref}`, so the base `sha` is excluded structurally and can never drive a branch-rewinding
+  PATCH; the head commit is read-only under `status.object.sha`.
+
+Chart requirement bumped to **oasgen-provider ≥ 0.38.0** (0.38.0 is where the `GitRef` pattern admission guard reaches the CRD; dependent lookups landed in 0.36.0 and are load-bearing).
+appVersion → `0.1.3`. `RepoContent` is still out; nothing in the active publish path needs `GitRef`
+(the frontend defaults to `BuilderPublish` over `git-provider`), so this is parity/completeness —
+"the knowledge outlives the code" — not a revived dependency.
+
 ## 2026-10-19 — `PullRequest` group-B recovery: a findby keyed on head/base (#14 closed)
 
 The other half of #14 is now fixable, because the upstream dependency shipped. The controller

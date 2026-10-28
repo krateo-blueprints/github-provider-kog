@@ -3,8 +3,8 @@
 ## What is this
 
 A Krateo **KOG** (Krateo OpenAPI Generation) provider, built on
-[`oasgen-provider`](https://github.com/krateo-platformops/oasgen-provider) **≥ 0.23.0**,
-that exposes 29 GitHub REST resources as Kubernetes kinds under the `github.krateo.io`
+[`oasgen-provider`](https://github.com/krateo-platformops/oasgen-provider) **≥ 0.38.0**,
+that exposes 30 GitHub REST resources as Kubernetes kinds under the `github.krateo.io`
 group. Each kind is listed by its create endpoint; get/update/delete sit on the matching
 item path.
 
@@ -13,6 +13,7 @@ item path.
 | Kind | GitHub API | Purpose |
 |------|-----------|---------|
 | `Repository` | `POST /orgs/{org}/repos` | create the destination repository itself |
+| `GitRef` | `POST /repos/{owner}/{repo}/git/refs` | create a branch or tag ref (`heads/…` or `tags/…`); base sha resolved from the default branch when `sha` is omitted |
 
 **Access** — who can reach what:
 
@@ -82,25 +83,25 @@ with **no body** when it is on, so it never returns anything a status schema cou
 derived from. `AutomatedSecurityFixes` is covered for exactly the opposite reason — its
 GET does return a body (`enabled`, `paused`).
 
-**Removed: `GitRef`, `RepoContent` and `PullRequest`** — and the companion proxy plugin
-with them. Those three were the transport of the **legacy blueprint-publish path**, where
-the Autopilot builder wrote a chart tree to a repo (`GitRef` → `RepoContent` per file →
+**The git-write kinds, and the only one still out.** `GitRef`, `RepoContent` and
+`PullRequest` were the transport of the **legacy blueprint-publish path**, where the
+Autopilot builder wrote a chart tree to a repo (`GitRef` → `RepoContent` per file →
 `PullRequest`) as `github.krateo.io` CRs. The frontend now defaults to an SCM-agnostic
 route instead: `AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults to `"true"` in the frontend
 chart's `values.yaml` **and** `values.schema.json`, so a fresh install publishes through a
 `BuilderPublish` claim over `git-provider`, and the `github.krateo.io` route is the
-explicit `"false"` fallback. They were also the only three kinds that still needed the
-plugin, so both went in one change.
+explicit `"false"` fallback. The three were also the only kinds that needed the companion
+proxy plugin, so it went when they left `github.krateo.io`.
 
-What each of them did, and exactly what it would take to bring it back **natively**, is
-recorded per kind: [docs/design-gitref.md](docs/design-gitref.md),
+Two have since returned **natively**, without the plugin: `PullRequest` (a
+`responseTransform` flattening `head`/`base`) and `GitRef` (a `requestTransform` for the
+`refs/` prefix plus a `dependentLookups` chain that resolves the base sha, needing
+oasgen-provider **≥ 0.38.0**). **`RepoContent` is the one still out** — returnable the
+same way, `status.sha` plus a `responseTransform`, now that the `%252F` double-escape is
+fixed in 0.23.0. What each did, and what its native restoration took, is recorded per
+kind: [docs/design-gitref.md](docs/design-gitref.md),
 [docs/design-repocontent.md](docs/design-repocontent.md),
-[docs/design-pullrequest.md](docs/design-pullrequest.md). `PullRequest` and `RepoContent`
-could return today — one `responseTransform` for `PullRequest`'s `head`/`base` flattening;
-`status.sha` plus a `responseTransform` for `RepoContent`, now that the `%252F`
-double-escape is fixed in 0.23.0. `GitRef` could too, but for one thing: resolving the
-base HEAD sha on create is a pre-call dependent read a `RestDefinition` cannot express,
-tracked as oasgen-provider **#120**.
+[docs/design-pullrequest.md](docs/design-pullrequest.md).
 
 `Repository` is what creates a destination repo in the first place — until it existed, a
 blueprint could only be published into a repository someone had already made by hand. Its
@@ -108,18 +109,20 @@ OAS defaults `auto_init` to `true` deliberately: a repository created with `auto
 false` has no commit and therefore no default branch, so nothing can branch from it or
 commit against it until someone pushes by hand.
 
-The chart ships 29 `RestDefinition`s + the trimmed OpenAPI spec each references (as a
+The chart ships 30 `RestDefinition`s + the trimmed OpenAPI spec each references (as a
 `ConfigMap`), and nothing else — **no runtime component of its own**: no Deployment, no
 Service, no image, no proxy. `oasgen-provider` watches the RestDefinitions, generates the
 CRDs under `github.krateo.io`, and auto-deploys a `rest-dynamic-controller` per kind. All
-29 kinds are **native**: every one of their verbs goes straight to GitHub. See
+30 kinds are **native**: every one of their verbs goes straight to GitHub. See
 [docs/overview.md](docs/overview.md).
 
 ## Install
 
-Prerequisite: a Krateo cluster with `oasgen-provider` **≥ 0.23.0** — it provides
-`restdefinitions.ogen.krateo.io`, and 0.23.0 is where `compareScope: updatable` arrives,
-which 24 of the 29 kinds declare.
+Prerequisite: a Krateo cluster with `oasgen-provider` **≥ 0.38.0** — it provides
+`restdefinitions.ogen.krateo.io`, and 0.38.0 is where the `GitRef` pattern admission guard
+reaches the CRD. `GitRef`'s base-sha `dependentLookups` landed in 0.36.0; 0.23.0 is where
+`compareScope: updatable` arrives, which 24 of the 30 kinds declare — a floor now subsumed
+by 0.38.0.
 
 Per the Krateo "everything is a Composition" rule, this chart is installed as a
 **component** — a `component-pins` entry that the core-provider CDC turns into a
@@ -145,10 +148,10 @@ Configuration per kind pointing at it:
 ```console
 $ kubectl create secret generic gh-token -n krateo-system \
     --from-literal=token=<YOUR_GITHUB_PAT>
-$ kubectl apply -f chart/samples/configurations.yaml   # all 29 <Kind>Configuration CRs
+$ kubectl apply -f chart/samples/configurations.yaml   # all 30 <Kind>Configuration CRs
 ```
 
-One PAT can drive the whole chart: all 29 Configurations may share a single name
+One PAT can drive the whole chart: all 30 Configurations may share a single name
 (`github-blueprints-config`), since the kind is implied by the resource that references
 it. What the PAT must be *allowed* to do differs by kind, though — `Repository` needs
 repository creation in the org (classic `repo`; fine-grained org **Administration: read &
@@ -166,7 +169,7 @@ them or the Secret. Full surface: [docs/configuration.md](docs/configuration.md)
 - [examples/blueprint-authoring](examples/blueprint-authoring/README.md) — the one-time
   token + `<Kind>Configuration` wiring, and `github.krateo.io` CRs applied in order
   against a scratch repo.
-- `chart/samples/` — the 29 `<Kind>Configuration` CRs and one applyable test CR per kind
+- `chart/samples/` — the 30 `<Kind>Configuration` CRs and one applyable test CR per kind
   (`test-<kind>.yaml`).
 
 ## Docs
@@ -184,8 +187,9 @@ The full documentation bundle follows the Krateo Documentation Standard (OKF):
 - [docs/log.md](docs/log.md) — curated history.
 - [docs/llms.txt](docs/llms.txt) — the file-by-file index.
 
-The three removed kinds keep a design document each — what the kind did, what the plugin
-did for it, and the native `RestDefinition` that would replace it:
+Each git-write kind that left with the plugin keeps a design document — what the kind did,
+what the plugin did for it, and the native `RestDefinition` that replaces it (`PullRequest`
+and `GitRef` already restored, `RepoContent` still out):
 [docs/design-gitref.md](docs/design-gitref.md),
 [docs/design-repocontent.md](docs/design-repocontent.md),
 [docs/design-pullrequest.md](docs/design-pullrequest.md).

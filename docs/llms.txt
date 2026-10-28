@@ -1,47 +1,50 @@
 # github-provider-kog — LLM doc index
-# One line per file (the 27 kinds other than Repository pair their RestDefinition with its
-# OpenAPI spec on one line — they are 1:1). A Krateo KOG provider (oasgen-provider ≥ 0.23.0)
-# exposing 28 GitHub REST resources as github.krateo.io Kubernetes kinds: repositories,
+# One line per file (the 29 kinds other than Repository pair their RestDefinition with its
+# OpenAPI spec on one line — they are 1:1). A Krateo KOG provider (oasgen-provider ≥ 0.38.0)
+# exposing 30 GitHub REST resources as github.krateo.io Kubernetes kinds: repositories,
 # access, repository configuration, CI/CD, work tracking and governance. The chart ships
 # RestDefinitions + trimmed OpenAPI specs and NOTHING else — no Deployment, no Service, no
 # image, no proxy, so it has no runtime component of its own; oasgen-provider generates the
-# CRDs and auto-deploys a rest-dynamic-controller per kind. All 28 kinds are NATIVE: every
+# CRDs and auto-deploys a rest-dynamic-controller per kind. All 30 kinds are NATIVE: every
 # verb goes straight to GitHub.
-# Removed: GitRef, RepoContent and PullRequest — the transport of the legacy
+# Git-write kinds: GitRef, RepoContent and PullRequest were the transport of the legacy
 # blueprint-publish path, superseded by the frontend's SCM-agnostic default
 # (AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER defaults to "true" → a BuilderPublish claim over
-# git-provider; the github.krateo.io route is the "false" fallback) — and the companion
-# proxy plugin they were the last users of went with them. One design doc per removed kind
-# records the native restoration (docs/design-*.md below).
+# git-provider; the github.krateo.io route is the "false" fallback), and the companion
+# proxy plugin they were the last users of went with them. PullRequest and GitRef have since
+# returned NATIVELY, without the plugin (GitRef via a refs/-prefix requestTransform + a
+# base-sha dependentLookups chain needing oasgen-provider >= 0.36.0; PullRequest via a
+# head/base responseTransform); RepoContent is the one still out. One design doc per kind
+# records what the plugin did and the native restoration (docs/design-*.md below).
 # Not expressible, and deliberately absent: Actions/Dependabot/Codespaces SECRETS (a write
 # needs an encrypted_value LibSodium sealed box + a key_id fetched first — no client-side
 # crypto and no dependent lookup in a RestDefinition; variables are NOT secrets and ARE
 # covered), and VulnerabilityAlerts (its GET returns 404 when off and 204 with NO BODY when
 # on, so no status schema can be derived — unlike AutomatedSecurityFixes, whose GET has one).
-docs/index.md: the map — what the provider is, the 28 kinds by family, the repo layout, links to the whole bundle
-docs/overview.md: how it works — RestDefinitions + OpenAPI specs → oasgen CRDs + controllers, and why the chart itself runs nothing (all 28 kinds native)
+docs/index.md: the map — what the provider is, the 30 kinds by family, the repo layout, links to the whole bundle
+docs/overview.md: how it works — RestDefinitions + OpenAPI specs → oasgen CRDs + controllers, and why the chart itself runs nothing (all 30 kinds native)
 docs/usage.md: install as a Krateo component, provision the token Secret (per-kind PAT rights differ) + one Configuration per kind, drive the kinds, verify
-docs/configuration.md: the surface — the one value resourceGroup, the per-kind RestDefinition mappings (identifiers, excludedSpecFields, compareScope: 23 updatable / 2 default fullSpec / 1 explicit fullSpec / 2 identifiersAndStatus), invariants
-docs/api.md: the generated github.krateo.io CRDs (28 resource kinds + a <Kind>Configuration each) and the CompositionDefinition derived from values.schema.json
+docs/configuration.md: the surface — the one value resourceGroup, the per-kind RestDefinition mappings (identifiers, excludedSpecFields, compareScope: 24 updatable / 2 default fullSpec / 1 explicit fullSpec / 3 identifiersAndStatus), invariants
+docs/api.md: the generated github.krateo.io CRDs (30 resource kinds + a <Kind>Configuration each) and the CompositionDefinition derived from values.schema.json
 docs/examples.md: index of the runnable examples
 docs/release.md: how a release ships — one plain-semver tag drives release-oci; the chart is the only artifact (no image in this repo)
 docs/log.md: curated history
-docs/design-gitref.md: restoring the removed GitRef natively — what the kind did, what the plugin's getGitRef/createGitRef did, the refs/-prefix asymmetry solved natively two ways, and the base-sha resolution that is NOT expressible (oasgen-provider #120): back today only if spec.sha becomes a required input
+docs/design-gitref.md: restoring GitRef natively (now shipped) — what the kind did, what the plugin's getGitRef/createGitRef did, the refs/-prefix asymmetry solved natively two ways, and the base-sha resolution via dependentLookups (oasgen-provider #120, landed in 0.36.0) so a sha-less create is native and spec.sha stays optional
 docs/design-repocontent.md: restoring the removed RepoContent natively — the plugin's put/get handlers behaviour by behaviour against the 0.23.0 replacement (branch→?ref fieldMapping, responseTransforms, status.sha auto-populating the update body, the %252F double-escape fixed upstream as #113): fully native today, the only loss a bounded 422-retry
-docs/design-pullrequest.md: restoring the removed PullRequest natively — the plugin's single job was flattening head/base on observe; one whole-document responseTransform on the get verb plus compareScope: updatable brings the kind back whole, and fixes the fork case the plugin got wrong
+docs/design-pullrequest.md: restoring PullRequest natively (now shipped) — the plugin's single job was flattening head/base on observe; one whole-document responseTransform on the get verb plus compareScope: updatable brings the kind back whole, and fixes the fork case the plugin got wrong
 examples/blueprint-authoring/README.md: the runnable example — the one-time token + <Kind>Configuration wiring, then github.krateo.io CRs applied in order against a scratch repo
-README.md: the repo front door — what it is (the 28 kinds grouped by family, what is deliberately not covered, and the three removed kinds with their design docs), install, configure, examples, docs, develop & release
+README.md: the repo front door — what it is (the 30 kinds grouped by family, what is deliberately not covered, and the git-write kinds with their design docs — RepoContent still out, PullRequest and GitRef returned), install, configure, examples, docs, develop & release
 # Source (read at the same tag; the docs above are derived from these):
 chart/Chart.yaml: chart metadata; version is the CHART_VERSION placeholder, appVersion tracks the OpenAPI/mapping revision
-chart/values.yaml: the single value resourceGroup (the group all 28 generated CRDs land under), with its rationale
+chart/values.yaml: the single value resourceGroup (the group all 30 generated CRDs land under), with its rationale
 chart/values.schema.json: the typed schema the CDC derives the component CRD from (scalar resourceGroup only)
-chart/templates/configmap-<kind>.yaml: one ConfigMap per kind wrapping chart/assets/<kind>.yaml; all 28 are a plain .Files.Get, copied verbatim — no template action anywhere in the assets
-chart/samples/configurations.yaml: the 28 <Kind>Configuration CRs, all sharing the name github-blueprints-config and one gh-token Secret (whose PAT needs org repo-create rights for Repository and org admin rights for the org-scoped kinds)
+chart/templates/configmap-<kind>.yaml: one ConfigMap per kind wrapping chart/assets/<kind>.yaml; all 30 are a plain .Files.Get, copied verbatim — no template action anywhere in the assets
+chart/samples/configurations.yaml: the 30 <Kind>Configuration CRs, all sharing the name github-blueprints-config and one gh-token Secret (whose PAT needs org repo-create rights for Repository and org admin rights for the org-scoped kinds)
 chart/samples/test-<kind>.yaml: one applyable test CR per kind, with the per-kind caveats in comments
 # The destination repository (native, like every other kind):
 chart/templates/rd-repository.yaml: the Repository RestDefinition (all four verbs native; compareScope updatable — DEFENSIVE, not load-bearing: the comparison SKIPS any spec key the observe response omits, so the create-only fields could never have drifted under fullSpec either, and the two scopes should agree today; the in-file comment corrects that earlier claim)
 chart/assets/repository.yaml: the Repository OpenAPI spec (org-scoped create only, auto_init defaults true, path params named org/name)
-# The other 27 kinds — rd-<kind>.yaml carries the identifiers/compareScope reasoning, assets/<kind>.yaml the
+# The other 29 kinds — rd-<kind>.yaml carries the identifiers/compareScope reasoning, assets/<kind>.yaml the
 # trimmed field set and the measured GitHub quirks. <kind> is the kind name lowercased.
 # access:
 chart/templates/rd-team.yaml + chart/assets/team.yaml: Team — org team keyed by the server-derived slug (get/update/delete read it from status.slug, a rename converges via the PATCH response); the update declares BOTH 201 and 200, because a real change answers 201; compareScope updatable
@@ -58,6 +61,7 @@ chart/templates/rd-reporuleset.yaml + chart/assets/reporuleset.yaml: RepoRuleset
 chart/templates/rd-orgruleset.yaml + chart/assets/orgruleset.yaml: OrgRuleset — the same ruleset document at org scope
 chart/templates/rd-autolink.yaml + chart/assets/autolink.yaml: Autolink — ticket-prefix→URL autolink; no update verb, yet fullSpec is kept DELIBERATELY: the GET echoes the whole resource, so an edited CR should report drift (an autolink can only be deleted and recreated)
 chart/templates/rd-branchprotection.yaml + chart/assets/branchprotection.yaml: BranchProtection — the protection document of one branch; PUT is both create and update; a jq responseTransform flattens GitHub's {"enabled": bool} wrappers and re-inserts the nulls the API demands for switched-off controls; compareScope updatable
+chart/templates/rd-gitref.yaml + chart/assets/gitref.yaml: GitRef — a branch/tag ref keyed by the short-form spec.ref (heads/<branch> or tags/<tag>, pattern ^(heads|tags)/.+); a create requestTransform adds the refs/ prefix GitHub's create-ref body wants, get/update trim it back (ltrimstr refs/); a sha-less create resolves the base commit via a dependentLookups chain (repo→default_branch→head sha) needing oasgen-provider >= 0.36.0 (#120); compareScope identifiersAndStatus — compared set is {ref}, a tautology, so the create-time base sha stays out of desired state (declared PATCH never fires)
 # CI/CD:
 chart/templates/rd-actionsvariablerepo.yaml + chart/assets/actionsvariablerepo.yaml: ActionsVariableRepo — plaintext repo Actions variable (a variable is not a secret: value is stored and returned verbatim, so no LibSodium step and no public-key lookup); compareScope updatable
 chart/templates/rd-actionsvariableorg.yaml + chart/assets/actionsvariableorg.yaml: ActionsVariableOrg — the org-scoped variable; adds selected_repositories_url to status

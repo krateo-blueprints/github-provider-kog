@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: github-provider-kog — GitRef restoration design
-description: How the GitRef kind would come back to github-provider-kog natively after the companion plugin is deleted — the ref-form asymmetry solved with a create-side requestTransform (or a findby hybrid), the base-sha dependent read that oasgen-provider 0.23.0 still cannot express, and why spec.sha must never be lifted to the response root.
+description: How the GitRef kind came back to github-provider-kog natively after the companion plugin was deleted — the ref-form asymmetry solved with a create-side requestTransform, the base-sha dependent read (not expressible until oasgen-provider 0.36.0's dependent lookups, now shipped), and why spec.sha must never be lifted to the response root.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [design, gitref, oasgen-provider, rest-dynamic-controller, github, plugin-removal]
 timestamp: 2026-09-09T00:00:00Z
@@ -9,11 +9,38 @@ timestamp: 2026-09-09T00:00:00Z
 
 # GitRef — restoration design
 
-`GitRef` is being removed from the chart along with `RepoContent`, `PullRequest` and the
-companion plugin, because the frontend now publishes through a `BuilderPublish` claim over
-`git-provider` (`AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults to `"true"`), leaving the
-`github.krateo.io` route as the `"false"` fallback nobody takes. This is the design that
-brings it back **natively**, so the knowledge outlives the code.
+> **Update 2026-10-28 — SHIPPED natively (chart appVersion 0.1.3, requires oasgen-provider ≥ 0.38.0).**
+> The one thing §3.2/§4 said was "NOT expressible" at 0.23.0 — the pre-call base-sha dependent read —
+> is now a first-class RestDefinition primitive: **dependent lookups**, released in oasgen-provider
+> **0.36.0** ([#120](https://github.com/krateo-platformops/oasgen-provider/issues/120), merged as #239).
+> The chart floor is **0.38.0** (not 0.36.0) because that is where the `spec.ref` admission `pattern`
+> actually reaches the generated CRD — validation keywords did not propagate before it
+> ([#249](https://github.com/krateo-platformops/oasgen-provider/issues/249) / PR #250, in 0.38.0).
+> So the kind returns in the form §4 ranked last and best: **Shape B + dependent lookups**, with
+> `spec.sha` **optional** (not required). `chart/assets/gitref.yaml` + `chart/templates/rd-gitref.yaml`
+> implement it: short-form `spec.ref` with a create `requestTransform` for the `refs/` prefix; a
+> two-step `dependentLookups` chain (repo → `default_branch` → that branch's `git/ref` → `object.sha`)
+> that fills the create body's `sha` **only when the CR omits it** (`when.customResourceFieldAbsent:
+> spec.sha`); and §3.3's branch-creation semantics (`compareScope: identifiersAndStatus`, `object.sha`
+> exposed under status, never a root `sha`). No plugin, no `createApiRef`, no snowplow dependency, and
+> **no CR-contract caveat** — a sha-less create now works natively.
+>
+> One deliberate divergence makes this work: `chart/assets/gitref.yaml` omits `sha` from the create
+> body's `required` list, where GitHub's published spec has `required: [ref, sha]`. A body's `required`
+> propagates into the generated CRD's `spec.required`, so had `sha` stayed required, every CR would
+> have to supply it and the `when: {customResourceFieldAbsent: spec.sha}` guard could never fire —
+> the lookup would be dead weight. We can diverge because we author this document; a KOG on a
+> vendor-published spec cannot, which is the general gap tracked as
+> [oasgen-provider#246](https://github.com/krateo-platformops/oasgen-provider/issues/246) (a
+> resolver-supplied field should be exemptable from `spec.required`; it affects shipped `secretRef`
+> too). Everything below is the original 0.23.0 analysis that led here; it is preserved as the
+> reasoning, with the verdict updated in §4.
+
+`GitRef` was removed from the chart along with `RepoContent` and the companion plugin, because
+the frontend now publishes through a `BuilderPublish` claim over `git-provider`
+(`AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults to `"true"`), leaving the `github.krateo.io` route
+as the `"false"` fallback nobody takes. This is the design that brought it back **natively**, so
+the knowledge outlives the code.
 
 Everything below is against **oasgen-provider / rest-dynamic-controller 0.23.0**
 (`krateo-platformops/oasgen-provider`, tag `0.23.0` — a monorepo carrying both engines under
@@ -195,11 +222,15 @@ paths:
                   # SHORT form: "heads/builder/demo". The create endpoint wants the FULL
                   # "refs/heads/..." in the body; the create requestTransform adds the prefix.
                   #
-                  # The pattern is the GUARD, and it is the reason this shape is safe to ship: a CR
-                  # carrying the full form is rejected at ADMISSION instead of creating a branch the
-                  # observe verb can never address (a silent create->422 loop). `pattern` survives
-                  # CRD generation verbatim (plumbing v1.14.2 crdgen/transpile.go:500). RE2 has no
-                  # lookahead, so it is an allow-list, not a negation of "refs/".
+                  # The pattern is the INTENDED GUARD: a CR carrying the full form should be rejected
+                  # at ADMISSION instead of creating a branch the observe verb can never address (a
+                  # silent create->422 loop). RE2 has no lookahead, so it is an allow-list, not a
+                  # negation of "refs/". NOTE (corrected 2026-10-28): this doc previously claimed
+                  # `pattern` "survives CRD generation verbatim". It did NOT until oasgen 0.38.0: before
+                  # that, every validation keyword was dropped at the OpenAPI->Schema adapter (crdgen
+                  # would carry it, but the adapter never handed it one). Fixed in oasgen-provider #249
+                  # (PR #250), released in 0.38.0 — the chart floor. On >= 0.38.0 the guard is ENFORCED;
+                  # verified live (spec.ref.pattern reaches the CRD, from the body declaration). See §4.
                   pattern: '^(heads|tags)/.+'
                 sha:
                   type: string
@@ -462,6 +493,41 @@ never compared under any scope; default it to `false` in the OAS.
 
 ## 4. Verdict
 
+> **Superseded by the 0.36.0 update (see the banner at the top).** The "one caveat" below — required
+> `spec.sha` — is no longer paid. The ranked option this section put LAST, "wait for #120 and the
+> request-direction jq fix, which together make the whole kind trivially native with **no** contract
+> change at all," is what shipped: #120 landed as dependent lookups in oasgen-provider 0.36.0, so
+> `spec.sha` is **optional** and the create resolves the base sha itself. The analysis below is kept
+> as the record of why the other options were rejected.
+
+> **Validation (2026-10-28, live on kind — lookup mechanics on published oasgen-provider 0.36.0, then
+> the admission guard re-verified on 0.38.0).** The kind was validated end-to-end against the real
+> GitHub API (throwaway repo `krateo-blueprints/kog-gitref-val`):
+>
+> - **CRD generates** and `spec.required` is `[configurationRef, owner, ref, repo]` — **`sha` absent**
+>   (optional), so the `when.customResourceFieldAbsent: spec.sha` guard can fire.
+> - **sha-less create** resolves the base sha via the lookup chain: `GET /repos/{owner}/{repo}` then
+>   `GET …/git/ref/heads%2Fmain` (one each — see the `%2F` note below), and the create request body
+>   carried the resolved default-branch head sha; the branch landed at exactly that sha, no duplicate.
+> - **explicit `spec.sha`** (set to a dangling commit, not the default-branch head) **skips the
+>   lookups entirely** — both lookup GETs fired exactly once across two concurrent CRs, i.e. only for
+>   the sha-less one — and the branch landed at the author's sha, proving the guard both ways.
+> - **`requestTransform`** adds the `refs/` prefix (request body `ref` is full-form); **`responseTransform`**
+>   normalizes `status.ref` to short form; **delete** issues `DELETE …/git/refs/heads%2F… → 204` and the
+>   branch is removed with no orphan (the observe-verb arbiter, not the delete status code).
+> - **`%2F`**: the RDC percent-encodes the slash in multi-segment refs (`heads%2Fbuilder%2Fdemo`);
+>   GitHub decodes it (probed `git/ref/heads%2Fmain → 200` directly), so observe/lookup/delete all
+>   succeed. Multi-segment refs work end to end.
+> - **Found and fixed during validation:** the `defaultBranch` lookup needs `GET /repos/{owner}/{repo}`
+>   to exist in the document — a dependent lookup resolves against a declared path exactly as a verb
+>   does — which the first draft omitted (create failed `path not found: /repos/{owner}/{repo}`); the
+>   plain repo GET was added to the asset.
+> - **Admission guard (oasgen #249/#250):** on **0.36.0** the `pattern` did NOT reach the CRD (`spec.ref.pattern`
+>   absent) — the chart floor is **0.38.0** precisely because #250 (in 0.38.0) fixes that. Re-verified on
+>   0.38.0: `spec.ref.pattern = ^(heads|tags)/.+` reaches the CRD, so a full-form `refs/heads/x` is now
+>   rejected at admission. It lands from the **body** declaration (not the path parameter — generator
+>   precedence gives body properties priority over a colliding parameter). §5 trap 2.
+
 **Back today, with one caveat — and the caveat is a CR-contract change, not a workaround.**
 
 - **observe, update, delete: fully native, no caveat.** Shape B needs three inline jq
@@ -491,10 +557,17 @@ Traps specific to this kind, in the order they bite:
 1. **`sha` must not be comparable.** Grep the RestDefinition for any `responseTransform` or
    `fieldMapping` writing a root-level `sha`. If one exists, the controller will PATCH the
    branch backwards. This is the highest-severity defect available in this file (§3.3).
-2. **Which ref form is `spec.ref`?** Shape B's `pattern: '^(heads|tags)/.+'` must be present
-   in the OAS and must reach the generated CRD (`kubectl explain gitref.spec.ref`, or read
-   the CRD). Without it, an author writing `refs/heads/x` gets a green create followed by a
-   permanent create→422 loop with no error pointing at the cause.
+2. **Which ref form is `spec.ref`?** Shape B's `pattern: '^(heads|tags)/.+'` is present in the
+   OAS (on both the create body `ref` and the `ref` path parameter) and, on the chart floor of
+   **oasgen-provider ≥ 0.38.0**, reaches the generated CRD — verified live (`kubectl get crd
+   gitrefs… -o jsonpath` on `spec.properties.ref.pattern` → `^(heads|tags)/.+`), so a full-form
+   `refs/heads/x` is rejected at admission rather than looping create→422. It lands from the **body**
+   declaration: for a name that is both a body field and a path parameter, the generator gives the
+   body property precedence and discards the colliding parameter schema whole, so a param-only
+   pattern would not reach `spec.ref` (the param copy is kept as a correct, currently-redundant
+   declaration). Below 0.38.0 oasgen dropped all validation keywords at its OpenAPI→Schema adapter
+   (oasgen-provider **#249**, fixed by PR **#250** in 0.38.0), so on an older oasgen the guard was
+   silently absent — which is why the floor is 0.38.0, not 0.36.0.
 3. **Every response-side `ref` mapping needs its identity pin.** `ref` is the identifier; a
    `fieldMapping` that reads it without another entry writing to `ref` deletes it from the
    body, breaking both `populateStatusFields` and the comparison (§3, fact 3). Shape B avoids

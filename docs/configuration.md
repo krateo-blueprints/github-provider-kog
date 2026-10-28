@@ -1,7 +1,7 @@
 ---
 type: Configuration
 title: github-provider-kog — configuration
-description: The whole config surface — the single chart value resourceGroup, the 29 RestDefinition mappings grouped by area, the compareScope tally and the reasoning behind each non-default choice, the native normalizations GitHub's REST inconsistencies demand, the OpenAPI ConfigMaps, and the invariants that must hold for a chart that ships no runtime component.
+description: The whole config surface — the single chart value resourceGroup, the 30 RestDefinition mappings grouped by area, the compareScope tally and the reasoning behind each non-default choice, the native normalizations GitHub's REST inconsistencies demand, the OpenAPI ConfigMaps, and the invariants that must hold for a chart that ships no runtime component.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, values, restdefinition, oasgen-provider]
 timestamp: 2026-09-09T00:00:00Z
@@ -19,7 +19,7 @@ The chart surface is deliberately tiny — one scalar. Everything else is fixed 
 
 | key | default | effect |
 |---|---|---|
-| `resourceGroup` | `github.krateo.io` | the API group every generated CRD lands under — 29 resource kinds plus a `<Kind>Configuration` auth kind for each. Referenced by every RestDefinition's `spec.resourceGroup`. |
+| `resourceGroup` | `github.krateo.io` | the API group every generated CRD lands under — 30 resource kinds plus a `<Kind>Configuration` auth kind for each. Referenced by every RestDefinition's `spec.resourceGroup`. |
 | `global` | `{}` (object) | Helm global values, injected by the chart-inspector / when used as a subchart. |
 
 The schema declares **only** a single top-level scalar on purpose: when the chart is
@@ -27,7 +27,7 @@ installed as a Krateo component the CDC derives the CompositionDefinition CRD fr
 schema, and a scalar default materializes cleanly in the component CR (nested-object
 toggles would not) ([api](./api.md)).
 
-There is **no per-kind toggle**. All 29 RestDefinitions are always installed; a
+There is **no per-kind toggle**. All 30 RestDefinitions are always installed; a
 RestDefinition costs nothing until a CR of its kind exists, and a per-kind switch would
 mean nested-object values the CDC cannot materialize.
 
@@ -35,7 +35,7 @@ mean nested-object values the CDC cannot materialize.
 
 Each `chart/templates/rd-<kind>.yaml` declares the API mapping oasgen-provider consumes;
 its in-file comments carry the reasoning behind every choice below. `configurationFields`
-is empty for all 29 — the token wiring comes from the oasgen-generated
+is empty for all 30 — the token wiring comes from the oasgen-generated
 `<Kind>Configuration` + `spec.configurationRef`, never from spec fields. The full
 per-kind verb, identifier, `compareScope` and status listing is in [api](./api.md); what
 follows is the mapping mechanics.
@@ -121,14 +121,14 @@ Three patterns recur across the set and are worth reading once:
 ### `compareScope` across the chart
 
 `compareScope` takes one of three values — `fullSpec` (the default),
-`identifiersAndStatus`, or `updatable`. Across the 29 kinds:
+`identifiersAndStatus`, or `updatable`. Across the 30 kinds:
 
 | value | kinds | count |
 |---|---|---|
 | `updatable` | `Repository`, `Team`, `TeamRepo`, `TeamMembership`, `Collaborator`, `OrgMembership`, `RepoWebhook`, `OrgWebhook`, `Environment`, `RepoRuleset`, `OrgRuleset`, `BranchProtection`, `ActionsVariableRepo`, `ActionsVariableOrg`, `EnvironmentVariable`, `RunnerGroup`, `DeploymentBranchPolicy`, `Label`, `Milestone`, `Issue`, `PullRequest`, `Release`, `CustomProperty`, `CodeSecurityConfig` | 24 |
 | default `fullSpec` (unset) | `Workflow`, `AutomatedSecurityFixes` | 2 |
 | `fullSpec` (set explicitly) | `Autolink` | 1 |
-| `identifiersAndStatus` | `DeployKey`, `Deployment` | 2 |
+| `identifiersAndStatus` | `DeployKey`, `Deployment`, `GitRef` | 3 |
 
 `updatable` requires **oasgen-provider ≥ 0.23.0** and an update verb; it derives the
 compared set from the OAS update body, so a field the update cannot send is never
@@ -275,7 +275,7 @@ pushed — a real gap, and closing it is what the change was actually for.
 
 ### Normalization in the RestDefinition
 
-All 29 kinds are native: every verb goes straight to `api.github.com`, and where GitHub's
+All 30 kinds are native: every verb goes straight to `api.github.com`, and where GitHub's
 REST API needs normalizing, the RestDefinition expresses it rather than a hop through
 something the chart would have to run. The mechanisms, and where each is used:
 
@@ -284,8 +284,9 @@ something the chart would have to run. The mechanisms, and where each is used:
 | static `queries` on a verb | `Collaborator` (findby) | pins `affiliation=direct` and `per_page=100`; both parameters are `excludedSpecFields` so they cannot become user-settable spec fields. Without the pin the endpoint defaults to `affiliation=all` and reports org/team access as if it were this CR's grant. |
 | static `headers` on a verb | `TeamRepo` (get) | `Accept: application/vnd.github.v3.repository+json`; without it the same endpoint answers 204 with nothing to observe. |
 | `fieldMapping` with an `alias` valueMapping | `Collaborator` (findby) | translates GitHub's display vocabulary (`read`/`write`) into the request vocabulary (`pull`/`push`) and relocates the value onto `spec.permission`, where the comparison looks for it. A custom repository role has no alias pair and passes through unchanged, which is correct. |
-| `requestTransform` (jq) | `BranchProtection` (create, update) | turns omitted controls into the explicit `null` GitHub requires for four members that must be present even when off. |
-| `responseTransform` (jq) | `BranchProtection` (get), `TeamRepo` (get), `PullRequest` (create/get/update/findby) | rewrites the response into the CR domain once, before status population and drift comparison — flattening `{"enabled": bool}` wrappers and sorting every list; deriving `permission` from cumulative booleans; replacing `PullRequest`'s `head`/`base` objects with the branch strings the spec carries. The last is what lets `PullRequest` be native at all: compared raw, a string spec field against an object response field is permanent drift, and the PATCH body does not even contain `head`. `PullRequest` carries it on ALL FOUR verbs (not just get) because head/base are identifiers and status is written from every response — see [design-pullrequest §8.2](./design-pullrequest.md). Every one of these programs is type-guarded rather than `//`-defaulted, because gojq does not swallow the indexing error of `.ref` on an already-normalized string — and a jq runtime error fails the reconcile outright rather than degrading. |
+| `requestTransform` (jq) | `BranchProtection` (create, update), `GitRef` (create) | for `BranchProtection`, turns omitted controls into the explicit `null` GitHub requires for four members that must be present even when off. For `GitRef`, adds the `refs/` prefix the create-ref body wants onto the short-form `spec.ref` (idempotent, so an author who wrote the full form is tolerated). |
+| `responseTransform` (jq) | `BranchProtection` (get), `TeamRepo` (get), `PullRequest` (create/get/update/findby), `GitRef` (create/get/update) | rewrites the response into the CR domain once, before status population and drift comparison — trimming GitHub's full-form `refs/...` ref back to the short form the `GitRef` spec carries (on every status-writing verb, or `status.ref` would flap between forms); flattening `{"enabled": bool}` wrappers and sorting every list; deriving `permission` from cumulative booleans; replacing `PullRequest`'s `head`/`base` objects with the branch strings the spec carries. The last is what lets `PullRequest` be native at all: compared raw, a string spec field against an object response field is permanent drift, and the PATCH body does not even contain `head`. `PullRequest` carries it on ALL FOUR verbs (not just get) because head/base are identifiers and status is written from every response — see [design-pullrequest §8.2](./design-pullrequest.md). Every one of these programs is type-guarded rather than `//`-defaulted, because gojq does not swallow the indexing error of `.ref` on an already-normalized string — and a jq runtime error fails the reconcile outright rather than degrading. |
+| `dependentLookups` (pre-call GET chain) | `GitRef` (create) | resolves the base commit for a sha-less create: repo → `default_branch` → that branch's `git/ref/{ref}` → `object.sha`, fed into the create body's `sha` only `when.customResourceFieldAbsent: spec.sha` (an explicit `spec.sha` wins and skips the calls). The one mechanism in this chart that needs **oasgen-provider ≥ 0.36.0** ([#120](https://github.com/krateo-platformops/oasgen-provider/issues/120), merged as #239); it is what let `GitRef` return without the companion plugin. |
 | `notFoundBody` (jq predicate) | `Workflow` (get), `AutomatedSecurityFixes` (get) | reports a 200 response as *absent* when the raw body says the feature is off, so the controller re-runs create. Evaluated before any response normalization. |
 | declared response codes | `Team` (update) | rest-dynamic-controller accepts only the 2xx codes declared on the operation. `PATCH /orgs/{org}/teams/{team_slug}` answers **201** when it actually changes something and 200 only when the value already matched, so the asset declares both — a document listing 200 alone would turn every real update into `invalid status code: 201`. |
 
@@ -297,7 +298,7 @@ would consume the key and `status.role_name` would silently never populate.
 ## The OpenAPI specs
 
 Each RestDefinition references a trimmed OpenAPI 3.0 spec (`chart/assets/<kind>.yaml`)
-carried as a ConfigMap (`chart/templates/configmap-<kind>.yaml`). All **29** ConfigMaps
+carried as a ConfigMap (`chart/templates/configmap-<kind>.yaml`). All **30** ConfigMaps
 are a plain `.Files.Get`: the assets contain no template action, so nothing is
 `tpl`-rendered and each spec is copied verbatim. No operation anywhere in the set
 overrides `servers` — every verb of every kind keeps `https://api.github.com`.
@@ -325,38 +326,44 @@ are not secrets and are covered at all three scopes.
 
 ## No runtime component
 
-The chart renders 29 ConfigMaps and 29 RestDefinitions, and nothing else — no Deployment,
+The chart renders 30 ConfigMaps and 30 RestDefinitions, and nothing else — no Deployment,
 no Service, no image, no proxy, and no `_helpers.tpl` (it held only the two helpers the
 proxy needed). Installing the chart puts data in the cluster; the only workloads are the
 `rest-dynamic-controller` deployments oasgen-provider creates per kind.
 
-That became true when `GitRef`, `RepoContent` and `PullRequest` were removed. They were
-the three kinds whose verbs routed through a companion proxy, and the only users of it,
-so the plugin went with them. The frontend now publishes through a `BuilderPublish` claim
-over `git-provider` — `AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults to `"true"` in the
-frontend chart's `values.yaml` and `values.schema.json` — and the `github.krateo.io`
-route is the `"false"` fallback.
+That became true when `GitRef`, `RepoContent` and `PullRequest` were removed — the three
+kinds whose verbs routed through a companion proxy, and the only users of it, so the plugin
+went with them. The frontend now publishes through a `BuilderPublish` claim over
+`git-provider` — `AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults to `"true"` in the frontend
+chart's `values.yaml` and `values.schema.json` — and the `github.krateo.io` route is the
+`"false"` fallback. Two of the three have since returned **natively**, with no proxy:
+`PullRequest` (a `responseTransform` flattening `head`/`base`, plus a findby for group-B
+recovery) and `GitRef` (a `requestTransform` for the `refs/` prefix plus a `dependentLookups`
+chain for the base sha, oasgen-provider ≥ 0.36.0). `RepoContent` is the one still out.
 
-What each of the three did, and exactly what it would take to bring it back **natively**,
-is written down per kind:
+What each did, and what a native return takes, is written down per kind:
 
-| document | kind | state of a native return at 0.23.0 |
+| document | kind | native-return state |
 |---|---|---|
-| [design-gitref](./design-gitref.md) | `GitRef` | blocked on one thing only: resolving the base HEAD sha on create is a pre-call dependent read a RestDefinition cannot express — oasgen-provider **#120**. |
-| [design-repocontent](./design-repocontent.md) | `RepoContent` | expressible today — `status.sha` plus a `responseTransform`, now that the `%252F` double-escape is fixed. |
-| [design-pullrequest](./design-pullrequest.md) | `PullRequest` | expressible today — a `responseTransform` flattening `head`/`base` to `ref` strings. |
+| [design-gitref](./design-gitref.md) | `GitRef` | **returned** (appVersion 0.1.3). The base-HEAD-sha pre-call read — oasgen-provider **#120** — shipped as dependent lookups in **0.36.0**, so a sha-less create is native; `spec.sha` stays optional. |
+| [design-repocontent](./design-repocontent.md) | `RepoContent` | expressible today — `status.sha` plus a `responseTransform`, now that the `%252F` double-escape is fixed. Not yet shipped. |
+| [design-pullrequest](./design-pullrequest.md) | `PullRequest` | **returned** — a `responseTransform` flattening `head`/`base` to `ref` strings. |
 
 ## Invariants
 
-- **oasgen-provider must be ≥ 0.23.0.** 23 kinds declare `compareScope: updatable`,
-  which does not exist below that version, and the CRD rejects it on a kind with no
-  update verb.
-- **The chart stays free of a runtime component.** It renders 29 ConfigMaps and 29
+- **oasgen-provider must be ≥ 0.38.0.** 0.38.0 is where the `GitRef` pattern admission
+  guard reaches the generated CRD — the fix that makes the OpenAPI validation keywords
+  land on the CRD ([#249](https://github.com/krateo-platformops/oasgen-provider/issues/249),
+  merged as #250). `GitRef`'s create resolves its base sha with **dependent lookups**, a
+  primitive that landed in 0.36.0 ([#120](https://github.com/krateo-platformops/oasgen-provider/issues/120),
+  merged as #239), and the `compareScope: updatable` that 24 kinds declare does not exist
+  below 0.23.0 — both floors still hold, now subsumed by 0.38.0.
+- **The chart stays free of a runtime component.** It renders 30 ConfigMaps and 30
   RestDefinitions and nothing else; every kind reaches `api.github.com` directly, no
   asset overrides `servers`, and every ConfigMap is a plain `.Files.Get` with nothing for
   `tpl` to resolve. A kind that needed a hop would reintroduce a Deployment, a Service and
-  an image to release — which is why the two kinds that could return natively are worth
-  the transforms their design docs specify.
+  an image to release — which is why the kinds that could return natively (`PullRequest`
+  and `GitRef` already have) are worth the transforms their design docs specify.
 - **`Repository` must exist and be initialised before anything writes into it.**
   `auto_init` defaults to `true` so the new repo has a first commit and therefore a
   default branch; without one there is no base sha to branch from and nothing to commit
@@ -365,13 +372,16 @@ is written down per kind:
 - **A RestDefinition's declared paths and methods must exist in its own asset.** Every
   verb resolves against the OpenAPI document the ConfigMap named by `oasPath` carries, so
   a path or method that is not in that document is a mapping the controller can never
-  execute. Every verb of all 29 was cross-checked against its own asset, and all 29
-  RestDefinitions were accepted by the deployed `restdefinitions.ogen.krateo.io` CRD at
-  oasgen-provider 0.23.0 (`kubectl apply --dry-run=server`).
+  execute. Every verb of the original 29 was cross-checked against its own asset and
+  accepted by the deployed `restdefinitions.ogen.krateo.io` CRD at oasgen-provider 0.23.0
+  (`kubectl apply --dry-run=server`); `GitRef`, the 30th, was validated live end-to-end on
+  oasgen-provider 0.36.0 (lookup mechanics) and 0.38.0 (the `spec.ref.pattern` admission guard),
+  its `dependentLookups` + `dependentLookup` resolver shape accepted and the sha-less/explicit-sha
+  paths and delete round-trip all confirmed against the real GitHub API.
 - **The token is provisioned out-of-band, and its rights are the union of the kinds in
   use.** The chart holds no credential; the portal write-path only references the
-  `<Kind>Configuration` CRs ([usage](./usage.md)). One PAT can drive all 29 kinds, and
-  `chart/samples/configurations.yaml` ships all 29 Configuration CRs under a single name
+  `<Kind>Configuration` CRs ([usage](./usage.md)). One PAT can drive all 30 kinds, and
+  `chart/samples/configurations.yaml` ships all 30 Configuration CRs under a single name
   — but `Repository` needs repository creation in the org (classic `repo` scope, or a
   fine-grained token with org **Administration: read & write**), and the org-scoped kinds — `Team`, `TeamMembership`,
   `TeamRepo`, `OrgMembership`, `OrgWebhook`, `OrgRuleset`, `ActionsVariableOrg`,

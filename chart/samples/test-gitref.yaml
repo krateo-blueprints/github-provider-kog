@@ -1,0 +1,27 @@
+# Create a git branch (a reference) in a destination repo — the `builder/*` branch a blueprint author
+# writes a chart tree onto. Second in the authoring chain: Repository -> GitRef -> RepoContent -> PullRequest.
+#
+# `ref` is the SHORT form, "heads/<branch>" (or "tags/<tag>"). Writing the full "refs/heads/..." form
+# is rejected at apply time by the CRD pattern — on purpose, so a mis-typed ref fails loudly instead of
+# creating a branch the controller can never observe. See docs/design-gitref.md §3.1.
+#
+# `sha` (the base commit the branch is cut from) is OPTIONAL: omit it and oasgen-provider resolves the
+# repo's default-branch head commit for you via a dependent lookup (the chart needs oasgen >= 0.38.0;
+# the lookup itself landed in 0.36.0, the admission guard on spec.ref in 0.38.0). Set it explicitly to
+# branch from a specific commit — an explicit value always wins and skips the lookup.
+#
+# Editing spec.ref on a live CR is NOT a rename: the observe addresses the ref by that value, so a
+# change makes the CR create a DIFFERENT branch and orphan the old one. Delete + recreate to move.
+apiVersion: github.krateo.io/v2022-11-28
+kind: GitRef
+metadata:
+  name: test-demo-destination-builder-branch
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  ref: heads/builder/demo
