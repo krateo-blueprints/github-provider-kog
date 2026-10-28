@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: github-provider-kog — GitRef restoration design
-description: How the GitRef kind would come back to github-provider-kog natively after the companion plugin is deleted — the ref-form asymmetry solved with a create-side requestTransform (or a findby hybrid), the base-sha dependent read that oasgen-provider 0.23.0 still cannot express, and why spec.sha must never be lifted to the response root.
+description: How the GitRef kind came back to github-provider-kog natively after the companion plugin was deleted — the ref-form asymmetry solved with a create-side requestTransform, the base-sha dependent read (not expressible until oasgen-provider 0.36.0's dependent lookups, now shipped), and why spec.sha must never be lifted to the response root.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [design, gitref, oasgen-provider, rest-dynamic-controller, github, plugin-removal]
 timestamp: 2026-09-09T00:00:00Z
@@ -9,11 +9,35 @@ timestamp: 2026-09-09T00:00:00Z
 
 # GitRef — restoration design
 
-`GitRef` is being removed from the chart along with `RepoContent`, `PullRequest` and the
-companion plugin, because the frontend now publishes through a `BuilderPublish` claim over
-`git-provider` (`AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults to `"true"`), leaving the
-`github.krateo.io` route as the `"false"` fallback nobody takes. This is the design that
-brings it back **natively**, so the knowledge outlives the code.
+> **Update 2026-10-28 — SHIPPED natively (chart appVersion 0.1.3, requires oasgen-provider ≥ 0.36.0).**
+> The one thing §3.2/§4 said was "NOT expressible" at 0.23.0 — the pre-call base-sha dependent read —
+> is now a first-class RestDefinition primitive: **dependent lookups**, released in oasgen-provider
+> **0.36.0** ([#120](https://github.com/krateo-platformops/oasgen-provider/issues/120), merged as #239).
+> So the kind returns in the form §4 ranked last and best: **Shape B + dependent lookups**, with
+> `spec.sha` **optional** (not required). `chart/assets/gitref.yaml` + `chart/templates/rd-gitref.yaml`
+> implement it: short-form `spec.ref` with a create `requestTransform` for the `refs/` prefix; a
+> two-step `dependentLookups` chain (repo → `default_branch` → that branch's `git/ref` → `object.sha`)
+> that fills the create body's `sha` **only when the CR omits it** (`when.customResourceFieldAbsent:
+> spec.sha`); and §3.3's branch-creation semantics (`compareScope: identifiersAndStatus`, `object.sha`
+> exposed under status, never a root `sha`). No plugin, no `createApiRef`, no snowplow dependency, and
+> **no CR-contract caveat** — a sha-less create now works natively.
+>
+> One deliberate divergence makes this work: `chart/assets/gitref.yaml` omits `sha` from the create
+> body's `required` list, where GitHub's published spec has `required: [ref, sha]`. A body's `required`
+> propagates into the generated CRD's `spec.required`, so had `sha` stayed required, every CR would
+> have to supply it and the `when: {customResourceFieldAbsent: spec.sha}` guard could never fire —
+> the lookup would be dead weight. We can diverge because we author this document; a KOG on a
+> vendor-published spec cannot, which is the general gap tracked as
+> [oasgen-provider#246](https://github.com/krateo-platformops/oasgen-provider/issues/246) (a
+> resolver-supplied field should be exemptable from `spec.required`; it affects shipped `secretRef`
+> too). Everything below is the original 0.23.0 analysis that led here; it is preserved as the
+> reasoning, with the verdict updated in §4.
+
+`GitRef` was removed from the chart along with `RepoContent` and the companion plugin, because
+the frontend now publishes through a `BuilderPublish` claim over `git-provider`
+(`AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults to `"true"`), leaving the `github.krateo.io` route
+as the `"false"` fallback nobody takes. This is the design that brought it back **natively**, so
+the knowledge outlives the code.
 
 Everything below is against **oasgen-provider / rest-dynamic-controller 0.23.0**
 (`krateo-platformops/oasgen-provider`, tag `0.23.0` — a monorepo carrying both engines under
@@ -461,6 +485,13 @@ They are not compatible, and the CR must be one of them. For the blueprint-autho
 never compared under any scope; default it to `false` in the OAS.
 
 ## 4. Verdict
+
+> **Superseded by the 0.36.0 update (see the banner at the top).** The "one caveat" below — required
+> `spec.sha` — is no longer paid. The ranked option this section put LAST, "wait for #120 and the
+> request-direction jq fix, which together make the whole kind trivially native with **no** contract
+> change at all," is what shipped: #120 landed as dependent lookups in oasgen-provider 0.36.0, so
+> `spec.sha` is **optional** and the create resolves the base sha itself. The analysis below is kept
+> as the record of why the other options were rejected.
 
 **Back today, with one caveat — and the caveat is a CR-contract change, not a workaround.**
 

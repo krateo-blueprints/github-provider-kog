@@ -1,0 +1,110 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-gitref
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-gitref/gitref.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: GitRef
+    # `ref` (SHORT form, e.g. "heads/builder/demo") is the identity: the one spec key that is also a
+    # response key, so status populates it and the get/update/delete paths key off it directly. A
+    # tautology for drift (we found the ref BY that ref), so it can never report a false positive.
+    identifiers:
+      - ref
+    additionalStatusFields:
+      - node_id
+      - url
+      # The branch's CURRENT head commit, by its nested path (populateStatusFields supports dot
+      # notation). Deliberately NOT lifted to a root `sha`: a root `sha` would become a COMPARED key
+      # and the controller would PATCH the branch backwards to its base commit — destroying every
+      # commit made since. additionalStatusFields is read-only against the response, so it exposes the
+      # head commit under status.object.sha WITHOUT perturbing the compare. See docs/design-gitref.md §3.3.
+      - object.sha
+    # Projects spec onto identifiers + additionalStatusFields = {ref}. This excludes `sha` STRUCTURALLY
+    # (not by the accident that GitHub nests the commit under object{}), which is what keeps the
+    # create-time base commit out of desired state. Drift that matters — the branch was deleted — is
+    # the observe 404, not a body compare. See docs/design-gitref.md §3.3.
+    compareScope: identifiersAndStatus
+    configurationFields: []
+    # PRE-CALL DEPENDENT READ (oasgen-provider >= 0.36.0; upstream #120/#239). Resolves the base commit
+    # for a sha-less create — exactly what the retired plugin's createGitRef handler did, now native.
+    # Two GETs in dependency order (fromLookup may only name an EARLIER lookup): repo -> default_branch,
+    # then that branch's ref -> object.sha. GET-only by design; an ambiguous match would be a hard error
+    # (not relevant here — both are single-object reads).
+    dependentLookups:
+      - name: defaultBranch
+        method: GET
+        path: /repos/{owner}/{repo}
+        parameters:
+          - inPath: owner
+            inCustomResource: spec.owner
+          - inPath: repo
+            inCustomResource: spec.repo
+        select: .default_branch
+      - name: baseSha
+        method: GET
+        path: /repos/{owner}/{repo}/git/ref/{ref}
+        parameters:
+          - inPath: owner
+            inCustomResource: spec.owner
+          - inPath: repo
+            inCustomResource: spec.repo
+          # get-ref's {ref} wants the SHORT "heads/<branch>" form; default_branch is a bare name, so
+          # prepend "heads/" via the lookup's valueMapping jq tier (the request-direction jq that is
+          # live for lookups — distinct from an inPath valueMapping on a verb, which is dead code).
+          - inPath: ref
+            fromLookup: defaultBranch
+            valueMapping:
+              type: jq
+              jq:
+                inline: '"heads/" + .'
+        select: .object.sha
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /repos/{owner}/{repo}/git/refs
+        # GitHub's create-ref body wants the FULL "refs/heads/..." form; spec.ref is SHORT. Add the
+        # prefix in the request direction, where a whole-document jq is implemented (requestTransform
+        # runs after body assembly). Idempotent, and tolerant of an author who wrote the full form.
+        requestTransform:
+          inline: '.ref |= (if startswith("refs/") then . else "refs/" + . end)'
+        # Fill the create body's `sha` from the baseSha lookup ONLY when the CR did not supply one. An
+        # explicit spec.sha wins and skips the lookup (no API calls), so a CR that already sets sha
+        # behaves exactly as a plain native create.
+        fieldMapping:
+          - inBody: sha
+            resolver:
+              type: dependentLookup
+              dependentLookup:
+                name: baseSha
+                when:
+                  customResourceFieldAbsent: spec.sha
+        # The CREATE response also populates status, so normalize `ref` to short form here too, or
+        # status.ref would hold "refs/heads/x" until the next observe rewrote it — a flapping identifier.
+        responseTransform:
+          inline: '.ref |= ltrimstr("refs/")'
+      - action: get
+        method: GET
+        # {ref} auto-populates from spec.ref (short form), which is exactly what this endpoint wants.
+        path: /repos/{owner}/{repo}/git/ref/{ref}
+        # Normalize GitHub's full-form `ref` into the CR domain BEFORE status population and drift
+        # comparison. Without it, spec.ref "heads/x" compares against response "refs/heads/x" — a
+        # permanent false drift, a PATCH every reconcile.
+        responseTransform:
+          inline: '.ref |= ltrimstr("refs/")'
+      - action: update
+        method: PATCH
+        path: /repos/{owner}/{repo}/git/refs/{ref}
+        # Under compareScope identifiersAndStatus the compared set is {ref}, a tautology, so this verb
+        # NEVER fires — which is the point: force-moving a working branch would fight RepoContent on the
+        # very branch GitRef created (§3.3). It stays declared because PATCH is the only way to force a
+        # ref and keeping it costs nothing. The response still populates status, hence the transform.
+        responseTransform:
+          inline: '.ref |= ltrimstr("refs/")'
+      - action: delete
+        method: DELETE
+        # Short-form {ref} from spec.ref; the delete path is always addressable (spec always exists),
+        # which Shape A's status-sourced delete was not — see docs/design-gitref.md §3.1.
+        path: /repos/{owner}/{repo}/git/refs/{ref}

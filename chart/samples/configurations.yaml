@@ -198,6 +198,19 @@ spec:
         key: token
 ---
 apiVersion: github.krateo.io/v1alpha1
+kind: GitRefConfiguration
+metadata:
+  name: github-blueprints-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
 kind: IssueConfiguration
 metadata:
   name: github-blueprints-config

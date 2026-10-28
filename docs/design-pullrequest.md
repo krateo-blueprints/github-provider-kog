@@ -18,6 +18,10 @@ it. This is the design that brings it back **without** the plugin.
 > idempotency table in §3 was re-run against the shipped program with gojq 0.12.19 and reproduces
 > exactly, including the live `octocat/Hello-World#2846` cross-repo body at 48 keys in and 48 out.
 > `GitRef` and `RepoContent` remain out; their design documents remain proposals.
+>
+> _Update (2026-10-28): `GitRef` has since also returned natively — the chart is now 30 kinds and
+> requires oasgen-provider ≥ 0.36.0, whose dependent lookups resolve the base sha that blocked it.
+> `RepoContent` is the one still out. See [log](./log.md) and [design-gitref](./design-gitref.md)._
 
 File references to the three removed kinds are to commit **`be409bc`** (`git show
 HEAD:chart/templates/rd-pullrequest.yaml`); the deletions are already staged in the working tree.

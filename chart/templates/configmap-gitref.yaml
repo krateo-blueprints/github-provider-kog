@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-gitref
+  namespace: {{ .Release.Namespace }}
+data:
+  # NOT tpl-rendered, like configmap-repository.yaml. GitRef is fully native — every verb goes
+  # straight to api.github.com and the asset carries no `servers` override — so the file is copied
+  # verbatim and contains no template action. (The pre-native, plugin-based chart tpl-rendered this
+  # file to inject the plugin Service URL via `webServiceUrl`; that mechanism is gone.)
+  gitref.yaml: |
+{{ .Files.Get "assets/gitref.yaml" | indent 4 }}

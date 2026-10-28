@@ -1,7 +1,7 @@
 ---
 type: API
 title: github-provider-kog — API
-description: The CRDs this component brings into the cluster — the 29 resource kinds under github.krateo.io, all of them native, grouped by area, with their paths, identifiers, status fields and compareScope, the oasgen-generated <Kind>Configuration kind each one gets, and the CompositionDefinition the core-provider CDC derives from values.schema.json.
+description: The CRDs this component brings into the cluster — the 30 resource kinds under github.krateo.io, all of them native, grouped by area, with their paths, identifiers, status fields and compareScope, the oasgen-generated <Kind>Configuration kind each one gets, and the CompositionDefinition the core-provider CDC derives from values.schema.json.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, crd, compositiondefinition, github, oasgen-provider]
 timestamp: 2026-09-09T00:00:00Z
@@ -39,39 +39,42 @@ typed by `values.schema.json`, whose only knob is the scalar `resourceGroup`
 
 ## The generated `github.krateo.io` kinds
 
-oasgen-provider watches the **29** `RestDefinition`s and generates the CRDs below under
+oasgen-provider watches the **30** `RestDefinition`s and generates the CRDs below under
 `resourceGroup` (default `github.krateo.io`, group version `v1alpha1`), auto-deploying a
 `rest-dynamic-controller` per kind. Every resource CR carries a `spec.configurationRef`
 (added by oasgen from the OpenAPI `securityScheme`) naming the `<Kind>Configuration` that
 holds its token wiring.
 
-**oasgen-provider ≥ 0.23.0 is required.** 24 of the 29 kinds declare
-`compareScope: updatable`, which does not exist below that version
+**oasgen-provider ≥ 0.36.0 is required.** `GitRef`'s create resolves its base sha with a
+`dependentLookups` chain that older versions cannot express; the `compareScope: updatable`
+that 24 of the 30 kinds declare needs ≥ 0.23.0, a floor now subsumed by 0.36.0
 ([configuration](./configuration.md)).
 
-**All 29 kinds are native.** Every verb goes straight to `api.github.com`, and the
+**All 30 kinds are native.** Every verb goes straight to `api.github.com`, and the
 normalizations GitHub's REST inconsistencies demand are expressed in the RestDefinition
 itself (static query parameters and headers, `fieldMapping` aliases, request/response jq
-transforms, `notFoundBody` predicates). The chart ships **no runtime component of its
-own**: it renders 29 ConfigMaps and 29 RestDefinitions and nothing else — no Deployment,
-no Service, no image, no proxy. The only workloads involved are the
+transforms, `dependentLookups`, `notFoundBody` predicates). The chart ships **no runtime
+component of its own**: it renders 30 ConfigMaps and 30 RestDefinitions and nothing else —
+no Deployment, no Service, no image, no proxy. The only workloads involved are the
 `rest-dynamic-controller` deployments oasgen-provider creates per kind.
 
 Three kinds used to route some verbs through a companion proxy plugin — `GitRef`,
-`RepoContent` and `PullRequest` — and they were removed together with it. The frontend
-now publishes through a `BuilderPublish` claim over `git-provider`
-(`AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults to `"true"` in the frontend chart's
-`values.yaml` and `values.schema.json`), so the `github.krateo.io` route is the `"false"`
-fallback. What each kind did, and exactly what it would take to bring it back natively,
-is recorded in [design-gitref](./design-gitref.md),
-[design-repocontent](./design-repocontent.md) and
+`RepoContent` and `PullRequest`. The plugin is gone, and publishing now defaults to a
+`BuilderPublish` claim over `git-provider` (`AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults
+to `"true"` in the frontend chart's `values.yaml` and `values.schema.json`), so the
+`github.krateo.io` route is the `"false"` fallback. `PullRequest` and `GitRef` have since
+returned natively, without the plugin — `GitRef` via a create `requestTransform` for the
+`refs/` prefix and a `dependentLookups` chain for the base sha, `PullRequest` via a
+`responseTransform` flattening `head`/`base`; `RepoContent` is the one still out. What each
+kind did, and what its native restoration took, is recorded in
+[design-gitref](./design-gitref.md), [design-repocontent](./design-repocontent.md) and
 [design-pullrequest](./design-pullrequest.md).
 
 ### The kind set at a glance
 
 One row per kind: the verbs and their paths, the `identifiers` the RestDefinition
 declares, the `compareScope`, and the `additionalStatusFields` that land under `status`.
-`configurationFields` is empty on all 29 — the token wiring comes from the
+`configurationFields` is empty on all 30 — the token wiring comes from the
 `<Kind>Configuration`, never from spec fields. The kinds with a trap worth reading before
 authoring one are written out in full below the tables.
 
@@ -97,6 +100,7 @@ authoring one are written out in full below the tables.
 | `OrgRuleset` | create `POST /orgs/{org}/rulesets`; get/update/delete `GET`/`PUT`/`DELETE .../rulesets/{ruleset_id}` | `id` | `updatable` | `node_id`, `name`, `target`, `source_type`, `source`, `enforcement`, `created_at`, `updated_at` |
 | `Autolink` | create `POST /repos/{owner}/{repo}/autolinks`; get/delete `GET`/`DELETE .../autolinks/{autolink_id}` — **no update verb** | `id` | `fullSpec` (set explicitly) | — |
 | `BranchProtection` | create/update `PUT`, get `GET`, delete `DELETE` on `/repos/{owner}/{repo}/branches/{branch}/protection` | `url` | `updatable` | — |
+| `GitRef` | create `POST /repos/{owner}/{repo}/git/refs`; get `GET .../git/ref/{ref}`; update/delete `PATCH`/`DELETE .../git/refs/{ref}` | `ref` | `identifiersAndStatus` | `node_id`, `url`, `object.sha` |
 
 **CI/CD** — Actions configuration and deployment gating.
 
@@ -171,8 +175,9 @@ author has to keep in sync ([configuration](./configuration.md)).
 `auto_init: false` has no commit and therefore no default branch, so whatever writes
 into it next — the `BuilderPublish` path over `git-provider`, a CI job, a clone — has
 no base sha to branch from and nothing to commit against. `Repository` creates the
-destination; the branch/file/PR steps that used to follow it in this chart are the three
-removed kinds, described in [design-gitref](./design-gitref.md),
+destination; the branch/file/PR steps that follow it are `GitRef` → `RepoContent` →
+`PullRequest`. `GitRef` and `PullRequest` returned natively; `RepoContent` is the one
+still out. See [design-gitref](./design-gitref.md),
 [design-repocontent](./design-repocontent.md) and
 [design-pullrequest](./design-pullrequest.md).
 
@@ -452,6 +457,18 @@ that survives the transform unchanged, which is why it is the identifier.
 - **`TeamMembership` and `OrgMembership` can sit `pending`.** Adding a user who is not yet
   an organization member creates an invitation, and `status.state` stays `pending` until
   they accept. It is the only way to tell a granted membership from an outstanding one.
+- **`GitRef` keeps the create-time base `sha` out of the drift comparison.** `spec.ref`
+  (short form `heads/<branch>` or `tags/<tag>`, pattern `^(heads|tags)/.+`) is the sole
+  identifier, and `compareScope: identifiersAndStatus` projects the compared set down to
+  `ref` alone — a tautology, since observe finds the ref *by* that ref. The optional
+  `spec.sha` is a create-time input: when it is omitted, a `dependentLookups` chain (repo →
+  `default_branch` → that branch's head) resolves the base commit, so a blueprint author
+  with no sha at hand can still create `heads/<branch>`. A create `requestTransform` adds
+  the `refs/` prefix GitHub's create-ref body wants onto the short-form ref; get and update
+  carry the inverse `responseTransform` (`ltrimstr "refs/"`) so `status.ref` never flaps
+  between forms. The declared `PATCH` never fires under this scope — force-moving a working
+  branch would fight `RepoContent` on the branch `GitRef` created — but it stays declared
+  because keeping it costs nothing. Needs oasgen-provider ≥ 0.36.0 for the dependent read.
 
 ### What is deliberately absent
 
@@ -468,26 +485,27 @@ that survives the transform unchanged, which is why it is the identifier.
   covered precisely because its GET *does* return a body (`enabled`, `paused`).
 - **`POST /user/repos`.** User-owned repository creation, covered under `Repository` above:
   one create verb cannot choose between two paths, and Krateo destinations are org-owned.
-- **`GitRef`, `RepoContent` and `PullRequest`.** Removed with the proxy plugin they were
-  the only users of, now that publishing goes through `git-provider` (above). Two of the
-  three are expressible natively at 0.23.0 today: `PullRequest` needs a
-  `responseTransform` flattening `head`/`base`, and `RepoContent` needs `status.sha` plus
-  a `responseTransform`, now that the `%252F` double-escape is fixed. `GitRef` is the one
-  that is not: resolving the base HEAD sha on create is a pre-call dependent read a
-  RestDefinition cannot express, tracked as oasgen-provider **#120**. The full designs are
-  in [design-gitref](./design-gitref.md), [design-repocontent](./design-repocontent.md)
+- **`RepoContent`.** The one git-write kind still out, since the proxy plugin the three
+  shared was removed and publishing moved to `git-provider` (above). It is expressible
+  natively today — `status.sha` plus a `responseTransform`, now that the `%252F`
+  double-escape is fixed — just not yet shipped. `PullRequest` and `GitRef` have already
+  returned natively: `PullRequest` via a `responseTransform` flattening `head`/`base`, and
+  `GitRef` via a create `requestTransform` for the `refs/` prefix plus a `dependentLookups`
+  chain that resolves the base HEAD sha — the pre-call dependent read once tracked as
+  oasgen-provider **#120**, shipped in 0.36.0. The full designs are in
+  [design-gitref](./design-gitref.md), [design-repocontent](./design-repocontent.md)
   and [design-pullrequest](./design-pullrequest.md).
 
 ## The `<Kind>Configuration` kinds
 
-For each of the 29 resource kinds, oasgen generates a `<Kind>Configuration` CRD from the
+For each of the 30 resource kinds, oasgen generates a `<Kind>Configuration` CRD from the
 OpenAPI bearer `securityScheme` — `RepositoryConfiguration`, `TeamConfiguration`,
 `LabelConfiguration`, and so on. Each carries the token wiring a resource CR references
 via `spec.configurationRef.name`:
 
 ```yaml
 apiVersion: github.krateo.io/v1alpha1
-kind: RepositoryConfiguration   # one per resource kind — 29 in total
+kind: RepositoryConfiguration   # one per resource kind — 30 in total
 metadata:
   name: github-blueprints-config
   namespace: krateo-system
@@ -504,8 +522,8 @@ The generated name is the kind name plus `Configuration`, so `CodeSecurityConfig
 that, not `CodeSecurityConfiguration` — yields `CodeSecurityConfigConfiguration` rather
 than a doubled `…ConfigurationConfiguration`.
 
-All 29 may share a single name — the kind is implied by the resource that references it.
-That is why `chart/samples/configurations.yaml` now ships all 29 under the same
+All 30 may share a single name — the kind is implied by the resource that references it.
+That is why `chart/samples/configurations.yaml` now ships all 30 under the same
 `github-blueprints-config`, and why **one PAT can drive the whole chart**. You only need
 the Configuration for the kinds you actually use; the rest are inert. The referenced
 `Secret` is provisioned out-of-band ([usage](./usage.md)); the chart ships none of this.
