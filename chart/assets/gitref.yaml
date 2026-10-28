@@ -8,6 +8,26 @@ servers:
   # used to do is expressed natively by the create verb's dependentLookup (see rd-gitref.yaml).
   - url: https://api.github.com
 paths:
+  # Declared ONLY so the `defaultBranch` dependent lookup (rd-gitref.yaml) can name it — a dependent
+  # lookup, exactly like a verb, resolves against a path this document declares, so the plain repo GET
+  # must exist here even though no GitRef VERB uses it. The lookup selects `.default_branch`.
+  "/repos/{owner}/{repo}":
+    get:
+      summary: Get a repository (dependent-lookup source for default_branch)
+      operationId: repos/get
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  default_branch:
+                    type: string
   "/repos/{owner}/{repo}/git/refs":
     post:
       summary: Create a reference
@@ -32,11 +52,19 @@ paths:
                   # get/update/delete paths address the ref in the short form, so one spec value
                   # serves every verb with no field juggling.
                   #
-                  # The pattern is the GUARD and the reason this shape is safe to ship: a CR carrying
-                  # the full "refs/..." form is rejected at ADMISSION instead of creating a branch the
-                  # observe verb (short form) can never find — a silent create->422 loop. The pattern
-                  # survives CRD generation verbatim. RE2 has no lookahead, so this is an allow-list,
-                  # not a negation of "refs/".
+                  # The intended GUARD: a CR carrying the full "refs/..." form should be rejected at
+                  # ADMISSION instead of creating a branch the observe verb (short form) can never find
+                  # — a silent create->422 loop. RE2 has no lookahead, so this is an allow-list, not a
+                  # negation of "refs/", and it is RE2-clean so the apiserver can compile it.
+                  #
+                  # CURRENTLY NOT ENFORCED BY THE GENERATED CRD. oasgen drops ALL validation keywords
+                  # (pattern, min/maxLength, min/max, multipleOf, min/maxItems, uniqueItems) at its
+                  # OpenAPI->Schema adapter boundary, so this never reaches spec.ref — verified live on
+                  # oasgen 0.36.0 (generated gitrefs CRD had no spec.ref.pattern). Fixed upstream in
+                  # krateo-platformops/oasgen-provider#249 (PR #250), not yet in a release. Until the
+                  # chart runs an oasgen that carries #250 this guard is DOCUMENTED-ONLY: a full-form
+                  # spec.ref yields a wedged CR (observe 404 -> recreate -> 422), not data loss. Kept on
+                  # BOTH this body field and the `ref` path parameter so it survives once propagation lands.
                   pattern: '^(heads|tags)/.+'
                 sha:
                   type: string
@@ -137,6 +165,12 @@ components:
       required: true
       schema:
         type: string
+        # Same guard as the create body's `ref` (short form only, "heads/<branch>" / "tags/<tag>").
+        # `ref` is BOTH the create body field and this path parameter, so the pattern is kept on both
+        # to survive the generator's by-name merge once validation keywords propagate. See the body
+        # `ref` comment above: NOT enforced by the generated CRD until oasgen carries
+        # krateo-platformops/oasgen-provider#249 (PR #250); documented-only until then.
+        pattern: '^(heads|tags)/.+'
   schemas:
     GitRef:
       type: object

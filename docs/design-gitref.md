@@ -219,11 +219,15 @@ paths:
                   # SHORT form: "heads/builder/demo". The create endpoint wants the FULL
                   # "refs/heads/..." in the body; the create requestTransform adds the prefix.
                   #
-                  # The pattern is the GUARD, and it is the reason this shape is safe to ship: a CR
-                  # carrying the full form is rejected at ADMISSION instead of creating a branch the
-                  # observe verb can never address (a silent create->422 loop). `pattern` survives
-                  # CRD generation verbatim (plumbing v1.14.2 crdgen/transpile.go:500). RE2 has no
-                  # lookahead, so it is an allow-list, not a negation of "refs/".
+                  # The pattern is the INTENDED GUARD: a CR carrying the full form should be rejected
+                  # at ADMISSION instead of creating a branch the observe verb can never address (a
+                  # silent create->422 loop). RE2 has no lookahead, so it is an allow-list, not a
+                  # negation of "refs/". NOTE (corrected 2026-10-28): this doc previously claimed
+                  # `pattern` "survives CRD generation verbatim" — it does NOT. oasgen drops every
+                  # validation keyword at its OpenAPI->Schema adapter (crdgen would carry it, but the
+                  # adapter never hands it one), so the guard does not reach spec.ref. Fixed upstream in
+                  # oasgen-provider #249 (PR #250), unreleased; documented-only until the chart runs a
+                  # release carrying it. Verified live on 0.36.0 — see the §4 validation note.
                   pattern: '^(heads|tags)/.+'
                 sha:
                   type: string
@@ -493,6 +497,30 @@ never compared under any scope; default it to `false` in the OAS.
 > `spec.sha` is **optional** and the create resolves the base sha itself. The analysis below is kept
 > as the record of why the other options were rejected.
 
+> **Validation (2026-10-28, live on kind + published oasgen-provider 0.36.0).** The kind was
+> validated end-to-end against the real GitHub API (throwaway repo `krateo-blueprints/kog-gitref-val`):
+>
+> - **CRD generates** and `spec.required` is `[configurationRef, owner, ref, repo]` — **`sha` absent**
+>   (optional), so the `when.customResourceFieldAbsent: spec.sha` guard can fire.
+> - **sha-less create** resolves the base sha via the lookup chain: `GET /repos/{owner}/{repo}` then
+>   `GET …/git/ref/heads%2Fmain` (one each — see the `%2F` note below), and the create request body
+>   carried the resolved default-branch head sha; the branch landed at exactly that sha, no duplicate.
+> - **explicit `spec.sha`** (set to a dangling commit, not the default-branch head) **skips the
+>   lookups entirely** — both lookup GETs fired exactly once across two concurrent CRs, i.e. only for
+>   the sha-less one — and the branch landed at the author's sha, proving the guard both ways.
+> - **`requestTransform`** adds the `refs/` prefix (request body `ref` is full-form); **`responseTransform`**
+>   normalizes `status.ref` to short form; **delete** issues `DELETE …/git/refs/heads%2F… → 204` and the
+>   branch is removed with no orphan (the observe-verb arbiter, not the delete status code).
+> - **`%2F`**: the RDC percent-encodes the slash in multi-segment refs (`heads%2Fbuilder%2Fdemo`);
+>   GitHub decodes it (probed `git/ref/heads%2Fmain → 200` directly), so observe/lookup/delete all
+>   succeed. Multi-segment refs work end to end.
+> - **Found and fixed during validation:** the `defaultBranch` lookup needs `GET /repos/{owner}/{repo}`
+>   to exist in the document — a dependent lookup resolves against a declared path exactly as a verb
+>   does — which the first draft omitted (create failed `path not found: /repos/{owner}/{repo}`); the
+>   plain repo GET was added to the asset.
+> - **Known gap (oasgen #249/#250):** the `pattern` admission guard does not reach the CRD; documented-only
+>   until the chart runs an oasgen release carrying #250. §5 trap 2.
+
 **Back today, with one caveat — and the caveat is a CR-contract change, not a workaround.**
 
 - **observe, update, delete: fully native, no caveat.** Shape B needs three inline jq
@@ -522,10 +550,15 @@ Traps specific to this kind, in the order they bite:
 1. **`sha` must not be comparable.** Grep the RestDefinition for any `responseTransform` or
    `fieldMapping` writing a root-level `sha`. If one exists, the controller will PATCH the
    branch backwards. This is the highest-severity defect available in this file (§3.3).
-2. **Which ref form is `spec.ref`?** Shape B's `pattern: '^(heads|tags)/.+'` must be present
-   in the OAS and must reach the generated CRD (`kubectl explain gitref.spec.ref`, or read
-   the CRD). Without it, an author writing `refs/heads/x` gets a green create followed by a
-   permanent create→422 loop with no error pointing at the cause.
+2. **Which ref form is `spec.ref`?** Shape B's `pattern: '^(heads|tags)/.+'` is present in the
+   OAS (on both the create body `ref` and the `ref` path parameter). It does **not** currently
+   reach the generated CRD: oasgen drops all validation keywords at its OpenAPI→Schema adapter
+   (oasgen-provider **#249**, PR **#250**, unreleased), confirmed live on 0.36.0 (`kubectl get crd
+   gitrefs… -o jsonpath` on `spec.properties.ref.pattern` → absent). So until the chart runs an
+   oasgen release carrying #250 the guard is **documented-only**: an author writing `refs/heads/x`
+   gets a green create then a permanent create→422 loop with no error pointing at the cause. The
+   pattern is kept in the OAS (RE2-clean, so install-safe once #250 lands) so it becomes a real
+   admission guard automatically on that bump.
 3. **Every response-side `ref` mapping needs its identity pin.** `ref` is the identifier; a
    `fieldMapping` that reads it without another entry writing to `ref` deletes it from the
    body, breaking both `populateStatusFields` and the comparison (§3, fact 3). Shape B avoids
