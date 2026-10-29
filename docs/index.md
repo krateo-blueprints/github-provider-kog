@@ -73,6 +73,10 @@ covered.
   Configuration CRs, drive the kinds, and verify.
 - [configuration](./configuration.md) — the whole surface: the one chart value, the
   RestDefinition mappings, and the invariants that must hold.
+- [upgrading](./upgrading.md) — upgrades that cross an oasgen-immutable field: the
+  pre-roll immutable-field gate (oasgen-provider #290) and the `PullRequest`
+  `identifiers` `[number]`→`[head, base]` migration — pause the composition-rendered
+  CRs, delete+recreate the CRD, re-adopt via `findby`.
 - [api](./api.md) — the generated CRDs (the 30 resource kinds + their
   `<Kind>Configuration`) and the CompositionDefinition the CDC derives from
   `values.schema.json`.
