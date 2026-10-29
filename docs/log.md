@@ -89,11 +89,34 @@ Composition deleted/re-rendered → cdc `drainFinalizerBoundChildren`, which *es
 through by design, cdc #108 — is guarded by `helm.sh/resource-policy: keep` on the rendered objects; a
 kind rename is not that path.)
 
-github-provider-kog itself: 0.6.0 is safe on fresh clusters and on krateo-057 (0 instances). The
-krateo-demo roll is held until the finalizer-patch procedure above is **rehearsed** — github-provider-kog
-is the right place to validate it for the ecosystem (blast radius: one GitHub deployment record, versus
-ironic-operator-kog's rack of HPE blades facing the identical `Node`→`nodes` rename), asserting both
-directions: patched finalizer → no external DELETE, and **intact** finalizer → the DELETE does fire.
+github-provider-kog itself: 0.6.0 is safe on fresh clusters and on krateo-057 (0 instances).
+
+**Rehearsed and verified (2026-10-29)** on a throwaway kind cluster (k8s **v1.36.1**, RDC
+`rest-dynamic-controller:0.38.0`, digest `sha256:1f2cdf22305b6617b55596d5c8a2b0ccca8708f2e3f8a99f4dce3bed1d4e8146`)
+against the real GitHub Deployments API, using the shipped `RepoDeployment` kind (the pre-rename
+`Deployment` kind is itself refused by the #200 guard on 0.38.0 — a bonus re-confirmation). Every
+`RepoDeployment` CR carried exactly `composition.krateo.io/finalizer` **even after a successful reconcile
+that created a real deployment record**. Four delete arms, external DELETE read off the RDC request log
+and confirmed by the record's fate on GitHub:
+
+- **strip finalizer → delete:** no external DELETE, record survived.
+- **control (sole finalizer intact, no orphan):** DELETE fired, record 404 — proving the null results are real.
+- **`deletion-policy=orphan` + sole finalizer:** no DELETE, record survived (synchronous reap; no GET/DELETE in the log at all).
+- **orphan + a second finalizer:** DELETE fired, record 404 — the log shows **GET then DELETE**, i.e. the object survived the governed-finalizer removal and the fall-through ran. Orphan is defeated by any second finalizer.
+
+So the deterministic model holds (no race; **multiplicity** is the variable, not timing), and
+strip-the-governed-finalizer-first is the verified-safe migration. Caveat worth keeping: a second
+finalizer protects the local object only from **that** delete pass, not permanently — the two-finalizer
+CR was reaped by a later pass once the other holder released, so "a second finalizer keeps it alive" is
+half true.
+
+**Verified runbook for the krateo-demo roll** (when it eventually takes 0.6.0): (1) check which finalizer
+the old-kind CRs carry on the *target* cluster — `kubectl get <kind>.github.krateo.io -A -o
+jsonpath='{.items[*].metadata.finalizers}'`; (2) per CR, **strip the finalizer first, then delete** (the
+two commands above) — never delete with it intact, never rely on `deletion-policy=orphan`; (3) only then
+remove the old RestDefinition (oasgen's `deploy.go:437` blocks the CRD drop while instances exist, so a
+premature RD removal just stalls — it does not cascade). Shared with the ironic-operator-kog session for
+its identical `Node`→`nodes` rename against hardware.
 
 ## 2026-10-28 — `GitRef` restored natively: dependent lookups make a sha-less create work (30 kinds)
 
