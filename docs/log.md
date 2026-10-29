@@ -44,13 +44,18 @@ resources all survive. There is no cascade to race and no timing window. krateo-
 (checked, clean); a mistaken roll to krateo-demo's `tenant-acme`/`globex` children would **stall, not
 destroy**.
 
-**Annotation correction (2026-10-29), twice over.** An earlier version of this entry named
-`krateo.io/deletion-policy=orphan` on the Composition as the safeguard; a first correction then
-over-shot to "it isn't a real annotation." Both wrong. It **is** real — `provider-runtime` `pkg/meta/meta.go`
-(`DeletionPolicyOrphan`, read by `meta.ShouldDelete`) — and it is a **managed-resource (CR) annotation,
-not a Composition one** (which is why core-provider's grep of *their* tree missed it). **But RDC never
-calls `ShouldDelete`** (`grep -rn ShouldDelete` over oasgen+RDC → zero hits), so putting it on a KOG CR
-does nothing today. Tracked as **oasgen-provider#276**. So it is not a working lever for KOG CRs.
+**Annotation (`krateo.io/deletion-policy=orphan`), after four code-backed passes — don't rely on it.**
+It is real and lives in **unstructured-runtime** (`pkg/meta`), it's a **managed-resource (CR) annotation**
+(not a Composition one — which is why core-provider's grep of *their own* tree missed it), and RDC
+**does** honour it: RDC links unstructured-runtime (v1.4.0), whose worker removes the finalizer when the
+policy is orphan. (An interim pass wrongly concluded "RDC never calls `ShouldDelete`" — that grep was
+against RDC's own tree, not its dependency: a false negative.) **But it is non-deterministic — it races.**
+The worker removes the finalizer with **no early return**, so execution falls through to `handleDelete`,
+which fetches the object first; if that fetch wins the apiserver reap, the external DELETE fires anyway
+on the very pass that honoured the policy. So an orphan-annotated delete is a timing coin-flip. The
+missing-early-return bug is tracked as **oasgen-provider#276** (fix belongs in unstructured-runtime). And
+`krateo.io/management-policy: observe-delete` forces `ShouldDelete` true, silently defeating orphan. So
+the annotation is NOT a dependable lever; the deterministic route below is.
 
 **Completing a rename migration on a populated cluster** (so the old RD can finally be removed) means
 clearing the old-kind CRs **without firing their finalizers**. The hazard: reaching zero by *deleting*
