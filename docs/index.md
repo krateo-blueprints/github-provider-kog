@@ -38,7 +38,7 @@ itself.
 | **Access** | `Team`, `TeamRepo`, `TeamMembership`, `Collaborator`, `OrgMembership` |
 | **Repository configuration** | `RepoWebhook`, `OrgWebhook`, `DeployKey`, `Environment`, `RepoRuleset`, `OrgRuleset`, `Autolink`, `BranchProtection` |
 | **CI/CD** | `ActionsVariableRepo`, `ActionsVariableOrg`, `EnvironmentVariable`, `RunnerGroup`, `DeploymentBranchPolicy`, `Workflow` |
-| **Work tracking** | `Label`, `Milestone`, `Issue`, `PullRequest`, `Release`, `Deployment` |
+| **Work tracking** | `Label`, `Milestone`, `Issue`, `PullRequest`, `Release`, `RepoDeployment` |
 | **Governance** | `CustomProperty`, `CodeSecurityConfig`, `AutomatedSecurityFixes` |
 
 Four facts hold across the whole set:

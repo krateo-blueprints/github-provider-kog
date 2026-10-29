@@ -161,7 +161,7 @@ commit `.github/workflows/release.yaml` by some other route first, or point
 | `test-gitref.yaml` | the `builder/demo` branch ref on `demo-destination` — base sha resolved from the default branch when `sha` is omitted (needs oasgen-provider ≥ 0.38.0) |
 | `test-pullrequest.yaml` | a PR from `builder/demo-branch` into `main` |
 | `test-release.yaml` | release `1.0.0`, creating the tag from `main` |
-| `test-deployment.yaml` | a deployment record of `main` to `staging` |
+| `test-repodeployment.yaml` | a deployment record of `main` to `staging` |
 
 The label and the milestone come before the issue that references them — and the issue
 references the milestone by the **number** GitHub assigns, not by title:
@@ -176,7 +176,7 @@ $ kubectl apply -f chart/samples/test-issue.yaml
 
 Deleting the `Issue` CR does not delete the issue — GitHub's REST API cannot — it only
 stops Krateo tracking it. Close it by setting `state: closed` instead. Deleting the
-`Deployment` CR does delete the deployment record; re-deploying means a new CR, since
+`RepoDeployment` CR does delete the deployment record; re-deploying means a new CR, since
 GitHub has no update endpoint for one.
 
 ### Governance

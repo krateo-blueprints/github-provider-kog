@@ -11,6 +11,42 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-10-29 — `Deployment` kind renamed to `RepoDeployment` (fresh-install blocker, 0.6.0)
+
+**A fresh install of any version carrying the `Deployment` kind cannot converge on oasgen-provider
+≥ 0.32.0.** `kind: Deployment` in group `github.krateo.io` generates the plural `deployments`, which
+`apps/v1` already serves; oasgen's shadowing guard ([krateo-platformops/oasgen-provider#200](https://github.com/krateo-platformops/oasgen-provider/issues/200),
+since 0.32.0) **refuses to create** a CRD whose plural or singular collides with a built-in, so the
+RestDefinition `…-deployment` stays `Creating`/`ReconcileError` and the whole chart never reaches
+Ready. It had gone unnoticed because the guard only **warns** where the CRD already exists (krateo-057
+has had it for weeks, unaffected) — it bites only a FRESH cluster. Surfaced by the snowplow session on
+a fresh install (installer 0.3.467, oasgen 0.39.0).
+
+**Fix: rename the kind to `RepoDeployment`** (→ plural `repodeployments`, collision-free; matches the
+chart's repo-scoped naming). Same GitHub repository Deployments API, same verbs. An authoritative
+screen of all 30 kinds against a live cluster's non-CRD api-resources (plural **and** singular)
+confirmed `Deployment` is the only collision; `DeploymentBranchPolicy` → `deploymentbranchpolicies` is
+clear and is untouched. Files renamed `*-deployment.yaml` → `*-repodeployment.yaml`; `appVersion`
+→ `0.1.4`.
+
+**Fresh clusters: nothing to migrate** — the rename alone converges (no existing `deployments.github.krateo.io`
+CRs).
+
+**Existing clusters are a migration, because the kind has a `DELETE` verb.** A naive rename-upgrade
+removes the old RestDefinition; oasgen then deletes `deployments.github.krateo.io` unconditionally and
+cascade-deletes its CRs, whose finalizers call `DELETE /repos/{owner}/{repo}/deployments/{id}` —
+**destroying the real GitHub deployment records**. So before the renamed chart reaches a cluster that
+may hold instances (krateo-demo's `tenant-acme`/`globex` children are the open case; krateo-057 itself
+has **0** instances, checked), `krateo.io/deletion-policy=orphan` must be on the Composition **and
+reconciled first** (applying it afterwards is too late). But orphan is a **holding state, not an end
+state**: it keeps the old RestDefinition, its CRD, and its RDC controller alive — so the `deployments`
+collision persists on that cluster, two controllers run for one logical resource, and the orphaned
+RestDefinition has no Composition owner and is never touched by a chart upgrade again. The completing
+step: migrate any instances to `RepoDeployment`, confirm **zero** CRs on the old kind, then delete the
+orphaned RestDefinition — at which point oasgen removes the old CRD (no CRs → no finalizers → no GitHub
+records at risk) and the ambiguity goes with it. That final condition is the same zero-instance gate
+applied on 057, just applied later.
+
 ## 2026-10-28 — `GitRef` restored natively: dependent lookups make a sha-less create work (30 kinds)
 
 `GitRef` is back — the chart's 30th kind — and the plugin stays gone. The one blocker

@@ -58,7 +58,7 @@ item path.
 | `Issue` | `POST /repos/{owner}/{repo}/issues` | open and update an issue (no delete — REST has none) |
 | `PullRequest` | `POST /repos/{owner}/{repo}/pulls` | open and update a pull request (no delete, and no close from spec) |
 | `Release` | `POST /repos/{owner}/{repo}/releases` | a release |
-| `Deployment` | `POST /repos/{owner}/{repo}/deployments` | an immutable deployment record |
+| `RepoDeployment` | `POST /repos/{owner}/{repo}/deployments` | an immutable deployment record |
 
 **Governance**:
 

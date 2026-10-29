@@ -48,7 +48,7 @@ Three patterns recur across the set and are worth reading once:
   `Release`'s `release_id` / `status.id` shape, shared by `Milestone`, `Issue`,
   `RepoWebhook`, `OrgWebhook`, `DeployKey`, `Autolink`, `RunnerGroup`,
   `DeploymentBranchPolicy`, `RepoRuleset`, `OrgRuleset`, `CodeSecurityConfig` and
-  `Deployment`. `Team` uses the same shape on `team_slug`, and `fieldMapping` rather than
+  `RepoDeployment`. `Team` uses the same shape on `team_slug`, and `fieldMapping` rather than
   `requestFieldMapping`.
 - **PUT as create *and* update.** Where GitHub exposes one idempotent upsert,
   `create` and `update` name the same method and path: `Collaborator`, `OrgMembership`,
@@ -102,7 +102,7 @@ Three patterns recur across the set and are worth reading once:
 | `PullRequest` | `head`, `base` | Identity is head+base (#14), so a `findby` can recover a CR that lost `status.number`. `pull_number` excluded, sourced from `status.number`; get/update bind it from there, so group-A (number present) still observes via `get` — identifiers drive findby MATCHING only. No delete verb (GitHub REST has none), and no close-from-spec either (`state` is PATCH-body-only, so it never reaches the spec). Every verb (create/get/update/findby) carries the SAME `responseTransform` that rewrites GitHub's `head`/`base` objects to their branch strings — `base` always `.ref`, `head` `.label` for a cross-repo (fork) PR and `.ref` otherwise — applied before each response populates status, so `status.head`/`status.base` are always strings. `status` also carries `merged` (a plain boolean) and `merged_at` (an RFC3339 timestamp, null until merged) via `additionalStatusFields`: `merged` distinguishes a merged PR from a closed-but-unmerged one, which `state` alone cannot, and `merged_at` carries when it merged. All only update while the CR keeps being re-observed. A CR that never recorded `status.number` recovers on its next reconcile via the `findby` on head/base (`GET /repos/{owner}/{repo}/pulls`, `identifiersMatchPolicy: AND`), which normalizes each list item before matching — requires **oasgen-provider >= 0.25.0**; see [design-pullrequest §8](./design-pullrequest.md). |
 | `Issue` | `number` | `issue_number` excluded, sourced from `status.number`. No delete verb (GitHub REST has none). `labels`, `assignees` and `milestone` are create-only: GitHub returns them as objects where the request takes strings and an integer. |
 | `Release` | `id` | `release_id` excluded, sourced from `status.id`. `generate_release_notes` is create-only. |
-| `Deployment` | `id` | `deployment_id` excluded, sourced from `status.id`. No update verb. `auto_merge` is **defaulted `false`** in the asset, against GitHub's own default of `true`; `required_contexts` is create-only; GitHub's `oneOf`-typed `payload` is not modelled. Status carries `original_environment`, not `environment` — see [api](./api.md). |
+| `RepoDeployment` | `id` | `deployment_id` excluded, sourced from `status.id`. No update verb. `auto_merge` is **defaulted `false`** in the asset, against GitHub's own default of `true`; `required_contexts` is create-only; GitHub's `oneOf`-typed `payload` is not modelled. Status carries `original_environment`, not `environment` — see [api](./api.md). |
 
 **Governance**
 
@@ -128,7 +128,7 @@ Three patterns recur across the set and are worth reading once:
 | `updatable` | `Repository`, `Team`, `TeamRepo`, `TeamMembership`, `Collaborator`, `OrgMembership`, `RepoWebhook`, `OrgWebhook`, `Environment`, `RepoRuleset`, `OrgRuleset`, `BranchProtection`, `ActionsVariableRepo`, `ActionsVariableOrg`, `EnvironmentVariable`, `RunnerGroup`, `DeploymentBranchPolicy`, `Label`, `Milestone`, `Issue`, `PullRequest`, `Release`, `CustomProperty`, `CodeSecurityConfig` | 24 |
 | default `fullSpec` (unset) | `Workflow`, `AutomatedSecurityFixes` | 2 |
 | `fullSpec` (set explicitly) | `Autolink` | 1 |
-| `identifiersAndStatus` | `DeployKey`, `Deployment`, `GitRef` | 3 |
+| `identifiersAndStatus` | `DeployKey`, `RepoDeployment`, `GitRef` | 3 |
 
 `updatable` requires **oasgen-provider ≥ 0.23.0** and an update verb; it derives the
 compared set from the OAS update body, so a field the update cannot send is never
@@ -218,7 +218,7 @@ its `rd-<kind>.yaml`:
   comment) could not be verified read-only. `identifiersAndStatus` with a status list
   containing no spec field makes the projected compared set empty: a key that exists is a
   key that is up to date, and a deleted one is still detected because the GET 404s.
-- **`Deployment`** has no update verb because a deployment is an immutable historical
+- **`RepoDeployment`** has no update verb because a deployment is an immutable historical
   record. Its create-only `auto_merge` and `required_contexts` are never echoed and are
   therefore skipped, but the fields the GET *does* echo would be compared under `fullSpec`
   with no update call to fix a difference — `environment` above all, which a CI job

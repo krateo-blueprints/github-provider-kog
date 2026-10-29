@@ -123,7 +123,7 @@ authoring one are written out in full below the tables.
 | `Issue` | create `POST /repos/{owner}/{repo}/issues`; get/update `GET`/`PATCH .../issues/{issue_number}` — **no delete verb** | `number` | `updatable` | `number`, `id`, `node_id`, `html_url`, `state`, `comments` |
 | `PullRequest` | create `POST /repos/{owner}/{repo}/pulls`; get/update `GET`/`PATCH .../pulls/{pull_number}` — **no delete verb**; the get verb carries a `responseTransform` | `number` | `updatable` | `number`, `html_url`, `state` |
 | `Release` | create `POST /repos/{owner}/{repo}/releases`; get/update/delete `GET`/`PATCH`/`DELETE .../releases/{release_id}` | `id` | `updatable` | `node_id`, `html_url`, `upload_url`, `created_at` |
-| `Deployment` | create `POST /repos/{owner}/{repo}/deployments`; get/delete `GET`/`DELETE .../deployments/{deployment_id}` — **no update verb** | `id` | `identifiersAndStatus` | `node_id`, `sha`, `url`, `statuses_url`, `original_environment`, `created_at` |
+| `RepoDeployment` | create `POST /repos/{owner}/{repo}/deployments`; get/delete `GET`/`DELETE .../deployments/{deployment_id}` — **no update verb** | `id` | `identifiersAndStatus` | `node_id`, `sha`, `url`, `statuses_url`, `original_environment`, `created_at` |
 
 **Governance** — org-level policy.
 
@@ -272,12 +272,12 @@ Renaming a team (editing `spec.name`) converges. The PATCH is addressed by the s
 the whole team, so `status.slug` is repopulated and the next observe addresses the new
 slug.
 
-### `Deployment` — `auto_merge` is pinned `false`
+### `RepoDeployment` — `auto_merge` is pinned `false`
 
 A deployment is an immutable historical record: GitHub's API here is create/read/delete
 with **no update verb**, which is why this kind uses `compareScope:
 identifiersAndStatus` — nothing else could be fixed even if it were compared. Changing a
-Deployment CR's spec is not an update; it is a request for a *new* deployment, and should
+RepoDeployment CR's spec is not an update; it is a request for a *new* deployment, and should
 be a new CR.
 
 `spec.auto_merge` defaults to **`false`** in `chart/assets/deployment.yaml`, overriding
