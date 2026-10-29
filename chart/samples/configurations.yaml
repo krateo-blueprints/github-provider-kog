@@ -146,7 +146,7 @@ spec:
         key: token
 ---
 apiVersion: github.krateo.io/v1alpha1
-kind: DeploymentConfiguration
+kind: RepoDeploymentConfiguration
 metadata:
   name: github-blueprints-config
   namespace: krateo-system

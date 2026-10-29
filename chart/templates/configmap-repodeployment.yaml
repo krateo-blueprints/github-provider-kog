@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-repodeployment
+  namespace: {{ .Release.Namespace }}
+data:
+  # NOT tpl-rendered, like configmap-repository.yaml: this kind (RepoDeployment) is fully native,
+  # every verb goes straight to api.github.com, and the asset contains no template action.
+  repodeployment.yaml: |
+{{ .Files.Get "assets/repodeployment.yaml" | indent 4 }}

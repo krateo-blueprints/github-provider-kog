@@ -4,6 +4,9 @@
 # this CR's spec will NOT change the deployment (the RestDefinition uses compareScope
 # `identifiersAndStatus` for exactly that reason). To deploy again, apply a new CR.
 #
+# Kind is `RepoDeployment` (not `Deployment`): a `Deployment` kind collides with k8s apps/v1
+# and oasgen-provider refuses to create its CRD on a fresh cluster. Same GitHub Deployments API.
+#
 # `auto_merge: false` is spelled out here for readability, but it is also the CRD default
 # (assets/deployment.yaml pins it, deliberately against GitHub's own default of true):
 # left true, GitHub responds to a ref that is behind the default branch by merging instead
@@ -14,7 +17,7 @@
 # checking. Omit it and GitHub verifies every unique context and answers 409 while any is
 # failing or pending — a loud failure, which is the right default to leave alone.
 apiVersion: github.krateo.io/v2022-11-28
-kind: Deployment
+kind: RepoDeployment
 metadata:
   name: test-demo-deployment
   namespace: krateo-system

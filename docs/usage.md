@@ -74,7 +74,7 @@ it needs grow with the groups you actually use.
 
 | kinds | what the token must be allowed to do | classic scope |
 |---|---|---|
-| `Issue`, `PullRequest`, `Label`, `Milestone`, `Release`, `Deployment` | write issues, labels, releases and deployments on one repository | `repo` |
+| `Issue`, `PullRequest`, `Label`, `Milestone`, `Release`, `RepoDeployment` | write issues, labels, releases and deployments on one repository | `repo` |
 | `RepoWebhook`, `DeployKey`, `Environment`, `DeploymentBranchPolicy`, `RepoRuleset`, `BranchProtection`, `Autolink`, `Collaborator`, `AutomatedSecurityFixes`, `ActionsVariableRepo`, `EnvironmentVariable`, `Workflow` | administer one repository's settings | `repo` |
 | `Repository` | create and delete repositories in the organization | `repo`, and the org must permit the token to create repositories |
 | `Team`, `TeamMembership`, `TeamRepo`, `OrgMembership`, `OrgWebhook`, `OrgRuleset`, `ActionsVariableOrg`, `RunnerGroup`, `CustomProperty`, `CodeSecurityConfig` | administer the organization | `admin:org`, on top of `repo` |
@@ -423,7 +423,7 @@ spec:
 | `Issue` | an issue; its number lands on `status.number` | `Repository` (+ `Label` / `Milestone` if referenced) |
 | `PullRequest` | a pull request; its number lands on `status.number` | `Repository` (+ the head branch must exist and differ from base) |
 | `Release` | a release, creating its tag if absent | `Repository` |
-| `Deployment` | an immutable deployment record | `Repository` (+ `Environment` if the target is gated) |
+| `RepoDeployment` | an immutable deployment record | `Repository` (+ `Environment` if the target is gated) |
 
 ```yaml
 apiVersion: github.krateo.io/v1alpha1
@@ -464,7 +464,7 @@ spec:
   `"D73A4A"` reads as permanent drift because GitHub echoes it lower-cased, and editing
   `name` is not a rename — GitHub renames through a second `new_name` body field the CR
   cannot carry, so it creates a *second* label and orphans the first.
-- **`Deployment` is an immutable record.** GitHub has no update endpoint for one, which
+- **`RepoDeployment` is an immutable record.** GitHub has no update endpoint for one, which
   is why the kind uses `compareScope: identifiersAndStatus`: editing the spec changes
   nothing, and deploying again means applying a new CR. Keep `auto_merge: false` (the
   CRD default, deliberately against GitHub's own `true`) — left true, a ref behind the

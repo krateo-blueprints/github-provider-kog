@@ -1,13 +1,19 @@
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
-  name: {{ .Release.Name }}-deployment
+  name: {{ .Release.Name }}-repodeployment
   namespace: {{ .Release.Namespace }}
 spec:
-  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-deployment/deployment.yaml
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-repodeployment/repodeployment.yaml
   resourceGroup: {{ .Values.resourceGroup }}
   resource:
-    kind: Deployment
+    # Kind is RepoDeployment, NOT Deployment: a `Deployment` in any group generates the plural
+    # `deployments`, which `apps/v1` already serves — oasgen-provider refuses to mint a CRD whose
+    # plural/singular collides with a built-in (shadowing guard, oasgen-provider #200, since 0.32.0),
+    # so a `Deployment` kind blocks the whole chart on a FRESH cluster (it only warns where the CRD
+    # already exists). This is the GitHub repository Deployments API; `RepoDeployment` -> plural
+    # `repodeployments` is collision-free and matches the chart's repo-scoped naming.
+    kind: RepoDeployment
     # Server-assigned id, as for Release and PullRequest.
     identifiers:
       - id
