@@ -28,7 +28,7 @@ spec:
     # field; get/update/delete source it from status.id via the requestFieldMapping below.
     # Same shape as rd-pullrequest.yaml's pull_number/status.number.
     #
-    # This is deliberately NOT the upstream krateoplatformops-blueprints approach, which adds a
+    # This is deliberately NOT the upstream approach, which adds a
     # `findby` verb over /orgs/{org}/actions/runner-groups to recover the id by name. It does not
     # need to: GitHub's create already returns the whole group including `id`, so the cheaper
     # excludedSpecFields + requestFieldMapping pattern already in this chart is enough, and it
