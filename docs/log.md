@@ -35,17 +35,31 @@ CRs).
 **Existing clusters are a migration, because the kind has a `DELETE` verb.** A naive rename-upgrade
 removes the old RestDefinition; oasgen then deletes `deployments.github.krateo.io` unconditionally and
 cascade-deletes its CRs, whose finalizers call `DELETE /repos/{owner}/{repo}/deployments/{id}` —
-**destroying the real GitHub deployment records**. So before the renamed chart reaches a cluster that
-may hold instances (krateo-demo's `tenant-acme`/`globex` children are the open case; krateo-057 itself
-has **0** instances, checked), `krateo.io/deletion-policy=orphan` must be on the Composition **and
-reconciled first** (applying it afterwards is too late). But orphan is a **holding state, not an end
-state**: it keeps the old RestDefinition, its CRD, and its RDC controller alive — so the `deployments`
-collision persists on that cluster, two controllers run for one logical resource, and the orphaned
-RestDefinition has no Composition owner and is never touched by a chart upgrade again. The completing
-step: migrate any instances to `RepoDeployment`, confirm **zero** CRs on the old kind, then delete the
-orphaned RestDefinition — at which point oasgen removes the old CRD (no CRs → no finalizers → no GitHub
-records at risk) and the ambiguity goes with it. That final condition is the same zero-instance gate
-applied on 057, just applied later.
+**destroying the real GitHub deployment records**. krateo-057 has **0** instances (checked), so its
+upgrade is clean; krateo-demo's `tenant-acme`/`globex` children are the open case and must be confirmed
+empty first.
+
+**Correction (2026-10-29): `krateo.io/deletion-policy=orphan` is NOT a real annotation** — an earlier
+version of this entry named it as the safeguard. core-provider grepped its tree: no such annotation
+exists; applying it is a silent no-op (clean apply, zero protection). There are two distinct
+teardown paths and neither is gated by that string:
+
+- **(a) Composition deleted / re-rendered** → the cdc's `hc.Uninstall` runs `drainFinalizerBoundChildren`,
+  which deletes finalizer-bearing children **first and waits** so they tear down their remote state
+  while credentials still exist (oasgen/cdc #108). That path *escorts the external DELETE through by
+  design.* The real lever is **`helm.sh/resource-policy: keep`** on the rendered objects (helm honours
+  it); it does nothing for path (b).
+- **(b) RestDefinition removed → oasgen reaps the generated CRD → apiserver cascade.** Neither helm nor
+  cdc is in this path; the only thing between the cascade and the external DELETE is **the finalizer,
+  which is oasgen's.** A **kind rename is this path.** The lever is therefore either a true oasgen orphan
+  semantic that stops its own finalizer from calling the remote (**UNCONFIRMED — question is out to the
+  oasgen-provider session**), or **removing the finalizers from the CRs before the CRD is reaped** (a CR
+  with no finalizer deletes locally; the remote object survives).
+
+So the only **verified**-safe shape for a rename on a populated cluster is: ensure the old kind has
+**zero CRs (or zero finalizers) before its RestDefinition is removed**, so no finalizer ever fires — the
+same zero-instance gate that made 057 safe, just applied deliberately. **Hold 0.6.0 off krateo-demo
+until the oasgen-provider session confirms which path-(b) mechanism actually exists.**
 
 ## 2026-10-28 — `GitRef` restored natively: dependent lookups make a sha-less create work (30 kinds)
 
