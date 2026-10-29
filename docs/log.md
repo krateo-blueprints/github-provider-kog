@@ -57,6 +57,20 @@ missing-early-return bug is tracked as **oasgen-provider#276** (fix belongs in u
 `krateo.io/management-policy: observe-delete` forces `ShouldDelete` true, silently defeating orphan. So
 the annotation is NOT a dependable lever; the deterministic route below is.
 
+Whether orphan governs a given CR at all comes down to **which finalizer that CR carries** — the worker
+removes exactly `composition.krateo.io/finalizer` and nothing else. Measured on 057: **every
+github.krateo.io CR carries exactly that finalizer** (confirmed on the 15 `Repository` and 17
+`PullRequest` CRs; it is the only finalizer value present across the group). So for github-provider-kog
+the annotation does govern our CRs (it is *not* inert — that was true of provider-runtime kinds like
+`git.krateo.io/LocalResource`, which carry `finalizer.managedresource.krateo.io`, a different runtime's
+finalizer the block can't touch), and the strip command below targets the correct name. `Deployment`
+(now `RepoDeployment`) had 0 instances on 057, so a migration runbook must **check the finalizer on the
+actual cluster being migrated** rather than assume — `kubectl get <kind>.github.krateo.io -A -o
+jsonpath='{.items[*].metadata.finalizers}'`. (Meta-lesson from four wrong answers in one afternoon: each
+came from pinning two of three axes and assuming the third — *which repo* the annotation lives in
+[dependency, not core-provider's tree], *which runtime version* [rdc `unstructured-runtime` v1.4.0 vs cdc
+v1.6.0], and *which finalizer the CR carries*.)
+
 **Completing a rename migration on a populated cluster** (so the old RD can finally be removed) means
 clearing the old-kind CRs **without firing their finalizers**. The hazard: reaching zero by *deleting*
 the CRs is itself the destructive act — each delete fires `composition.krateo.io/finalizer` and the
