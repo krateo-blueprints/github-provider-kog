@@ -7,6 +7,12 @@ CRD has been generated**, which it refuses rather than applies. A refused upgrad
 the RestDefinition stays at its old shape, the CRD and all custom resources keep serving, and nothing
 is destroyed. But the new shape never takes until you perform the migration below.
 
+> **This runbook has been executed end-to-end on two clusters of deliberately different shape** —
+> krateo-057 (17 composition-rendered PullRequest CRs across 18 compositions, plus two orphaned RDs from a
+> partially-applied upgrade) and krateo-demo (0 PullRequest CRs, 0 owning compositions, the new kinds
+> arriving owned). Same ordering, same gates, same halt triggers on both; the shape differences are called
+> out inline. Both are now on installer build 0.3.473 at `identifiers: [head, base]`.
+
 ## Pre-roll gate: does this release cross an immutable field?
 
 Before rolling a new version onto an existing cluster, check — for **every** RestDefinition in the
@@ -72,6 +78,14 @@ plumbed onto the upgrade path at `helm/v3/config.go:62`). `TakeOwnership` skips 
 the **upgrade** path specifically, which is what a release at rev 37 takes. So the completed 0.6.0 apply
 adopts `gitref` and `repodeployment` with no "invalid ownership metadata" and nothing to delete or
 pre-annotate. (Source: core-provider, verified against the cdc apply code.)
+
+**This orphan state is specific to a *partially-applied* upgrade.** On a cluster where 0.4.0+ was never
+partially applied — a fresh install, or any cluster with no pre-existing `pullrequest` CRD to refuse
+against — the new kinds (`gitref`, `repodeployment`) are created **owned** on the first successful apply
+(`meta.helm.sh/release-name = github-provider-kog`, `Ready=True` directly), and there is nothing for
+`TakeOwnership` to adopt because they never existed unowned. Confirmed on krateo-demo: both arrived owned,
+no adoption step. So this whole section applies only when you are recovering 057's exact partial-apply
+state; on a clean cluster it is a no-op you can read past.
 
 Note the scope of `TakeOwnership`: it governs **only** helm's ownership gate. It does **not** relax
 immutable-field refusals — the `cannot patch "github-provider-kog-pullrequest"` error is the apiserver
@@ -148,6 +162,17 @@ may be **other, unrelated** unhealthy children too. Assert the stack can apply (
 is fully `Ready`. (On krateo-057: the cluster is converged on the 2.13.43 / 0.3.471 roll, umbrella
 `Synced=True`; the only unhealthy children are github-provider-kog itself and the unrelated
 `krateo-audit-worm` chart defect — neither blocks this migration. The installer confirms 057 readiness.)
+
+> **The destructive steps degenerate to no-ops on an empty population — there is no separate "empty
+> cluster" variant.** Re-read the live population at pre-flight (do not carry over an earlier survey). If a
+> cluster has **0** PullRequest CRs it has nothing to back up (step 0), no owning compositions to pause
+> (step 1a), nothing to delete or reap (step 2), and no re-adoption to assert (step 6) — those steps find
+> an empty set and pass. What always runs is the three-step spine: **pause the github-provider-kog
+> composition (1b) → delete the RestDefinition (3) → unpause (4)**. krateo-demo ran exactly this reduced
+> path (0 CRs, 0 BuilderPublish, 0 `deployments.github.krateo.io`, re-read live at pre-flight) and
+> converged in ~2 min; krateo-057 ran all six with the 18-composition pause and 17 per-CR assertions. Walk
+> the steps and let the empty ones no-op rather than deciding up front which to skip — the ordering, gates,
+> and halt triggers are identical either way.
 
 **0. Capture the baseline** (this is your re-adoption positive control):
 
@@ -230,6 +255,13 @@ stale. Corroborate cheaply: `helm history <release> -n krateo-system` shows no n
 `status.managed` is unchanged (a paused `Observe` cannot self-heal drift). cdc ≥ 2.13.40 emits the event;
 057 runs 2.13.43.
 
+> **core-provider 2.13.44 fixes #258:** a paused composition now reports
+> `Ready=True/ReconcileGracefullyPaused` even when it was `Unavailable` at pause time — the exact case that
+> would have made the condition gate wait forever. So on cdc ≥ 2.13.44 the condition becomes a usable gate
+> too. **Keep the Event as the primary gate regardless:** it is positive evidence emitted by the paused code
+> path itself and cannot be stale, whereas a condition reflects the last write and can lag. Treat the
+> condition as corroboration on ≥ 2.13.44, not a replacement.
+
 > **Announce the maintenance window.** Pausing the existing compositions only stops re-rendering of
 > *already-published* artifacts (on 057, all 17 represent completed publishes — `status.number` set, PR
 > exists — so nothing in flight is affected). But while a BuilderPublish is paused, a **new** publish
@@ -281,6 +313,11 @@ re-create from racing the teardown:
 kubectl -n krateo-system get restdefinition github-provider-kog-pullrequest   # expect: NotFound
 kubectl get crd pullrequests.github.krateo.io                                 # expect: NotFound
 ```
+
+> **`Undeploy` drops the CRD *before* the RD's own finalizer clears** (observed on both clusters). So for a
+> few seconds you will see `RD=Terminating, CRD=NotFound` — that is the **normal** teardown order, not a
+> stall. Wait for the RD to reach `NotFound` too before step 4; only a CRD still present after the RD is
+> gone, or a CRD stuck `Terminating`, indicates a blocked Undeploy.
 
 **4. Unpause the github-provider-kog composition — it re-creates the RD at `[head, base]`.** With both the
 RD and CRD gone, remove the pause annotations from the `github-provider-kog` composition only. Its next
@@ -349,6 +386,12 @@ match baseline). Do **not** wait for the umbrella to flip `Ready=True` — it ma
 unrelated reasons (on 057, the `krateo-audit-worm` chart defect is a separate unhealthy child). Check the
 `githubproviderkogs/.../github-provider-kog` child specifically, not the umbrella rollup.
 
+Expect a **one-cycle lag** between the component and the umbrella even on a clean run: on krateo-demo the
+`github-provider-kog` composition went `True/Available` while the umbrella still reported `managed children
+not healthy: githubproviderkogs/.../github-provider-kog`, and cleared on the next reconcile ~25s later.
+Assert on the component reaching `Ready`, then let the umbrella catch up a cycle later — do not read that
+transient as a failure.
+
 ### Stop conditions — halt and report rather than improvise
 
 - **After step 1:** if any of the 18 compositions (17 BuilderPublish + github-provider-kog) has **not**
@@ -359,8 +402,10 @@ unrelated reasons (on 057, the `krateo-audit-worm` chart defect is a separate un
   above all any sign of an external GitHub DELETE firing (there must be none; no delete verb) — HALT.
 - **After step 2:** if `kubectl get pullrequests.github.krateo.io -A` is not empty, HALT. Either a finalizer
   did not release or a composition was not actually paused and re-created a CR. Do not delete the RD.
-- **After step 3:** the CRD must reach `NotFound`. If it lingers `Terminating`, Undeploy is blocked
-  (usually a straggler instance or a CRD finalizer) — HALT and investigate; do not proceed to step 4.
+- **After step 3:** both the RD and the CRD must reach `NotFound`. The CRD reaches it *first* (Undeploy
+  drops the CRD, then the RD finalizer clears), so a brief `RD=Terminating, CRD=NotFound` is normal — wait
+  it out. Only a CRD that lingers `Terminating`, or is still present after the RD is gone, means Undeploy is
+  blocked (usually a straggler instance or a CRD finalizer) — HALT and investigate; do not proceed to step 4.
 - **After step 4:** if within a few minutes the RD is not `Ready` at `identifiers: [head, base]` **and** the
   CRD is not served, HALT **before** unpausing the BuilderPublishes — do not re-render CRs against a
   missing or wrong-shaped CRD. Investigate the github-provider-kog composition's apply.
