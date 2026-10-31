@@ -1,3 +1,12 @@
+---
+type: Runbook
+title: github-provider-kog — upgrading
+description: Upgrades that cross an oasgen-provider immutable field — the pre-roll immutable-field gate across all seven immutable fields read structurally off the live CRD, the orphaned-RestDefinition adoption via Helm TakeOwnership after a partially-applied upgrade, and the PullRequest identifiers migration from [number] to [head, base] (pause the composition-rendered CRs, delete the RestDefinition so Undeploy drops the CRD, unpause to regenerate at the new identity, re-adopt via findby). Validated end-to-end on krateo-057 and krateo-demo.
+resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
+tags: [krateo, upgrade, migration, oasgen-provider, pullrequest, restdefinition]
+timestamp: 2026-10-30T00:00:00Z
+---
+
 # Upgrading github-provider-kog
 
 Most upgrades of this chart are a plain `helm upgrade`: the RestDefinitions re-render,
