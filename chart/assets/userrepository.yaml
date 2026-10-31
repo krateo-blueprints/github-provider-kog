@@ -1,0 +1,175 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - User Repositories
+servers:
+  - url: https://api.github.com
+paths:
+  # CREATE is user-scoped: POST /user/repos creates a repository owned by the authenticated
+  # user (the token's account). This is the sibling of Repository's org-scoped create — a
+  # separate kind because a RestDefinition has exactly ONE create verb and cannot choose
+  # /orgs/{org}/repos vs /user/repos at runtime. No path parameter: the owner is the token.
+  "/user/repos":
+    post:
+      summary: Create a repository for the authenticated user
+      operationId: repos/create-for-authenticated-user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                homepage:
+                  type: string
+                private:
+                  type: boolean
+                visibility:
+                  type: string
+                has_issues:
+                  type: boolean
+                has_wiki:
+                  type: boolean
+                has_projects:
+                  type: boolean
+                # CREATE-ONLY and load-bearing, exactly as in Repository: a repo created with
+                # auto_init=false has no commit and no default branch, so a later GitRef or
+                # RepoContent aimed at it fails until someone pushes by hand.
+                auto_init:
+                  type: boolean
+                  default: true
+                gitignore_template:
+                  type: string
+                license_template:
+                  type: string
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
+  # GET/PATCH address the repo as /repos/{owner}/{name}. `owner` is the authenticated user's
+  # login — a spec field the author sets to their own username (it is NOT on the create path,
+  # which is /user/repos, so unlike Repository's `org` it serves the item path only). `name`
+  # serves both the create body and the item path. There is NO delete verb: deleting the CR
+  # ORPHANS the repository, it does not destroy it — the same deliberate choice Repository
+  # makes, so the oasgen-provider #125 CRD cascade (uninstall / RD-drop) can never delete a
+  # user's repositories. Restore delete only with the #125 guard and a per-CR opt-in.
+  "/repos/{owner}/{name}":
+    get:
+      summary: Get a repository
+      operationId: repos/get-user-repo
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
+    patch:
+      summary: Update a repository
+      operationId: repos/update-user-repo
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/name'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                # `name`, `private` and `visibility` are accepted by GitHub's PATCH but are
+                # DELIBERATELY NOT MODELLED HERE, for the identical reasons documented at length in
+                # repository.yaml: compared in the `updatable` set, `name` would let drift RENAME a
+                # live repo (307 redirect trap) and `private`/`visibility` would let a re-rendered
+                # consumer value flip the exposure of repositories that already exist (irreversible).
+                # All three remain CREATE-body fields, so the CRD and create-time behaviour are
+                # unchanged; only reconciling them as drift is gone, which is correct.
+                description:
+                  type: string
+                homepage:
+                  type: string
+                has_issues:
+                  type: boolean
+                has_wiki:
+                  type: boolean
+                has_projects:
+                  type: boolean
+                default_branch:
+                  type: string
+                archived:
+                  type: boolean
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    name:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Repository:
+      type: object
+      properties:
+        id:
+          type: integer
+        node_id:
+          type: string
+        name:
+          type: string
+        full_name:
+          type: string
+        html_url:
+          type: string
+        clone_url:
+          type: string
+        ssh_url:
+          type: string
+        default_branch:
+          type: string
+        private:
+          type: boolean
+        visibility:
+          type: string
+        description:
+          type: string
+        homepage:
+          type: string
+        has_issues:
+          type: boolean
+        has_wiki:
+          type: boolean
+        has_projects:
+          type: boolean
+        archived:
+          type: boolean
+security:
+  - accessToken: []

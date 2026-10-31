@@ -11,6 +11,16 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-10-31 — `UserRepository` added (user-owned repos, 32nd kind)
+
+`UserRepository` closes the one remaining feature gap versus the legacy `krateoplatformops/github-provider`: creating a repository under the **authenticated user** rather than an org. It is the user-owned sibling of `Repository` — a separate kind because a RestDefinition has exactly one create verb and cannot choose `POST /orgs/{org}/repos` vs `POST /user/repos` at runtime. `appVersion` → `0.1.6`; the chart is now **32 kinds**.
+
+- Create is `POST /user/repos` (no path parameter — the owner is the token account); get/update address `/repos/{owner}/{name}`, with `owner` a spec field set to the token user's own login (item-path only, not on create).
+- **No delete verb**, deliberately — deleting the CR orphans the repository, it does not destroy it, the same oasgen-provider #125 cascade-safety `Repository` takes.
+- `name`, `private` and `visibility` are kept out of the PATCH body for the identical reasons documented for `Repository`: a compared `name` would let drift rename a live repo, and compared `private`/`visibility` would flip the exposure of repos that already exist. `compareScope: updatable` is load-bearing for the same reason.
+
+Verified: `helm lint` clean; `helm template` renders 32 ConfigMaps + 32 RestDefinitions; `hack/assert-drift-invariants.py` and `hack/preflight-refs.py` pass.
+
 ## 2026-10-31 — `RepoContent` restored natively (31st kind)
 
 `RepoContent` — the last git-write kind still out (`Repository` → `GitRef` → `RepoContent` per file →

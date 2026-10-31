@@ -5,10 +5,10 @@ info:
 servers:
   - url: https://api.github.com
 paths:
-  # CREATE is org-scoped. GitHub has a second create endpoint, POST /user/repos, for
-  # user-owned repos; it is deliberately NOT modelled here, because a RestDefinition has one
-  # create verb and a resource cannot choose between two paths. Krateo destinations are
-  # org-owned. See docs/usage.md if a user-owned variant is ever needed.
+  # CREATE is org-scoped. GitHub's second create endpoint, POST /user/repos (user-owned
+  # repos), is modelled as a SEPARATE kind, UserRepository (assets/userrepository.yaml) —
+  # a RestDefinition has one create verb and a resource cannot choose between two paths, so
+  # the user-owned variant is its own RestDefinition rather than a branch of this one.
   "/orgs/{org}/repos":
     post:
       summary: Create an organization repository

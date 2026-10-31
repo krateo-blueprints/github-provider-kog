@@ -1,0 +1,47 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-userrepository
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-userrepository/userrepository.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: UserRepository
+    # The user-owned sibling of Repository: create is POST /user/repos (owned by the token's
+    # account), item verbs address /repos/{owner}/{name}. A separate kind because a
+    # RestDefinition has one create verb and cannot pick /orgs/{org}/repos vs /user/repos.
+    identifiers:
+      - name
+    additionalStatusFields:
+      - id
+      - node_id
+      - full_name
+      - html_url
+      - clone_url
+      - ssh_url
+      - default_branch
+    # updatable is LOAD-BEARING, identical to Repository: `private`/`visibility` are create-body
+    # fields the PATCH deliberately omits, and fullSpec would compare GitHub's GET echo of them
+    # back into the drift set and flip the exposure of repositories that already exist. Do NOT
+    # change to fullSpec and do not delete the line (the default IS fullSpec). hack/assert-drift-
+    # invariants.py asserts the same guarantee for Repository.
+    compareScope: updatable
+    configurationFields: []
+    verbsDescription:
+      - action: create
+        method: POST
+        path: /user/repos
+      - action: get
+        method: GET
+        path: /repos/{owner}/{name}
+      - action: update
+        method: PATCH
+        path: /repos/{owner}/{name}
+    # NO DELETE VERB, DELIBERATELY — same as Repository. Deleting this CR ORPHANS the GitHub
+    # repository; it does not destroy it. oasgen-provider deletes a RestDefinition's CRD
+    # unconditionally (SkipCRD:false), cascade-deleting every CR and running every finalizer; with
+    # a delete verb here that chain would end in DELETE /repos/{owner}/{name} — so removing this
+    # RestDefinition or uninstalling the chart would DESTROY every user repository it ever created.
+    # That is oasgen-provider #125. A leaked repo is an inconvenience; a destroyed one is not
+    # recoverable. Restore the verb only alongside the #125 guard and a per-CR opt-in.

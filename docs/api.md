@@ -1,7 +1,7 @@
 ---
 type: API
 title: github-provider-kog — API
-description: The CRDs this component brings into the cluster — the 31 resource kinds under github.krateo.io, all of them native, grouped by area, with their paths, identifiers, status fields and compareScope, the oasgen-generated <Kind>Configuration kind each one gets, and the CompositionDefinition the core-provider CDC derives from values.schema.json.
+description: The CRDs this component brings into the cluster — the 32 resource kinds under github.krateo.io, all of them native, grouped by area, with their paths, identifiers, status fields and compareScope, the oasgen-generated <Kind>Configuration kind each one gets, and the CompositionDefinition the core-provider CDC derives from values.schema.json.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, crd, compositiondefinition, github, oasgen-provider]
 timestamp: 2026-09-09T00:00:00Z
@@ -39,7 +39,7 @@ typed by `values.schema.json`, whose only knob is the scalar `resourceGroup`
 
 ## The generated `github.krateo.io` kinds
 
-oasgen-provider watches the **31** `RestDefinition`s and generates the CRDs below under
+oasgen-provider watches the **32** `RestDefinition`s and generates the CRDs below under
 `resourceGroup` (default `github.krateo.io`, group version `v1alpha1`), auto-deploying a
 `rest-dynamic-controller` per kind. Every resource CR carries a `spec.configurationRef`
 (added by oasgen from the OpenAPI `securityScheme`) naming the `<Kind>Configuration` that
@@ -48,14 +48,14 @@ holds its token wiring.
 **oasgen-provider ≥ 0.38.0 is required.** 0.38.0 is where the `GitRef` pattern admission
 guard reaches the generated CRD ([#249](https://github.com/krateo-platformops/oasgen-provider/issues/249)/#250);
 `GitRef`'s create resolves its base sha with a `dependentLookups` chain that landed in
-0.36.0; the `compareScope: updatable` that 24 of the 31 kinds declare needs ≥ 0.23.0, a
+0.36.0; the `compareScope: updatable` that 25 of the 32 kinds declare needs ≥ 0.23.0, a
 floor now subsumed by 0.38.0 ([configuration](./configuration.md)).
 
-**All 31 kinds are native.** Every verb goes straight to `api.github.com`, and the
+**All 32 kinds are native.** Every verb goes straight to `api.github.com`, and the
 normalizations GitHub's REST inconsistencies demand are expressed in the RestDefinition
 itself (static query parameters and headers, `fieldMapping` aliases, request/response jq
 transforms, `dependentLookups`, `notFoundBody` predicates). The chart ships **no runtime
-component of its own**: it renders 31 ConfigMaps and 31 RestDefinitions and nothing else —
+component of its own**: it renders 32 ConfigMaps and 32 RestDefinitions and nothing else —
 no Deployment, no Service, no image, no proxy. The only workloads involved are the
 `rest-dynamic-controller` deployments oasgen-provider creates per kind.
 
@@ -76,7 +76,7 @@ kind did, and what its native restoration took, is recorded in
 
 One row per kind: the verbs and their paths, the `identifiers` the RestDefinition
 declares, the `compareScope`, and the `additionalStatusFields` that land under `status`.
-`configurationFields` is empty on all 31 — the token wiring comes from the
+`configurationFields` is empty on all 32 — the token wiring comes from the
 `<Kind>Configuration`, never from spec fields. The kinds with a trap worth reading before
 authoring one are written out in full below the tables.
 
@@ -140,6 +140,7 @@ authoring one are written out in full below the tables.
 | kind | verbs | identifiers | `compareScope` | status |
 |---|---|---|---|---|
 | `Repository` | create `POST /orgs/{org}/repos`; get/update `GET`/`PATCH /repos/{org}/{name}`. **No delete verb** — deleting the CR orphans the repository, it does not destroy it (see below) | `name` | `updatable` | `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
+| `UserRepository` | create `POST /user/repos`; get/update `GET`/`PATCH /repos/{owner}/{name}` — **no delete verb** | `name` | `updatable` | `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
 
 ### `Repository` — create the destination repository
 
@@ -210,9 +211,10 @@ Setting this kind to `fullSpec` — or deleting the line, since `fullSpec` is th
 silently restores the hazard. The rule and its code evidence are in
 [configuration](./configuration.md).
 
-GitHub's second create endpoint, `POST /user/repos` (user-owned repositories), is
-deliberately not modelled: a `RestDefinition` has one create verb and cannot choose
-between two paths, and Krateo destinations are org-owned.
+GitHub's second create endpoint, `POST /user/repos` (user-owned repositories), is modelled
+by a separate kind, `UserRepository` (its row is in the table above): a `RestDefinition`
+has one create verb and cannot choose between two paths, so the user-owned create is its
+own kind. Krateo destinations are normally org-owned.
 
 ### `Collaborator` — `status.role_name` is the effective role, and can over-report
 
@@ -486,8 +488,10 @@ that survives the transform unchanged, which is why it is the identifier.
   and 204 with no body when it is on** — it never returns a body, so no status schema can
   be derived from it and observe has nothing to compare. `AutomatedSecurityFixes` is
   covered precisely because its GET *does* return a body (`enabled`, `paused`).
-- **`POST /user/repos`.** User-owned repository creation, covered under `Repository` above:
-  one create verb cannot choose between two paths, and Krateo destinations are org-owned.
+- **`POST /user/repos` is no longer absent.** User-owned repository creation is modelled by
+  the separate `UserRepository` kind — a `RestDefinition` has one create verb and cannot
+  choose between two paths, so the user-owned create is its own kind rather than a mode of
+  `Repository` (see the `Repository` / `UserRepository` rows above).
 - **The git-write kinds are no longer absent.** `RepoContent`, `PullRequest` and `GitRef`
   have all returned natively, after the proxy plugin the three shared was removed and
   publishing moved to `git-provider` (above): `RepoContent` via `status.sha` plus a
@@ -501,14 +505,14 @@ that survives the transform unchanged, which is why it is the identifier.
 
 ## The `<Kind>Configuration` kinds
 
-For each of the 31 resource kinds, oasgen generates a `<Kind>Configuration` CRD from the
+For each of the 32 resource kinds, oasgen generates a `<Kind>Configuration` CRD from the
 OpenAPI bearer `securityScheme` — `RepositoryConfiguration`, `TeamConfiguration`,
 `LabelConfiguration`, and so on. Each carries the token wiring a resource CR references
 via `spec.configurationRef.name`:
 
 ```yaml
 apiVersion: github.krateo.io/v1alpha1
-kind: RepositoryConfiguration   # one per resource kind — 31 in total
+kind: RepositoryConfiguration   # one per resource kind — 32 in total
 metadata:
   name: github-blueprints-config
   namespace: krateo-system
@@ -525,8 +529,8 @@ The generated name is the kind name plus `Configuration`, so `CodeSecurityConfig
 that, not `CodeSecurityConfiguration` — yields `CodeSecurityConfigConfiguration` rather
 than a doubled `…ConfigurationConfiguration`.
 
-All 31 may share a single name — the kind is implied by the resource that references it.
-That is why `chart/samples/configurations.yaml` now ships all 31 under the same
+All 32 may share a single name — the kind is implied by the resource that references it.
+That is why `chart/samples/configurations.yaml` now ships all 32 under the same
 `github-blueprints-config`, and why **one PAT can drive the whole chart**. You only need
 the Configuration for the kinds you actually use; the rest are inert. The referenced
 `Secret` is provisioned out-of-band ([usage](./usage.md)); the chart ships none of this.

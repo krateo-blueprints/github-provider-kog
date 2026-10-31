@@ -1,0 +1,24 @@
+# Create a repository owned by the authenticated user (the token's account), the user-owned
+# sibling of Repository. Create is POST /user/repos; get/update address /repos/{owner}/{name}.
+#
+# `owner` MUST be the token user's own login — it is only used on the get/update item path, not
+# on create, so a wrong value makes the first observe 404. `name` is the identifier.
+#
+# There is no delete verb: deleting this CR stops Krateo tracking the repo but never deletes it
+# on GitHub (same safety as Repository). `private`/`visibility` are honoured at create and NOT
+# reconciled afterward (changing them here will not flip an existing repo's exposure).
+apiVersion: github.krateo.io/v2022-11-28
+kind: UserRepository
+metadata:
+  name: test-user-repo
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: my-github-username        # the token account's own login
+  name: demo-user-repo
+  description: "Created for the authenticated user via Krateo"
+  private: true
+  auto_init: true                  # ensures a first commit + default branch
