@@ -1,51 +1,52 @@
 # github-provider-kog — LLM doc index
-# One line per file (the 29 kinds other than Repository pair their RestDefinition with its
+# One line per file (the 30 kinds other than Repository pair their RestDefinition with its
 # OpenAPI spec on one line — they are 1:1). A Krateo KOG provider (oasgen-provider ≥ 0.38.0)
-# exposing 30 GitHub REST resources as github.krateo.io Kubernetes kinds: repositories,
+# exposing 31 GitHub REST resources as github.krateo.io Kubernetes kinds: repositories,
 # access, repository configuration, CI/CD, work tracking and governance. The chart ships
 # RestDefinitions + trimmed OpenAPI specs and NOTHING else — no Deployment, no Service, no
 # image, no proxy, so it has no runtime component of its own; oasgen-provider generates the
-# CRDs and auto-deploys a rest-dynamic-controller per kind. All 30 kinds are NATIVE: every
+# CRDs and auto-deploys a rest-dynamic-controller per kind. All 31 kinds are NATIVE: every
 # verb goes straight to GitHub.
 # Git-write kinds: GitRef, RepoContent and PullRequest were the transport of the legacy
 # blueprint-publish path, superseded by the frontend's SCM-agnostic default
 # (AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER defaults to "true" → a BuilderPublish claim over
 # git-provider; the github.krateo.io route is the "false" fallback), and the companion
-# proxy plugin they were the last users of went with them. PullRequest and GitRef have since
-# returned NATIVELY, without the plugin (GitRef via a refs/-prefix requestTransform + a
-# base-sha dependentLookups chain needing oasgen-provider >= 0.36.0; PullRequest via a
-# head/base responseTransform); RepoContent is the one still out. One design doc per kind
+# proxy plugin they were the last users of went with them. PullRequest, GitRef and
+# RepoContent have all since returned NATIVELY, without the plugin (GitRef via a refs/-prefix
+# requestTransform + a base-sha dependentLookups chain needing oasgen-provider >= 0.36.0;
+# PullRequest via a head/base responseTransform; RepoContent via a branch→?ref fieldMapping +
+# responseTransforms + status.sha auto-populating the update body). One design doc per kind
 # records what the plugin did and the native restoration (docs/design-*.md below).
 # Not expressible, and deliberately absent: Actions/Dependabot/Codespaces SECRETS (a write
 # needs an encrypted_value LibSodium sealed box + a key_id fetched first — no client-side
 # crypto and no dependent lookup in a RestDefinition; variables are NOT secrets and ARE
 # covered), and VulnerabilityAlerts (its GET returns 404 when off and 204 with NO BODY when
 # on, so no status schema can be derived — unlike AutomatedSecurityFixes, whose GET has one).
-docs/index.md: the map — what the provider is, the 30 kinds by family, the repo layout, links to the whole bundle
-docs/overview.md: how it works — RestDefinitions + OpenAPI specs → oasgen CRDs + controllers, and why the chart itself runs nothing (all 30 kinds native)
+docs/index.md: the map — what the provider is, the 31 kinds by family, the repo layout, links to the whole bundle
+docs/overview.md: how it works — RestDefinitions + OpenAPI specs → oasgen CRDs + controllers, and why the chart itself runs nothing (all 31 kinds native)
 docs/usage.md: install as a Krateo component, provision the token Secret (per-kind PAT rights differ) + one Configuration per kind, drive the kinds, verify
 docs/configuration.md: the surface — the one value resourceGroup, the per-kind RestDefinition mappings (identifiers, excludedSpecFields, compareScope: 24 updatable / 2 default fullSpec / 1 explicit fullSpec / 3 identifiersAndStatus), invariants
-docs/api.md: the generated github.krateo.io CRDs (30 resource kinds + a <Kind>Configuration each) and the CompositionDefinition derived from values.schema.json
+docs/api.md: the generated github.krateo.io CRDs (31 resource kinds + a <Kind>Configuration each) and the CompositionDefinition derived from values.schema.json
 docs/examples.md: index of the runnable examples
 docs/release.md: how a release ships — one plain-semver tag drives release-oci; the chart is the only artifact (no image in this repo)
 docs/log.md: curated history
 docs/upgrading.md: upgrades that cross an oasgen-immutable field — the pre-roll immutable-field gate (oasgen-provider #290; seven fields read structurally off the live CRD's x-kubernetes-validations) and TakeOwnership adopting orphaned RDs, then the PullRequest identifiers [number]->[head,base] migration: pause the 17 composition-rendered BuilderPublish CRs, strip finalizers + delete, delete+recreate the pullrequests CRD, unpause so self-heal re-renders and findby re-adopts (non-destructive — PullRequest has no delete verb)
 docs/design-gitref.md: restoring GitRef natively (now shipped) — what the kind did, what the plugin's getGitRef/createGitRef did, the refs/-prefix asymmetry solved natively two ways, and the base-sha resolution via dependentLookups (oasgen-provider #120, landed in 0.36.0) so a sha-less create is native and spec.sha stays optional
-docs/design-repocontent.md: restoring the removed RepoContent natively — the plugin's put/get handlers behaviour by behaviour against the 0.23.0 replacement (branch→?ref fieldMapping, responseTransforms, status.sha auto-populating the update body, the %252F double-escape fixed upstream as #113): fully native today, the only loss a bounded 422-retry
+docs/design-repocontent.md: restoring RepoContent natively (now shipped) — the plugin's put/get handlers behaviour by behaviour against the 0.23.0 replacement (branch→?ref fieldMapping, responseTransforms, status.sha auto-populating the update body, the %252F double-escape fixed upstream as #113): fully native today, the only loss a bounded 422-retry
 docs/design-pullrequest.md: restoring PullRequest natively (now shipped) — the plugin's single job was flattening head/base on observe; one whole-document responseTransform on the get verb plus compareScope: updatable brings the kind back whole, and fixes the fork case the plugin got wrong
 examples/blueprint-authoring/README.md: the runnable example — the one-time token + <Kind>Configuration wiring, then github.krateo.io CRs applied in order against a scratch repo
-README.md: the repo front door — what it is (the 30 kinds grouped by family, what is deliberately not covered, and the git-write kinds with their design docs — RepoContent still out, PullRequest and GitRef returned), install, configure, examples, docs, develop & release
+README.md: the repo front door — what it is (the 31 kinds grouped by family, what is deliberately not covered, and the git-write kinds with their design docs — RepoContent, PullRequest and GitRef all returned), install, configure, examples, docs, develop & release
 # Source (read at the same tag; the docs above are derived from these):
 chart/Chart.yaml: chart metadata; version is the CHART_VERSION placeholder, appVersion tracks the OpenAPI/mapping revision
-chart/values.yaml: the single value resourceGroup (the group all 30 generated CRDs land under), with its rationale
+chart/values.yaml: the single value resourceGroup (the group all 31 generated CRDs land under), with its rationale
 chart/values.schema.json: the typed schema the CDC derives the component CRD from (scalar resourceGroup only)
-chart/templates/configmap-<kind>.yaml: one ConfigMap per kind wrapping chart/assets/<kind>.yaml; all 30 are a plain .Files.Get, copied verbatim — no template action anywhere in the assets
-chart/samples/configurations.yaml: the 30 <Kind>Configuration CRs, all sharing the name github-blueprints-config and one gh-token Secret (whose PAT needs org repo-create rights for Repository and org admin rights for the org-scoped kinds)
+chart/templates/configmap-<kind>.yaml: one ConfigMap per kind wrapping chart/assets/<kind>.yaml; all 31 are a plain .Files.Get, copied verbatim — no template action anywhere in the assets
+chart/samples/configurations.yaml: the 31 <Kind>Configuration CRs, all sharing the name github-blueprints-config and one gh-token Secret (whose PAT needs org repo-create rights for Repository and org admin rights for the org-scoped kinds)
 chart/samples/test-<kind>.yaml: one applyable test CR per kind, with the per-kind caveats in comments
 # The destination repository (native, like every other kind):
 chart/templates/rd-repository.yaml: the Repository RestDefinition (all four verbs native; compareScope updatable — DEFENSIVE, not load-bearing: the comparison SKIPS any spec key the observe response omits, so the create-only fields could never have drifted under fullSpec either, and the two scopes should agree today; the in-file comment corrects that earlier claim)
 chart/assets/repository.yaml: the Repository OpenAPI spec (org-scoped create only, auto_init defaults true, path params named org/name)
-# The other 29 kinds — rd-<kind>.yaml carries the identifiers/compareScope reasoning, assets/<kind>.yaml the
+# The other 30 kinds — rd-<kind>.yaml carries the identifiers/compareScope reasoning, assets/<kind>.yaml the
 # trimmed field set and the measured GitHub quirks. <kind> is the kind name lowercased.
 # access:
 chart/templates/rd-team.yaml + chart/assets/team.yaml: Team — org team keyed by the server-derived slug (get/update/delete read it from status.slug, a rename converges via the PATCH response); the update declares BOTH 201 and 200, because a real change answers 201; compareScope updatable
@@ -76,6 +77,7 @@ chart/templates/rd-milestone.yaml + chart/assets/milestone.yaml: Milestone — n
 chart/templates/rd-issue.yaml + chart/assets/issue.yaml: Issue — number-keyed issue; NO delete verb (GitHub REST has none — close it with spec.state instead); updatable keeps title/body/state/state_reason fixable while leaving labels/assignees/milestone (sent as strings, returned as objects) out of the comparison
 chart/templates/rd-release.yaml + chart/assets/release.yaml: Release — id-keyed release; compareScope updatable
 chart/templates/rd-repodeployment.yaml + chart/assets/repodeployment.yaml: RepoDeployment — immutable deployment record with no update verb, so compareScope identifiersAndStatus; auto_merge is pinned FALSE in the asset (GitHub defaults it true and then answers 202 with no deployment at all); status carries original_environment, NOT environment, so the projected compared set stays empty
+chart/templates/rd-repocontent.yaml + chart/assets/repocontent.yaml: RepoContent — commit a file into a repo via an idempotent PUT (create-or-update); a branch→?ref fieldMapping plus responseTransforms on get/create/update bring it back natively, status.sha auto-populates the update body (so no 422-retry), and the %252F double-escape that broke observe on a builder/x branch is fixed upstream; default fullSpec
 # governance:
 chart/templates/rd-customproperty.yaml + chart/assets/customproperty.yaml: CustomProperty — org custom-property schema; PUT upserts on the same URL GET/DELETE use, so create and update are one call and updatable covers the whole settable surface
 chart/templates/rd-codesecurityconfig.yaml + chart/assets/codesecurityconfig.yaml: CodeSecurityConfig — org code-security configuration; named CodeSecurityConfig on purpose, so the generated auth kind is CodeSecurityConfigConfiguration rather than a doubled …ConfigurationConfiguration; compareScope updatable

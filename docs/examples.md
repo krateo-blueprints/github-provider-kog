@@ -1,7 +1,7 @@
 ---
 type: ExampleIndex
 title: github-provider-kog — examples
-description: Index of the runnable examples — the Repository CR that creates the destination repository every repository-scoped sample configures, and the sample CR for each of the 30 kinds under chart/samples/, grouped by area with the order each group must be applied in.
+description: Index of the runnable examples — the Repository CR that creates the destination repository every repository-scoped sample configures, and the sample CR for each of the 31 kinds under chart/samples/, grouped by area with the order each group must be applied in.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [examples, github, samples]
 timestamp: 2026-09-09T00:00:00Z
@@ -42,8 +42,8 @@ timestamp: 2026-09-09T00:00:00Z
 There is no end-to-end git-write example. The git-write kinds left `github.krateo.io` with
 the proxy plugin that served them, and publishing now runs through the frontend's
 `BuilderPublish` claim over `git-provider` (`AUTOPILOT_PUBLISH_VIA_GIT_PROVIDER` defaults
-to `"true"`). Two of the three have since returned natively, without the plugin —
-`PullRequest` and `GitRef`; `RepoContent` is the one still out. What each kind did and what
+to `"true"`). All three have since returned natively, without the plugin —
+`RepoContent`, `PullRequest` and `GitRef`. What each kind did and what
 bringing it back natively took is recorded in [design-gitref](./design-gitref.md),
 [design-repocontent](./design-repocontent.md) and
 [design-pullrequest](./design-pullrequest.md).
@@ -51,7 +51,7 @@ bringing it back natively took is recorded in [design-gitref](./design-gitref.md
 ## The sample CRs, by group
 
 The chart ships one sample per kind — `chart/samples/test-<kind>.yaml`, lower-cased —
-covering the other 29 kinds as well. Each carries its gotchas in a
+covering the other 30 kinds as well. Each carries its gotchas in a
 header comment and sets `krateo.io/connector-verbose: "true"`, and every one of them
 names the `krateo-blueprints` org and a `demo-destination` repository. Edit those first
 and work in a **scratch org**: several kinds delete the real thing when their CR is
@@ -66,7 +66,7 @@ allowed to do does differ by group — the per-group rights table is in
 [usage](./usage.md), which also works each group's fields and gotchas through.
 
 ```console
-$ kubectl apply -f chart/samples/configurations.yaml    # all 30, one shared name
+$ kubectl apply -f chart/samples/configurations.yaml    # all 31, one shared name
 ```
 
 ### Access

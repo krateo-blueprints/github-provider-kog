@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-repocontent
+  namespace: {{ .Release.Namespace }}
+data:
+  # Plain .Files.Get, like every other kind in this chart. RepoContent was a `tpl`-rendered asset
+  # pre-removal because its put/get operations carried a per-operation `servers:` override pointing
+  # at the proxy plugin (`{{"{{"}} include "webServiceUrl" . {{"}}"}}`). The plugin is gone and so is the
+  # override, so there is no template action left to resolve. A leftover `servers:` would be fatal.
+  repocontent.yaml: |
+{{ .Files.Get "assets/repocontent.yaml" | indent 4 }}

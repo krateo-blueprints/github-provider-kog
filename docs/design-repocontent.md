@@ -7,6 +7,14 @@ tags: [kog, design, repocontent, oasgen-provider, plugin-removal]
 timestamp: 2026-09-09T00:00:00Z
 ---
 
+> **IMPLEMENTED (2026-10-31).** This design shipped as written — `chart/assets/repocontent.yaml`,
+> `chart/templates/{configmap,rd}-repocontent.yaml`, `chart/samples/test-repocontent.yaml` and a
+> `RepoContentConfiguration` in `chart/samples/configurations.yaml`. The chart is now **31 kinds**;
+> this document is the design record it was built from. The one deviation worth noting: RepoContent
+> keeps its native **delete verb** (deleting the CR deletes the file), so — unlike `Repository` — the
+> oasgen-provider #125 CRD cascade would delete every managed file on an uninstall; a file is
+> recoverable from git history, but weigh it before a destructive default.
+
 Written against `be409bc` (the last commit that still carries the kind).
 
 **Provenance of the runtime citations, stated because it matters:** the line numbers below were
