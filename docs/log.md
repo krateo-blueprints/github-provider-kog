@@ -32,20 +32,91 @@ clear and is untouched. Files renamed `*-deployment.yaml` → `*-repodeployment.
 **Fresh clusters: nothing to migrate** — the rename alone converges (no existing `deployments.github.krateo.io`
 CRs).
 
-**Existing clusters are a migration, because the kind has a `DELETE` verb.** A naive rename-upgrade
-removes the old RestDefinition; oasgen then deletes `deployments.github.krateo.io` unconditionally and
-cascade-deletes its CRs, whose finalizers call `DELETE /repos/{owner}/{repo}/deployments/{id}` —
-**destroying the real GitHub deployment records**. So before the renamed chart reaches a cluster that
-may hold instances (krateo-demo's `tenant-acme`/`globex` children are the open case; krateo-057 itself
-has **0** instances, checked), `krateo.io/deletion-policy=orphan` must be on the Composition **and
-reconciled first** (applying it afterwards is too late). But orphan is a **holding state, not an end
-state**: it keeps the old RestDefinition, its CRD, and its RDC controller alive — so the `deployments`
-collision persists on that cluster, two controllers run for one logical resource, and the orphaned
-RestDefinition has no Composition owner and is never touched by a chart upgrade again. The completing
-step: migrate any instances to `RepoDeployment`, confirm **zero** CRs on the old kind, then delete the
-orphaned RestDefinition — at which point oasgen removes the old CRD (no CRs → no finalizers → no GitHub
-records at risk) and the ambiguity goes with it. That final condition is the same zero-instance gate
-applied on 057, just applied later.
+**Existing clusters — the migration, and oasgen already guards the scary part.** The old kind has a
+`DELETE` verb (`DELETE /repos/{owner}/{repo}/deployments/{id}`), so the fear was that a rename-upgrade
+removes the old RestDefinition, oasgen drops `deployments.github.krateo.io`, the CRs cascade-delete and
+their finalizers destroy the real GitHub deployment records. **oasgen refuses to let that happen:**
+`deploy.Undeploy` (`go/oasgen-provider/.../deploy.go:437`) counts live instances **at the moment of the
+destructive act** (not from a prior reconcile) and returns `ErrLiveInstances` if any exist; a **failed
+LIST also refuses** ("'I could not count' must never read as 'there were none'"). So removing the old RD
+on a populated cluster **blocks** — the RD sits in `Deleting`, and the CRD, its CRs and their external
+resources all survive. There is no cascade to race and no timing window. krateo-057 has **0** instances
+(checked, clean); a mistaken roll to krateo-demo's `tenant-acme`/`globex` children would **stall, not
+destroy**.
+
+**Annotation (`krateo.io/deletion-policy=orphan`), after four code-backed passes — don't rely on it.**
+It is real and lives in **unstructured-runtime** (`pkg/meta`), it's a **managed-resource (CR) annotation**
+(not a Composition one — which is why core-provider's grep of *their own* tree missed it), and RDC
+**does** honour it: RDC links unstructured-runtime (v1.4.0), whose worker removes the finalizer when the
+policy is orphan. (An interim pass wrongly concluded "RDC never calls `ShouldDelete`" — that grep was
+against RDC's own tree, not its dependency: a false negative.) **But it is non-deterministic — it races.**
+The worker removes the finalizer with **no early return**, so execution falls through to `handleDelete`,
+which fetches the object first; if that fetch wins the apiserver reap, the external DELETE fires anyway
+on the very pass that honoured the policy. So an orphan-annotated delete is a timing coin-flip. The
+missing-early-return bug is tracked as **oasgen-provider#276** (fix belongs in unstructured-runtime). And
+`krateo.io/management-policy: observe-delete` forces `ShouldDelete` true, silently defeating orphan. So
+the annotation is NOT a dependable lever; the deterministic route below is.
+
+Whether orphan governs a given CR at all comes down to **which finalizer that CR carries** — the worker
+removes exactly `composition.krateo.io/finalizer` and nothing else. Measured on 057: **every
+github.krateo.io CR carries exactly that finalizer** (confirmed on the 15 `Repository` and 17
+`PullRequest` CRs; it is the only finalizer value present across the group). So for github-provider-kog
+the annotation does govern our CRs (it is *not* inert — that was true of provider-runtime kinds like
+`git.krateo.io/LocalResource`, which carry `finalizer.managedresource.krateo.io`, a different runtime's
+finalizer the block can't touch), and the strip command below targets the correct name. `Deployment`
+(now `RepoDeployment`) had 0 instances on 057, so a migration runbook must **check the finalizer on the
+actual cluster being migrated** rather than assume — `kubectl get <kind>.github.krateo.io -A -o
+jsonpath='{.items[*].metadata.finalizers}'`. (Meta-lesson from four wrong answers in one afternoon: each
+came from pinning two of three axes and assuming the third — *which repo* the annotation lives in
+[dependency, not core-provider's tree], *which runtime version* [rdc `unstructured-runtime` v1.4.0 vs cdc
+v1.6.0], and *which finalizer the CR carries*.)
+
+**Completing a rename migration on a populated cluster** (so the old RD can finally be removed) means
+clearing the old-kind CRs **without firing their finalizers**. The hazard: reaching zero by *deleting*
+the CRs is itself the destructive act — each delete fires `composition.krateo.io/finalizer` and the
+external DELETE, hand-executing the cascade oasgen's guard would otherwise have blocked. Safe sequence
+per CR — **finalizer off first, then delete**:
+
+```
+kubectl patch <kind>.<group> <name> -n <ns> --type merge -p '{"metadata":{"finalizers":null}}'
+kubectl delete <kind>.<group> <name> -n <ns>
+```
+
+Better: adopt the instances onto the new kind, confirm it observes the same external objects, *then*
+strip finalizers and remove the old ones. Scaling the RDC controller to 0 is **not** a substitute — the
+CRs keep their finalizers, sit `Terminating`, and the CRD hangs with them. (The other teardown path —
+Composition deleted/re-rendered → cdc `drainFinalizerBoundChildren`, which *escorts* the external DELETE
+through by design, cdc #108 — is guarded by `helm.sh/resource-policy: keep` on the rendered objects; a
+kind rename is not that path.)
+
+github-provider-kog itself: 0.6.0 is safe on fresh clusters and on krateo-057 (0 instances).
+
+**Rehearsed and verified (2026-10-29)** on a throwaway kind cluster (k8s **v1.36.1**, RDC
+`rest-dynamic-controller:0.38.0`, digest `sha256:1f2cdf22305b6617b55596d5c8a2b0ccca8708f2e3f8a99f4dce3bed1d4e8146`)
+against the real GitHub Deployments API, using the shipped `RepoDeployment` kind (the pre-rename
+`Deployment` kind is itself refused by the #200 guard on 0.38.0 — a bonus re-confirmation). Every
+`RepoDeployment` CR carried exactly `composition.krateo.io/finalizer` **even after a successful reconcile
+that created a real deployment record**. Four delete arms, external DELETE read off the RDC request log
+and confirmed by the record's fate on GitHub:
+
+- **strip finalizer → delete:** no external DELETE, record survived.
+- **control (sole finalizer intact, no orphan):** DELETE fired, record 404 — proving the null results are real.
+- **`deletion-policy=orphan` + sole finalizer:** no DELETE, record survived (synchronous reap; no GET/DELETE in the log at all).
+- **orphan + a second finalizer:** DELETE fired, record 404 — the log shows **GET then DELETE**, i.e. the object survived the governed-finalizer removal and the fall-through ran. Orphan is defeated by any second finalizer.
+
+So the deterministic model holds (no race; **multiplicity** is the variable, not timing), and
+strip-the-governed-finalizer-first is the verified-safe migration. Caveat worth keeping: a second
+finalizer protects the local object only from **that** delete pass, not permanently — the two-finalizer
+CR was reaped by a later pass once the other holder released, so "a second finalizer keeps it alive" is
+half true.
+
+**Verified runbook for the krateo-demo roll** (when it eventually takes 0.6.0): (1) check which finalizer
+the old-kind CRs carry on the *target* cluster — `kubectl get <kind>.github.krateo.io -A -o
+jsonpath='{.items[*].metadata.finalizers}'`; (2) per CR, **strip the finalizer first, then delete** (the
+two commands above) — never delete with it intact, never rely on `deletion-policy=orphan`; (3) only then
+remove the old RestDefinition (oasgen's `deploy.go:437` blocks the CRD drop while instances exist, so a
+premature RD removal just stalls — it does not cascade). Shared with the ironic-operator-kog session for
+its identical `Node`→`nodes` rename against hardware.
 
 ## 2026-10-28 — `GitRef` restored natively: dependent lookups make a sha-less create work (30 kinds)
 
