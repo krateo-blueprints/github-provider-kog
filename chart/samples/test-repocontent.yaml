@@ -1,0 +1,29 @@
+# Commit ONE file onto a branch — the middle step of an authoring chain
+# (Repository -> GitRef (branch) -> RepoContent (per file) -> PullRequest).
+#
+# `content` is base64-encoded file bytes. `path` is the identifier. `branch` is expressed once
+# here; the get verb relocates it onto GitHub's `?ref`, while the PUT/DELETE bodies take it as
+# `branch`.
+#
+# Omit `sha` when creating a NEW file; the controller strips it on create anyway. On update the
+# sha is sourced automatically from status (populated by the previous observe) — do NOT hand-set
+# spec.sha. The branch must already exist (create the GitRef first), or the PUT 404s.
+#
+# Deleting this CR DELETES THE FILE on the branch (RepoContent has a native delete verb). The file
+# is recoverable from git history, but be aware the delete is real.
+apiVersion: github.krateo.io/v2022-11-28
+kind: RepoContent
+metadata:
+  name: test-chart-yaml
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-blueprints-config
+  owner: krateo-blueprints
+  repo: demo-destination
+  path: charts/demo/Chart.yaml
+  branch: builder/demo-branch
+  message: "chore(demo): add Chart.yaml via Krateo"
+  content: YXBpVmVyc2lvbjogdjIKbmFtZTogZGVtbwp2ZXJzaW9uOiAwLjEuMAo=

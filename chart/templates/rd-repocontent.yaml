@@ -1,0 +1,115 @@
+apiVersion: ogen.krateo.io/v1alpha1
+kind: RestDefinition
+metadata:
+  name: {{ .Release.Name }}-repocontent
+  namespace: {{ .Release.Namespace }}
+spec:
+  oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-repocontent/repocontent.yaml
+  resourceGroup: {{ .Values.resourceGroup }}
+  resource:
+    kind: RepoContent
+    # One file in a repository, keyed by its path within owner/repo — the same owner/repo + key
+    # split RepoContent shares with Repository (`name`) and the others. `path` is a path parameter
+    # on every verb.
+    identifiers:
+      - path
+    # The blob sha (the update and delete bodies auto-source it from here — see below) and the
+    # file's web URL. Both come back on the get and on the create/update responses once the
+    # responseTransforms below lift them to the root.
+    additionalStatusFields:
+      - sha
+      - html_url
+    # `ref` is GitHub's query-parameter name for the branch on the get verb. The CR expresses the
+    # branch ONCE, as spec.branch (which the PUT/DELETE bodies genuinely take), and the get verb's
+    # fieldMapping relocates it onto `?ref`. Without this exclusion every OAS parameter becomes a
+    # spec field and authors would face a ref/branch pair to keep in sync. IMMUTABLE once the CRD
+    # is generated (oasgen-provider #290) — getting it in on the first apply matters.
+    excludedSpecFields:
+      - ref
+    # Default fullSpec, deliberately — do NOT set `updatable` here (and note the default IS
+    # fullSpec, so this field is omitted on purpose). Walking the spec, the get response carries
+    # only `path`, `content` and (if the author set it) `sha`; owner/repo/branch/message/
+    # committer/author are absent from the GET body and the comparison SKIPS any spec key the
+    # response does not carry. `updatable` would derive the same set minus `path` (a path parameter
+    # that cannot drift), so it changes nothing — and fullSpec keeps this kind honest about
+    # comparing `content`, the one thing it exists to manage.
+    configurationFields: []
+    verbsDescription:
+      # CREATE: PUT /contents. A create runs only after Observe reported the file ABSENT, so a sha
+      # is never correct here. status is NOT cleared when a create fails (clearStatusFields sits
+      # AFTER the call), so a stale status.sha from an earlier observe would otherwise be sent on
+      # every create attempt of a file that no longer exists, and nothing would clear it. Strip it
+      # unconditionally: `del(.sha)` on a body without sha is a no-op. Update keeps its sha.
+      - action: create
+        method: PUT
+        path: /repos/{owner}/{repo}/contents/{path}
+        requestTransform:
+          inline: del(.sha)
+        # GitHub's PUT answers {"content":{...},"commit":{...}} with NO root sha/path/html_url, and
+        # both write paths clearStatusFields() first while populateStatusFields reads ROOT keys
+        # only — so without this every successful write leaves status EMPTY until the next observe.
+        # That is not cosmetic: a spec edit enqueues Update DIRECTLY (skipping Observe), and the
+        # update body sources `sha` from status, so two quick edits in a row would send the second
+        # PUT sha-less. Lift the nested keys to the root; `//` fallbacks make it inert if GitHub
+        # ever flattens the shape itself.
+        responseTransform:
+          inline: |
+            . + {
+              path:     (.content.path     // .path),
+              sha:      (.content.sha      // .sha),
+              html_url: (.content.html_url // .html_url)
+            }
+      # UPDATE: the same PUT. It keeps its sha (status.sha reaches the body with no mapping, proven
+      # in production by the always-native delete verb, whose body GitHub requires to carry sha).
+      - action: update
+        method: PUT
+        path: /repos/{owner}/{repo}/contents/{path}
+        responseTransform:
+          inline: |
+            . + {
+              path:     (.content.path     // .path),
+              sha:      (.content.sha      // .sha),
+              html_url: (.content.html_url // .html_url)
+            }
+      # GET: observe. `ref` <- spec.branch (a plain relocation, no valueMapping — a request-
+      # direction jq valueMapping is NOT implemented and must never be added here). An omitted
+      # spec.branch resolves to not-found and the entry is skipped, so GitHub reads the default
+      # branch, exactly as before.
+      - action: get
+        method: GET
+        path: /repos/{owner}/{repo}/contents/{path}
+        fieldMapping:
+          - inQuery: ref
+            inCustomResource: spec.branch
+        # GitHub returns `content` as RFC-2045-wrapped base64 (soft newlines every 60 chars), while
+        # spec.content is unwrapped — a byte-identical file would compare UNEQUAL at the string leaf
+        # and loop "update" (a new commit) forever. Stripping the soft breaks yields exactly
+        # StdEncoding, which is what GitHub wraps. Use split/join, NOT @base64d|@base64 (gojq's
+        # @base64d truncates at the first padding byte).
+        #
+        # `encoding: none` is GitHub's answer for a file >= 1 MB: `content` comes back EMPTY.
+        # Dropping the key makes the comparison SKIP it — observe is content-blind for such a file,
+        # the bounded failure. LEAVING it would compare "" against spec.content forever: drift, a
+        # PUT, a new commit, every reconcile.
+        responseTransform:
+          inline: |
+            if .encoding == "none" then
+              del(.content)
+            elif (.content | type) == "string" then
+              .content |= (split("\n") | join(""))
+            else
+              .
+            end
+      # DELETE: native, as it always was. GitHub's delete body REQUIRES sha; status.sha auto-
+      # sources it (the body property `sha` is in the operation's request-body schema, and
+      # processFields writes any status field whose name is in that set when spec has not set it).
+      #
+      # NOTE for maintainers: unlike Repository (which deliberately has NO delete verb to keep
+      # oasgen-provider #125's unconditional CRD cascade-delete harmless), RepoContent keeps delete
+      # — deleting the CR deletes the FILE on the branch. A file is recoverable from git history and
+      # delete is the documented RepoContent lifecycle, so the trade differs from a whole repo. But
+      # the same cascade applies: dropping this RestDefinition or uninstalling the chart will delete
+      # every file every RepoContent CR manages. Weigh that before adding a destructive default.
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{repo}/contents/{path}

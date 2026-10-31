@@ -22,6 +22,8 @@ it. This is the design that brings it back **without** the plugin.
 > _Update (2026-10-28): `GitRef` has since also returned natively — the chart is now 30 kinds and
 > requires oasgen-provider ≥ 0.38.0, where the pattern admission guard reaches the CRD; its dependent lookups (0.36.0) resolve the base sha that blocked it.
 > `RepoContent` is the one still out. See [log](./log.md) and [design-gitref](./design-gitref.md)._
+>
+> _Update (2026-10-31): `RepoContent` has since returned natively too — the chart is now **31 kinds**. See [design-repocontent](./design-repocontent.md)._
 
 File references to the three removed kinds are to commit **`be409bc`** (`git show
 HEAD:chart/templates/rd-pullrequest.yaml`); the deletions are already staged in the working tree.

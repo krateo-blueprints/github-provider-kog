@@ -11,6 +11,40 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-10-31 — `RepoContent` restored natively (31st kind)
+
+`RepoContent` — the last git-write kind still out (`Repository` → `GitRef` → `RepoContent` per file →
+`PullRequest`) — returns as a plain native `RestDefinition`, no proxy plugin, completing the git-write
+restoration that `PullRequest` and `GitRef` began. `appVersion` → `0.1.5`; the chart is now **31 kinds**.
+
+**How it is native** (full design in [design-repocontent](./design-repocontent.md)):
+
+- The get verb relocates `spec.branch` onto GitHub's `?ref` query via a `fieldMapping` (the OAS
+  parameter is declared `ref` and `excludedSpecFields`, so the CR expresses the branch once, and the
+  PUT/DELETE bodies still take it as `branch`).
+- A `responseTransform` on get strips GitHub's RFC-2045 line-wrapping from `content`, so a byte-identical
+  file does not loop "update" forever — with a `del(.content)` guard for the `encoding: none` case GitHub
+  returns for files ≥ 1 MB (leaving it would PUT a new commit every reconcile).
+- `responseTransform`s on create/update lift GitHub's nested `content.{sha,path,html_url}` to the root, so
+  `populateStatusFields` (root keys only) fills status after a write — without which a second quick spec
+  edit would PUT sha-less.
+- `requestTransform: del(.sha)` on create drops a stale `status.sha` (a create only ever runs against an
+  absent file); update and delete auto-source `sha` from `status.sha`, so no pre-call read is needed — the
+  reason this needs no `dependentLookups` the way `GitRef` did (oasgen-provider #120).
+
+**Delete verb kept, deliberately.** Unlike `Repository` (which drops `delete` so the oasgen-provider #125
+CRD cascade can never destroy a repo), `RepoContent` keeps its native delete — deleting the CR deletes the
+file. A file is recoverable from git history and delete is the documented RepoContent lifecycle, but the
+same cascade applies: dropping the RestDefinition or uninstalling the chart deletes every managed file.
+A conscious trade, flagged in the design.
+
+`compareScope` is left at the default `fullSpec`: the get response carries only `path`, `content` and an
+optional `sha`, so the compared set is exactly `content` — the one thing the kind manages — and
+`updatable` would derive the same set. It is the one non-`updatable` kind that *has* an update verb.
+
+Verified: `helm template` renders **31 ConfigMaps + 31 RestDefinitions** with no error;
+`hack/assert-drift-invariants.py` and `hack/preflight-refs.py` both pass.
+
 ## 2026-10-29 — `Deployment` kind renamed to `RepoDeployment` (fresh-install blocker, 0.6.0)
 
 **A fresh install of any version carrying the `Deployment` kind cannot converge on oasgen-provider

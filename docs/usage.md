@@ -1,7 +1,7 @@
 ---
 type: Usage
 title: github-provider-kog — usage
-description: How to run the provider — install it as a Krateo component, provision the GitHub token Secret and one Configuration CR per kind (all 30 may share a single name), create the destination repository with Repository, drive the other 29 kinds group by group (access, repository configuration, CI/CD, work tracking, governance), and verify the generated CRDs and controllers. The chart ships no runtime component of its own.
+description: How to run the provider — install it as a Krateo component, provision the GitHub token Secret and one Configuration CR per kind (all 31 may share a single name), create the destination repository with Repository, drive the other 30 kinds group by group (access, repository configuration, CI/CD, work tracking, governance), and verify the generated CRDs and controllers. The chart ships no runtime component of its own.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, install, oasgen-provider, github]
 timestamp: 2026-09-09T00:00:00Z
@@ -17,11 +17,11 @@ A Krateo cluster with `oasgen-provider` **≥ 0.38.0** running (it provides
 0.9.x carried the four kinds the chart started with, but the floor is now **0.38.0**:
 0.38.0 is where the `GitRef` pattern admission guard reaches the generated CRD. `GitRef`'s
 create resolves its base sha with `dependentLookups`, a primitive that landed in 0.36.0.
-24 of the 30 kinds also set `compareScope: updatable`, a value
+24 of the 31 kinds also set `compareScope: updatable`, a value
 `RestDefinition` CRDs below 0.23.0 reject on apply so their kinds never appear — the
 earlier floor, now subsumed by 0.38.0.
 
-Nothing else is required. The chart renders 30 ConfigMaps and 30 RestDefinitions and
+Nothing else is required. The chart renders 31 ConfigMaps and 31 RestDefinitions and
 nothing more: there is no Deployment, no Service and no image of its own to pull. Every
 verb of every kind is a native call to `api.github.com`, made by the
 rest-dynamic-controller oasgen-provider generates.
@@ -69,12 +69,12 @@ A classic token needs `repo`; a fine-grained token needs the organization permis
 token scoped for one repository's settings drives those kinds and fails on `Repository`
 alone.
 
-The 30 kinds spread the same way: a single PAT can drive the whole chart, but the rights
+The 31 kinds spread the same way: a single PAT can drive the whole chart, but the rights
 it needs grow with the groups you actually use.
 
 | kinds | what the token must be allowed to do | classic scope |
 |---|---|---|
-| `Issue`, `PullRequest`, `Label`, `Milestone`, `Release`, `RepoDeployment` | write issues, labels, releases and deployments on one repository | `repo` |
+| `Issue`, `PullRequest`, `Label`, `Milestone`, `Release`, `RepoDeployment`, `RepoContent` | write issues, labels, releases, deployments and file contents on one repository | `repo` |
 | `RepoWebhook`, `DeployKey`, `Environment`, `DeploymentBranchPolicy`, `RepoRuleset`, `BranchProtection`, `Autolink`, `Collaborator`, `AutomatedSecurityFixes`, `ActionsVariableRepo`, `EnvironmentVariable`, `Workflow` | administer one repository's settings | `repo` |
 | `Repository` | create and delete repositories in the organization | `repo`, and the org must permit the token to create repositories |
 | `Team`, `TeamMembership`, `TeamRepo`, `OrgMembership`, `OrgWebhook`, `OrgRuleset`, `ActionsVariableOrg`, `RunnerGroup`, `CustomProperty`, `CodeSecurityConfig` | administer the organization | `admin:org`, on top of `repo` |
@@ -89,11 +89,11 @@ until it is widened.
 
 Then one Configuration per kind. They may all share a name — the kind is implied by the
 resource that references it — which is why `chart/samples/configurations.yaml` ships all
-30 under the same `github-blueprints-config`:
+31 under the same `github-blueprints-config`:
 
 ```yaml
 apiVersion: github.krateo.io/v1alpha1
-kind: RepositoryConfiguration    # one of 30: TeamConfiguration, RepoRulesetConfiguration,
+kind: RepositoryConfiguration    # one of 31: TeamConfiguration, RepoRulesetConfiguration,
                                  # LabelConfiguration, EnvironmentConfiguration,
                                  # CustomPropertyConfiguration, …
 metadata:
@@ -124,7 +124,7 @@ is created and stored by an operator, never handled by the browser or snowplow.
 ## Create the destination repository
 
 `Repository` creates the repo every other repository-scoped kind then configures, so it
-comes **first**. Like all 30 kinds it is fully native: create (`POST /orgs/{org}/repos`)
+comes **first**. Like all 31 kinds it is fully native: create (`POST /orgs/{org}/repos`)
 and get/update (`GET`/`PATCH /repos/{org}/{name}`) go straight to
 `api.github.com`. See `chart/samples/test-repository.yaml`:
 
@@ -209,21 +209,23 @@ Publishing is the frontend's job now, over an SCM-agnostic route:
 
 What each kind did, and exactly what bringing it back natively took, is written down, one
 document per kind: [GitRef](./design-gitref.md), [RepoContent](./design-repocontent.md),
-[PullRequest](./design-pullrequest.md). **`PullRequest` and `GitRef` have since returned**
-— natively, without the plugin. `PullRequest` needs one `responseTransform` on the get
-verb that flattens GitHub's head/base objects back to the branch strings the spec carries,
-with `compareScope: updatable` to drop the create-only fields the PATCH can never fix.
+[PullRequest](./design-pullrequest.md). **All three have since returned** — natively,
+without the plugin. `PullRequest` needs one `responseTransform` on the get verb that
+flattens GitHub's head/base objects back to the branch strings the spec carries, with
+`compareScope: updatable` to drop the create-only fields the PATCH can never fix.
 `GitRef` needs a `requestTransform` for the `refs/` prefix plus a `dependentLookups` chain
 that resolves the base HEAD sha for a sha-less create — the pre-call dependent read once
-tracked as oasgen-provider **#120**, which landed in **0.36.0**. `RepoContent` is the one
-still out — returnable the same way, `status.sha` plus a `responseTransform`, now that
-0.23.0 fixes the `%252F` double-escape.
+tracked as oasgen-provider **#120**, which landed in **0.36.0**. `RepoContent` relocates
+`spec.branch` onto GitHub's `?ref` via a `fieldMapping`, canonicalizes the base64 `content`
+and lifts `sha`/`html_url` to the root with `responseTransform`s, and drops a stale `sha`
+on create with `requestTransform: del(.sha)` — the `status.sha` the update and delete
+bodies need is auto-populated, so no pre-call read is required.
 
-What is left in the chart is 30 native kinds and no runtime component at all.
+What is left in the chart is 31 native kinds and no runtime component at all.
 
-## The other 29 kinds
+## The other 30 kinds
 
-`Repository` creates the destination; the other 29 kinds cover the rest of a repository's
+`Repository` creates the destination; the other 30 kinds cover the rest of a repository's
 and an organization's configuration. They share a shape — reference a
 `<Kind>Configuration`, name the target with GitHub's own path parameters (`owner`/`repo`,
 or `org`), set the fields, apply — and every verb of every one of them is native
@@ -525,7 +527,7 @@ spec:
 
 ```console
 $ # oasgen should generate a CRD per kind, plus a <Kind>Configuration CRD for each
-$ kubectl get crd | grep -c github.krateo.io     # 60 = 30 kinds + 30 Configurations
+$ kubectl get crd | grep -c github.krateo.io     # 62 = 31 kinds + 31 Configurations
 $ kubectl get restdefinitions.ogen.krateo.io -n krateo-system
 $ # and a rest-dynamic-controller Deployment per kind it has reconciled
 $ kubectl get deploy -n krateo-system \
@@ -533,9 +535,9 @@ $ kubectl get deploy -n krateo-system \
 ```
 
 Every Deployment that shows up there was generated by oasgen-provider, because the chart
-ships none of its own: the release renders 30 ConfigMaps and 30 RestDefinitions and
+ships none of its own: the release renders 31 ConfigMaps and 31 RestDefinitions and
 nothing else.
 
 Set `krateo.io/connector-verbose: "true"` on a resource CR (as every sample does) and read
 that kind's own controller's logs. There is one log to check per kind and no second place
-to look: with all 30 kinds native, nothing sits in front of them.
+to look: with all 31 kinds native, nothing sits in front of them.
