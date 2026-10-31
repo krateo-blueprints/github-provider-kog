@@ -13,7 +13,7 @@ Curated history; release notes live in GitHub Releases.
 
 ## 2026-10-31 — `UserRepository` added (user-owned repos, 32nd kind)
 
-`UserRepository` closes the one remaining feature gap versus the legacy `krateoplatformops/github-provider`: creating a repository under the **authenticated user** rather than an org. It is the user-owned sibling of `Repository` — a separate kind because a RestDefinition has exactly one create verb and cannot choose `POST /orgs/{org}/repos` vs `POST /user/repos` at runtime. `appVersion` → `0.1.6`; the chart is now **32 kinds**.
+`UserRepository` closes the one remaining feature gap versus the legacy standalone `github-provider`: creating a repository under the **authenticated user** rather than an org. It is the user-owned sibling of `Repository` — a separate kind because a RestDefinition has exactly one create verb and cannot choose `POST /orgs/{org}/repos` vs `POST /user/repos` at runtime. `appVersion` → `0.1.6`; the chart is now **32 kinds**.
 
 - Create is `POST /user/repos` (no path parameter — the owner is the token account); get/update address `/repos/{owner}/{name}`, with `owner` a spec field set to the token user's own login (item-path only, not on create).
 - **No delete verb**, deliberately — deleting the CR orphans the repository, it does not destroy it, the same oasgen-provider #125 cascade-safety `Repository` takes.
