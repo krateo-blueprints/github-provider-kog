@@ -27,9 +27,13 @@ spec:
     additionalStatusFields:
       - role_name
     # affiliation is pinned by the findby verb's static `queries` below and per_page by its
-    # `pagination` block (sizePath). Excluding them keeps them out of the generated CRD: every OAS
-    # parameter of every verb otherwise becomes a spec field, and a user-settable `affiliation: all`
-    # would silently break observe (see below).
+    # `pagination` block (sizePath). Both are query parameters of the findby (list) verb, not create
+    # parameters, so neither was ever a spec field — oasgen builds the spec from the create operation
+    # alone (getBaseSchemaForSpec) and warns that each excludedSpecFields entry below is not in the
+    # schema. The entries are redundant no-ops, kept because excludedSpecFields is oasgen-immutable
+    # (#290); they record the intent that these stay fixed and non-user-settable. (The hazard they
+    # guard against — a user-settable `affiliation: all` silently breaking observe, see below — never
+    # arises precisely because affiliation is not a spec field in the first place.)
     excludedSpecFields:
       - affiliation
       - per_page
@@ -112,7 +116,8 @@ spec:
         # a duplicate create: 50 x 100 = 5000 direct collaborators before the walk gives up.
         #
         # `page` is not declared as an OAS parameter and is intentionally NOT added: the paginator
-        # sets it on the URL directly, so it never becomes a spec field, and excludedSpecFields
+        # sets it on the URL directly. A findby (list) verb's query parameters are not create
+        # parameters, so `page` would not be a spec field even if declared; excludedSpecFields
         # (oasgen-immutable) stays unchanged. per_page remains an OAS parameter + excludedSpecFields
         # entry — the paginator sets its value, it is still not user-settable.
         pagination:

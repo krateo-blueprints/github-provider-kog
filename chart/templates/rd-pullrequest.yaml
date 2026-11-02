@@ -41,14 +41,18 @@ spec:
       - state
       - merged
       - merged_at
-    # pull_number is assigned by GitHub on create, so it must NOT be a (required) spec field;
-    # get/update source it from status.number via the requestFieldMapping below. Same shape as
-    # Issue's issue_number.
+    # pull_number is a path parameter on get/update only, never a create parameter — and oasgen
+    # builds the spec from the create operation alone (getBaseSchemaForSpec) — so it is not a spec
+    # field to begin with. The excludedSpecFields entry below is a redundant no-op (oasgen warns it
+    # is not in the schema), kept because excludedSpecFields is oasgen-immutable (#290) and it records
+    # the intent that the number is never author-supplied; get/update source the path parameter from
+    # status.number via the requestFieldMapping below. Same shape as Issue's issue_number.
     excludedSpecFields:
       - pull_number
     # Compare exactly what the PATCH body can express. The CRD spec is built from the CREATE body
-    # plus the path/query parameters of every verb, so of the PATCH's four properties only
-    # title/body/base are spec fields — `state` is not — and the effective compared set is
+    # plus the create operation's own path/query parameters (getBaseSchemaForSpec hardcodes the
+    # create action), so of the PATCH's four properties only title/body/base are spec fields —
+    # `state` is not, because it lives in the PATCH body only — and the effective compared set is
     # {title, body, base}: all three are properties of the GET response and all three are fixable
     # by the PATCH. head is a spec field but not in the PATCH body, so `updatable` never compares it
     # (a PR's head cannot be changed after creation anyway).
@@ -122,8 +126,9 @@ spec:
         # a duplicate create: 50 x 100 = 5000 PRs before the walk gives up.
         #
         # Neither `page` nor `per_page` is a declared OAS parameter of pulls/list and neither is
-        # added: the paginator sets both on the URL directly, so nothing new becomes a spec field and
-        # excludedSpecFields (oasgen-immutable, [pull_number]) stays unchanged.
+        # added: the paginator sets both on the URL directly. A list (findby) verb's query parameters
+        # are not create parameters, so they would never be spec fields even if declared; and
+        # excludedSpecFields (oasgen-immutable, [pull_number]) stays unchanged regardless.
         pagination:
           type: pageNumber
           pageNumber:

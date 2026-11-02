@@ -19,9 +19,12 @@ spec:
       - html_url
       - state
       - comments
-    # issue_number is assigned by GitHub on create, so it must NOT be a (required) spec
-    # field; get/update source it from status.number via the requestFieldMapping below.
-    # Same shape as PullRequest's pull_number.
+    # issue_number is a path parameter on get/update only, never a create parameter — and oasgen
+    # builds the spec from the create operation alone (getBaseSchemaForSpec) — so it is not a spec
+    # field to begin with. The excludedSpecFields entry below is a redundant no-op (oasgen warns it
+    # is not in the schema), kept because excludedSpecFields is oasgen-immutable (#290) and it records
+    # the intent that the number is never author-supplied; get/update source the path parameter from
+    # status.number via the requestFieldMapping below. Same shape as PullRequest's pull_number.
     excludedSpecFields:
       - issue_number
     # `updatable` compares title, body, state and state_reason — the whole PATCH body, and all

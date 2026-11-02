@@ -21,9 +21,13 @@ spec:
       - url
       - verified
       - created_at
-    # key_id is a path parameter on get/delete but is not knowable at create time, so it must
-    # not become a (required) spec field; the requestFieldMapping entries below source it from
-    # status.id. Same pattern as PullRequest's pull_number.
+    # key_id is a path parameter on get/delete only, never a create parameter — and oasgen builds
+    # the spec from the create operation alone (getBaseSchemaForSpec) — so it is not a spec field to
+    # begin with. The excludedSpecFields entry below is therefore a redundant no-op (oasgen warns it
+    # is not in the schema), kept because excludedSpecFields is oasgen-immutable (#290) and it records
+    # the intent that the id is never author-supplied. What actually fills the path parameter is the
+    # requestFieldMapping below, which sources it from status.id. Same pattern as PullRequest's
+    # pull_number.
     excludedSpecFields:
       - key_id
     # DELIBERATE, and the one non-obvious choice in this file.

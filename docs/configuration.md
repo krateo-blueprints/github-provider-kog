@@ -42,9 +42,12 @@ follows is the mapping mechanics.
 
 Three patterns recur across the set and are worth reading once:
 
-- **Server-assigned identifiers.** When GitHub assigns the item key on create, that key
-  is `excludedSpecFields` (so it never becomes a required spec field the author has to
-  fill in) and each item verb sources it from status via `requestFieldMapping`. That is
+- **Server-assigned identifiers.** When GitHub assigns the item key on create, that key is a
+  path parameter on the item verbs only — never a create parameter — so oasgen (which builds the
+  spec from the create operation alone) never makes it a spec field, and each item verb sources it
+  from status via `requestFieldMapping`. The matching `excludedSpecFields` entry is a redundant
+  no-op, kept because `excludedSpecFields` is immutable (#290) and it records that the key is never
+  author-supplied. That is
   `Release`'s `release_id` / `status.id` shape, shared by `Milestone`, `Issue`,
   `RepoWebhook`, `OrgWebhook`, `DeployKey`, `Autolink`, `RunnerGroup`,
   `DeploymentBranchPolicy`, `RepoRuleset`, `OrgRuleset`, `CodeSecurityConfig` and
@@ -54,10 +57,14 @@ Three patterns recur across the set and are worth reading once:
   `create` and `update` name the same method and path: `Collaborator`, `OrgMembership`,
   `TeamMembership`, `TeamRepo`, `Environment`, `CustomProperty` and `BranchProtection`
   all declare one method and one path for both.
-- **Path parameters are spec fields.** Every OAS parameter of every verb becomes a CR
-  spec field of the same name, which is why several assets rename or exclude parameters
-  rather than accept GitHub's naming (see `Repository`'s `org`/`name` below, and
-  `CustomProperty`'s `property_name`).
+- **Only the create operation's parameters are spec fields.** oasgen builds the spec from the
+  create operation alone — its body plus its own path/query parameters — so a parameter that
+  appears only on the other verbs is never a spec field. A non-create path parameter is instead
+  filled by name from a same-named spec field (the one the create operation already produced), or
+  sourced from status via a mapping. That is why several assets rename parameters so the
+  create-derived fields can fill the item paths (see `Repository`'s `org`/`name` below, and
+  `CustomProperty`'s `property_name`), and why a server-assigned id that no create field can supply
+  is sourced from status instead.
 
 **Access**
 
@@ -317,14 +324,16 @@ are a plain `.Files.Get`: the assets contain no template action, so nothing is
 overrides `servers` — every verb of every kind keeps `https://api.github.com`.
 
 What the assets do carry is parameter naming, and `repository.yaml` is the clearest case.
-GitHub addresses a repository as `/repos/{owner}/{repo}`; the asset declares the parameters
-as `org` and `name`. A path parameter becomes a CR spec field of the same name, so
-naming them after GitHub would give the CRD an `owner` alongside the `org` the create
-path (`/orgs/{org}/repos`) needs, and a `repo` alongside the `name` the create body
-needs — a duplicate pair the author has to keep in sync by hand. Naming them `org` and
-`name` lets **one** pair of fields serve the create path, the create body and the
-get/update/delete path. `customproperty.yaml` applies the same rename, turning GitHub's
-`custom_property_name` into `property_name`.
+GitHub addresses a repository as `/repos/{owner}/{repo}`; the asset declares those path
+parameters as `org` and `name`. The spec fields come from the create operation: `org` is the
+create path parameter (`/orgs/{org}/repos`) and `name` is a create-body field. A non-create path
+parameter is filled by name from a same-named spec field, so naming the item-path parameters `org`
+and `name` lets that **one** pair of create-derived fields serve the create path, the create body
+and the get/update/delete path. Had the asset kept GitHub's `owner`/`repo` instead, there would be
+no `spec.owner`/`spec.repo` to fill them from — they are not create parameters, so they would not
+be spec fields — and the item verbs could not be addressed from the spec without extra mapping.
+`customproperty.yaml` applies the same rename, turning GitHub's `custom_property_name` into
+`property_name`.
 
 `repository.yaml` models only the org-scoped create: GitHub's user-scoped create,
 `POST /user/repos`, is a **separate kind**, `UserRepository`. A RestDefinition has exactly one

@@ -11,6 +11,37 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-02 — docs: correct the "every parameter becomes a spec field" claim
+
+Several comments and docs stated that **every OAS parameter of every verb** becomes a CR spec
+field, and framed each `excludedSpecFields` entry as what keeps a parameter out of the CRD. That is
+wrong. oasgen-provider builds a CRD's `spec` from the **create operation alone** — its request body
+plus the create operation's own path/query parameters (`getBaseSchemaForSpec` hardcodes the create
+action). A parameter that appears only on the other verbs is therefore never a spec field in the
+first place.
+
+Measured on krateo-057's live CRDs: the get/update/delete-only path parameters listed in
+`excludedSpecFields` (`pull_number`, `hook_id`, `autolink_id`, `ruleset_id`, `key_id`,
+`branch_policy_id`, `issue_number`, `milestone_number`, `release_id`, `deployment_id`,
+`runner_group_id`, `configuration_id`, `team_slug`) — plus `RepoContent`'s `ref` and
+`UserRepository`'s `owner` — are **absent** from `spec.properties`/`spec.required`, and oasgen emits
+`field '<x>' set in excludedSpecFields not found in schema` for each. So those entries, and the
+findby `queries` parameters (`Collaborator`'s `affiliation`/`per_page`, `UserRepository`'s
+`affiliation`/`sort`/`direction`/`per_page`/`page`), are **redundant no-ops**. What actually fills a
+non-create path parameter is either a same-named spec field the create operation already produced
+(the real reason `Repository` renames its parameters to `org`/`name`) or a `requestFieldMapping` /
+`fieldMapping` from `status`.
+
+**Why the no-op entries stay.** `excludedSpecFields` is oasgen-immutable (#290); removing a redundant
+entry would break upgrades on every existing cluster. Each such comment was reworded to say the entry
+is retained for immutability, is a no-op because the field is not a create parameter, and records the
+intent that the value is never author-supplied — **no `excludedSpecFields` entry (or any other YAML
+value) was added, removed, reordered or changed.** Comments and prose only. Proof: `helm template`
+of `origin/main` and this branch parsed to **identical** objects across all 64 rendered documents
+(32 RestDefinitions + 32 ConfigMaps, the embedded asset YAML re-parsed), every raw textual difference
+being a comment line; `helm lint`, `hack/assert-drift-invariants.py` and `hack/preflight-refs.py` all
+pass.
+
 ## 2026-11-02 — `Collaborator` and `PullRequest` findby now paginate
 
 Both findby verbs — `Collaborator` (`GET /repos/{owner}/{repo}/collaborators`) and `PullRequest`
