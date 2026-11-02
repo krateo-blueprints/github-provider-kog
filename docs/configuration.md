@@ -360,17 +360,23 @@ actually be immune to this whole-config hazard). The blocker is **optionality, n
 capability**: the resolver is all-or-nothing — it errors when the pointer path is absent on
 the CR, with no absent/`when` guard (unlike `dependentLookup`, which has one) — so declaring
 it would make the secret **mandatory** and break both secretless webhooks and existing
-plaintext CRs. An upstream guard (parity with `dependentLookup`'s
-`when.customResourceFieldAbsent`) is **in progress** —
+plaintext CRs. An upstream absent-guard (parity with `dependentLookup`'s
+`when.customResourceFieldAbsent`) is tracked in
 [krateo-platformops/oasgen-provider#383](https://github.com/krateo-platformops/oasgen-provider/issues/383),
-which wires the existing `guardSkips(r.When, mg)` (today used only by `dependentLookup`)
-into the `secretRef` branch. Once it ships in a release the cluster runs, an **optional**
+**held** until a constraint on which Secrets a resolver may read is designed — an
+implementation exists on a branch, with no PR and no release. Once it ships, an **optional**
 `config.secretRef` can be added additively, with no immutable-field change (the pointer is
 not in the update body schema, so it is never compared). That planned optional
 `config.secretRef` will document the **namespace as the trust boundary** — as
 `configurationRef` already is for the GitHub token: anyone who can create a webhook CR in
 namespace *N* can make GitHub sign with any Secret in *N*. No timeline or version is
-promised; use random secrets of at least 32 bytes regardless.
+promised.
+
+Regardless of how the secret is supplied, use a **random secret of at least 32 bytes**:
+that defeats *offline guessing* of the secret from captured signed deliveries. It does
+**not** stop *replay* of genuine signed deliveries — entropy does not cover that — so the
+receiver must also verify `repository.full_name` in the payload (and may pin the
+`X-GitHub-Hook-ID` header) to reject deliveries replayed from, or meant for, another hook.
 
 ### Normalization in the RestDefinition
 

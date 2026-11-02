@@ -30,8 +30,9 @@ write-only `reviewers` / `wait_timer` / `prevent_self_review`), and **declarativ
 rest, where the CR can express the value and a revert is normal Kubernetes behaviour). This is
 documented in a new `docs/configuration.md` section, with a webhook-secret guidance block (the CR is
 authoritative for the secret; why it is not yet sourced from a `Secret` — the `secretRef` resolver is
-all-or-nothing, so an upstream absent-guard is needed first, now in progress as
-[oasgen-provider#383](https://github.com/krateo-platformops/oasgen-provider/issues/383), before an
+all-or-nothing, so an upstream absent-guard is needed first, tracked in
+[oasgen-provider#383](https://github.com/krateo-platformops/oasgen-provider/issues/383) but held until a
+constraint on which Secrets a resolver may read is designed, before an
 optional `config.secretRef` can be added additively), and pointers from `docs/api.md`, `docs/usage.md` and the six affected
 `rd-<kind>.yaml` assets.
 
