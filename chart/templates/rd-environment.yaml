@@ -39,6 +39,11 @@ spec:
     # The comparator ignores a spec key the response does not carry, so they cannot loop; they
     # simply are not observed. Someone editing those three settings in the GitHub UI will not be
     # reverted. deployment_branch_policy IS returned top-level, so it is genuinely reconciled.
+    #
+    # Ownership note: "not compared" is not "safe". Because the whole PUT body is re-sent from
+    # spec, a PUT fired by deployment_branch_policy drift still OVERWRITES out-of-band wait_timer /
+    # prevent_self_review / reviewers from spec — invisibly, since they are write-only. See
+    # docs/configuration.md "Updates send whole values — what a CR owns".
     configurationFields: []
     verbsDescription:
       # PUT is create-or-update upstream, so create and update are the same endpoint. Observe

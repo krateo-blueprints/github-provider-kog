@@ -11,6 +11,38 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-02 — docs: whole-value update semantics and what a CR owns
+
+A whole-map overwrite audit of the chart established that `rest-dynamic-controller` assembles an
+update/PUT body **by top-level spec key**, so every object/map/array spec field is sent **whole on
+every update**. `compareScope` governs only what is *compared* (what can *trigger* an update), never
+what is *sent* — so once an update fires, the complete value from spec goes on the wire, and where
+GitHub replaces that value rather than merging it, anything present on GitHub but absent from the CR
+is removed. Arrays are compared positionally, so an out-of-band element does not slip past — it
+lengthens the array, reads as drift, and triggers the very replacing PUT that deletes it.
+
+The audit classified every exposed object/array across the 32 kinds into: **data loss / capability
+gap** (the 14 unmodelled `RepoRuleset`/`OrgRuleset` rule types; `BranchProtection`'s unmodelled
+`dismissal_restrictions` / `bypass_pull_request_allowances` / `checks` app_id form; webhook
+`config` keys `token`/`digest`/`username`/`password`), **silent** (webhook `config.secret` — cleared
+on any config PATCH if set out-of-band, and masked on read, the most important case; `Environment`'s
+write-only `reviewers` / `wait_timer` / `prevent_self_review`), and **declarative by design** (the
+rest, where the CR can express the value and a revert is normal Kubernetes behaviour). This is
+documented in a new `docs/configuration.md` section, with a webhook-secret guidance block (the CR is
+authoritative for the secret; why it is not yet sourced from a `Secret` — the `secretRef` resolver is
+all-or-nothing, so an upstream absent-guard is being requested before an optional `config.secretRef`
+can be added additively), and pointers from `docs/api.md`, `docs/usage.md` and the six affected
+`rd-<kind>.yaml` assets.
+
+The audit was prompted by the openstack-ironic-operator-kog session's finding that a partial
+`spec.extra` deleted previously-set Ironic keys — the same whole-value replace hazard, in a different
+provider. The webhook-`config.secret` clearing specifically is MED-HIGH confidence (GitHub's
+wholesale-replace config model plus the asset authors' statement), **not** live-verified. Docs and
+comments only — **no YAML value was added, removed, reordered or changed.** Proof: `helm template` of
+`origin/main` and this branch parsed to **identical** objects across all 64 rendered documents (32
+RestDefinitions + 32 ConfigMaps, the embedded asset YAML re-parsed); `helm lint`,
+`hack/assert-drift-invariants.py` and `hack/preflight-refs.py` all pass.
+
 ## 2026-11-02 — docs: correct the "every parameter becomes a spec field" claim
 
 Several comments and docs stated that **every OAS parameter of every verb** becomes a CR spec

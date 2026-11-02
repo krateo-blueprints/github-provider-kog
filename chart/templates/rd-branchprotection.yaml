@@ -29,6 +29,11 @@ spec:
     # — but it is one response-shape change away from comparing a path parameter against nothing.
     # `identifiersAndStatus` would be actively wrong here: it would compare only `url`, so editing
     # `enforce_admins` or `required_status_checks` on a live CR would silently never be pushed.
+    #
+    # Ownership note: the PUT replaces the WHOLE protection document, so unmodelled sub-controls set
+    # in the UI (required_pull_request_reviews.dismissal_restrictions / .bypass_pull_request_allowances,
+    # and the required_status_checks `checks` app_id form) are wiped when any modelled field drifts.
+    # See docs/configuration.md "Updates send whole values — what a CR owns".
     compareScope: updatable
     configurationFields: []
     verbsDescription:
