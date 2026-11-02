@@ -11,6 +11,79 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-03 — feat: model merge_queue and the five pattern ruleset rules
+
+Closed six of the fourteen `RepoRuleset`/`OrgRuleset` rule-type capability gaps the 2026-11-02
+whole-value audit flagged as **data loss** (a rule type a CR cannot express is deleted on reconcile
+because the PUT re-sends the whole `rules` array): `merge_queue` and the five pattern rules
+`commit_message_pattern`, `commit_author_email_pattern`, `committer_email_pattern`,
+`branch_name_pattern`, `tag_name_pattern`. Modelled rule types go from 9 to 15; eight remain
+unmodelled by design — the four product-reference rules (`workflows`, `code_scanning`,
+`license_compliance_scanning`, `copilot_code_review`, which key other GitHub products by IDs this
+provider cannot resolve) and the four Enterprise-only push-target rules (`file_path_restriction`,
+`max_file_path_length`, `file_extension_restriction`, `max_file_size`).
+
+The asset comment had claimed the pattern rules' `name`/`pattern` keys "would collide with the
+ruleset's own name inside a union `parameters` object", and omitted them for that reason. Checked
+against the oasgen-provider monorepo at tag **0.43.0** (what clusters run) and current `main`: there
+is **no collision**. oasgen's only name-merge logic (`addParametersToSpec` in
+`internal/tools/oas2jsonschema/spec_builder.go`, #108/#257) reconciles a **root-level** request-body
+property against a **path/query/header parameter** of the same name; it never walks nested body keys
+and never merges body-against-body. The pattern keys live at `rules[].parameters.{name,pattern}`,
+two levels below the top-level ruleset `name`, so the merge cannot reach them, and a property
+literally named `pattern` is parsed from the `properties` map by its key — a different field from the
+`pattern` validation keyword (`libopenapi_adapter`). So the six types were added to the existing
+`{type, parameters}` union, every key optional, with each type's GitHub-required set documented, and
+the misleading comment was replaced with the corrected explanation. The change is **purely additive**:
+the nine existing types keep an identical shape.
+
+GitHub echoes the new parameters verbatim on GET (`merge_method`/`grouping_strategy`/`operator` keep
+casing; pattern `name`/`pattern` stored as sent), and the comparator walks only keys the CR declares,
+so neither new type introduces a permanent-drift loop. `compareScope: updatable` and the positional
+array comparison are unchanged. Verified against GitHub's current REST `repository-rule` schema.
+
+Proof: `helm lint` + render (32 RestDefinitions + 32 ConfigMaps); `hack/assert-drift-invariants.py`
+and `hack/preflight-refs.py` pass; strict server dry-run of both RestDefinitions on krateo-057
+accepted (never applied); the `RepoRuleset`/`OrgRuleset` CRDs generated with `oasgen-render` at tag
+0.43.0 accept one valid CR per new rule type plus a `pull_request` regression control, and reject
+wrong-typed, bad-enum, unknown-type and missing-`type` samples; field-by-field immutable-field diff
+vs `origin/main` shows zero changes (`kind`, `identifiers`, `configurationFields`,
+`excludedSpecFields`, `resourceGroup`, `additionalStatusFields`, `includedSpecFields` all unchanged).
+
+## 2026-11-02 — docs: whole-value update semantics and what a CR owns
+
+A whole-map overwrite audit of the chart established that `rest-dynamic-controller` assembles an
+update/PUT body **by top-level spec key**, so every object/map/array spec field is sent **whole on
+every update**. `compareScope` governs only what is *compared* (what can *trigger* an update), never
+what is *sent* — so once an update fires, the complete value from spec goes on the wire, and where
+GitHub replaces that value rather than merging it, anything present on GitHub but absent from the CR
+is removed. Arrays are compared positionally, so an out-of-band element does not slip past — it
+lengthens the array, reads as drift, and triggers the very replacing PUT that deletes it.
+
+The audit classified every exposed object/array across the 32 kinds into: **data loss / capability
+gap** (the 14 unmodelled `RepoRuleset`/`OrgRuleset` rule types; `BranchProtection`'s unmodelled
+`dismissal_restrictions` / `bypass_pull_request_allowances` / `checks` app_id form; webhook
+`config` keys `token`/`digest`/`username`/`password`), **silent** (webhook `config.secret` — cleared
+on any config PATCH if set out-of-band, and masked on read, the most important case; `Environment`'s
+write-only `reviewers` / `wait_timer` / `prevent_self_review`), and **declarative by design** (the
+rest, where the CR can express the value and a revert is normal Kubernetes behaviour). This is
+documented in a new `docs/configuration.md` section, with a webhook-secret guidance block (the CR is
+authoritative for the secret; why it is not yet sourced from a `Secret` — the `secretRef` resolver is
+all-or-nothing, so an upstream absent-guard is needed first, tracked in
+[oasgen-provider#383](https://github.com/krateo-platformops/oasgen-provider/issues/383) but held until a
+constraint on which Secrets a resolver may read is designed, before an
+optional `config.secretRef` can be added additively), and pointers from `docs/api.md`, `docs/usage.md` and the six affected
+`rd-<kind>.yaml` assets.
+
+The audit was prompted by the openstack-ironic-operator-kog session's finding that a partial
+`spec.extra` deleted previously-set Ironic keys — the same whole-value replace hazard, in a different
+provider. The webhook-`config.secret` clearing specifically is MED-HIGH confidence (GitHub's
+wholesale-replace config model plus the asset authors' statement), **not** live-verified. Docs and
+comments only — **no YAML value was added, removed, reordered or changed.** Proof: `helm template` of
+`origin/main` and this branch parsed to **identical** objects across all 64 rendered documents (32
+RestDefinitions + 32 ConfigMaps, the embedded asset YAML re-parsed); `helm lint`,
+`hack/assert-drift-invariants.py` and `hack/preflight-refs.py` all pass.
+
 ## 2026-11-02 — docs: correct the "every parameter becomes a spec field" claim
 
 Several comments and docs stated that **every OAS parameter of every verb** becomes a CR spec

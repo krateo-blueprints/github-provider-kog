@@ -50,6 +50,10 @@ spec:
     # back verbatim on GET — merge_method / grouping_strategy / operator keep their casing, the
     # pattern `name`/`pattern` strings are stored as sent — so none introduces a permanent drift
     # loop.
+    #
+    # Ownership note: the PUT re-sends the WHOLE `rules` array, so a UI-added rule of one of the 8
+    # still-unmodelled rule types on this CR-managed ruleset is DELETED on the next reconcile (the
+    # CR cannot express it). See docs/configuration.md "Updates send whole values — what a CR owns".
     configurationFields: []
     verbsDescription:
       - action: create

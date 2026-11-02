@@ -49,6 +49,12 @@ spec:
     # `identifiersAndStatus` was rejected: it would also stop comparing the delivery URL and the
     # event list, which ARE fixable by the PATCH and are exactly what an operator expects a
     # controller to hold in place.
+    #
+    # Ownership note: because the whole `config` map is re-sent and GitHub replaces it wholesale,
+    # the CR is AUTHORITATIVE for config.secret — a secret set out-of-band (UI, Terraform) is
+    # CLEARED on the next config PATCH, silently disabling HMAC signing (masked ******** on read).
+    # Keep the secret in spec.config.secret and treat this CR as sensitive. See
+    # docs/configuration.md "Updates send whole values — what a CR owns".
     compareScope: updatable
     configurationFields: []
     verbsDescription:

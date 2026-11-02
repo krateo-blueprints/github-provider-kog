@@ -36,6 +36,11 @@ spec:
     # config.content_type, config.insecure_ssl, events and active — the fixable set — while the
     # secret still rides along on any PATCH, because the request body is assembled by top-level
     # key and carries the whole `config` map.
+    #
+    # Ownership note: GitHub replaces `config` wholesale, so the CR is AUTHORITATIVE for
+    # config.secret — a secret set out-of-band is CLEARED on the next config PATCH (and org hooks
+    # also drop unmodelled config.username/password). See docs/configuration.md
+    # "Updates send whole values — what a CR owns".
     compareScope: updatable
     configurationFields: []
     verbsDescription:

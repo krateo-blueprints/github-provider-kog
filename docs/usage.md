@@ -372,10 +372,20 @@ spec:
   must already have a commit — a protection `PUT` against an empty branch is a `404` —
   and `restrictions` is org-only. Write `contexts` and `restrictions` sorted; the
   observed lists come back that way.
-- **Webhook secrets sit in the CR in clear text.** `config.secret` is the HMAC key GitHub
-  signs deliveries with and there is no Secret-backed field for it, so treat
-  `RepoWebhook` / `OrgWebhook` CRs as sensitive — or leave it out and verify deliveries
-  another way.
+- **Webhook secrets sit in the CR in clear text, and the CR owns them.** `config.secret`
+  is the HMAC key GitHub signs deliveries with and there is no Secret-backed field for it,
+  so treat `RepoWebhook` / `OrgWebhook` CRs as sensitive — or leave it out and verify
+  deliveries another way. The CR is **authoritative**: a secret set out-of-band (UI,
+  Terraform) is cleared on the next config update, because the whole `config` map is re-sent
+  and GitHub replaces it wholesale. Set it in `spec.config.secret` and do not rotate it
+  elsewhere.
+- **These kinds own their object/array fields wholesale.** For `RepoRuleset`, `OrgRuleset`,
+  `BranchProtection`, `RepoWebhook`, `OrgWebhook` and `Environment`, an update re-sends the
+  *whole* value of each managed object/array, so anything added out-of-band that the CR
+  cannot express (a ruleset rule of an unmodelled type, a UI-set branch-protection
+  sub-control) is deleted on the next reconcile. Do not mix CR-managed and hand-managed
+  state on the same ruleset / protection / webhook / environment — see
+  [configuration → Updates send whole values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
 - **`DeployKey` and `Autolink` are immutable.** GitHub has no update endpoint for either;
   to rotate a key or change an autolink prefix, delete the CR and create a new one.
 - **`Environment`'s two `deployment_branch_policy` booleans must disagree** —
