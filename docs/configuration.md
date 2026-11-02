@@ -361,9 +361,16 @@ capability**: the resolver is all-or-nothing — it errors when the pointer path
 the CR, with no absent/`when` guard (unlike `dependentLookup`, which has one) — so declaring
 it would make the secret **mandatory** and break both secretless webhooks and existing
 plaintext CRs. An upstream guard (parity with `dependentLookup`'s
-`when.customResourceFieldAbsent`) is being requested; once it exists, an **optional**
+`when.customResourceFieldAbsent`) is **in progress** —
+[krateo-platformops/oasgen-provider#383](https://github.com/krateo-platformops/oasgen-provider/issues/383),
+which wires the existing `guardSkips(r.When, mg)` (today used only by `dependentLookup`)
+into the `secretRef` branch. Once it ships in a release the cluster runs, an **optional**
 `config.secretRef` can be added additively, with no immutable-field change (the pointer is
-not in the update body schema, so it is never compared). No timeline is promised.
+not in the update body schema, so it is never compared). That planned optional
+`config.secretRef` will document the **namespace as the trust boundary** — as
+`configurationRef` already is for the GitHub token: anyone who can create a webhook CR in
+namespace *N* can make GitHub sign with any Secret in *N*. No timeline or version is
+promised; use random secrets of at least 32 bytes regardless.
 
 ### Normalization in the RestDefinition
 
