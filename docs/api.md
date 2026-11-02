@@ -242,8 +242,8 @@ Two further properties of the observe path:
   *effective* permission, so any org member on a repo with a base permission would read
   back as an existing, up-to-date collaborator and the PUT would never fire.
   `affiliation=direct` is the only view that reports the repository-level grant this CR
-  owns. No pagination is configured, deliberately, so a repository with more than 100
-  direct collaborators observes only the first 100.
+  owns. The findby walks every page via the `pageNumber` pagination strategy (short-page
+  termination), so a repository with more than 100 direct collaborators is observed in full.
 - Adding a user who is **not** an organization member creates a repository
   **invitation** (201), and an invitee is not a collaborator until they accept — so the
   CR stays not-Ready and re-issues the PUT each reconcile until then. GitHub caps

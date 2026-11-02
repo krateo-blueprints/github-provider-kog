@@ -347,12 +347,14 @@ server-assigned id:
           - inResponse: ref
             inCustomResource: status.shortRef
             valueMapping: { type: jq, jq: { inline: 'ltrimstr("refs/")' } }
-      # COLD START and adoption. Unpaginated by GitHub's own behaviour (probed), which matters:
-      # the controller's only pagination strategy is continuationToken, which re-sends a response
-      # HEADER verbatim as a query parameter (types.go:40-74) and cannot read GitHub's Link header —
-      # the same limitation documented on rd-collaborator.yaml:97-103. `/git/refs` IS paginated and
-      # is therefore the wrong endpoint. Use `/git/matching-refs/` (no trailing segment) if the kind
-      # must also observe TAGS cold; the body then carries every ref in the repository.
+      # COLD START and adoption. `/git/matching-refs/heads` is UNPAGINATED by GitHub's own behaviour
+      # (probed): a single response carries every matching ref, so no pagination walk is needed here
+      # at all. `/git/refs` IS paginated and is therefore the wrong endpoint — pick the endpoint that
+      # returns the whole set in one body rather than one that must be paged. (Where a list endpoint
+      # genuinely is paged, the controller's `pageNumber` strategy — used by Collaborator and
+      # PullRequest findby — increments `?page` and walks it; it exists since oasgen-provider 0.24.0,
+      # #142.) Use `/git/matching-refs/` (no trailing segment) if the kind must also observe TAGS
+      # cold; the body then carries every ref in the repository.
       - action: findby
         method: GET
         path: /repos/{owner}/{repo}/git/matching-refs/heads

@@ -100,14 +100,41 @@ spec:
         identifiersMatchPolicy: AND
         queries:
           # state=all so a merged/closed PR is still found (group B is reported precisely because the
-          # PR's state changed after creation). per_page=100 is GitHub's max; no pagination strategy
-          # is configured (the controller's continuationToken scheme does not fit GitHub's Link
-          # header), so a repo with >100 PRs observes only the first page — far beyond any blueprint
-          # publish repo, but stated rather than hidden.
+          # PR's state changed after creation).
           - name: state
             value: all
-          - name: per_page
-            value: "100"
+        # Walk EVERY page. per_page is no longer a static query — the pageNumber paginator sets both
+        # per_page (sizePath) and page (pagePath) on the URL, so a repo with more than 100 PRs is
+        # observed in full. This closes the >100-PR wedge: a PR sitting on page 2 used to read as
+        # not-found, the reconciler re-created it, and GitHub answered 422 "pull request already
+        # exists" every reconcile thereafter.
+        #
+        # Why pageNumber and not continuationToken: GitHub paginates with a Link header, not a bare
+        # token a continuation scheme could re-send as a query parameter. pageNumber just increments
+        # ?page. The strategy has existed since oasgen-provider 0.24.0 (#142), well under the chart's
+        # 0.38.0 floor — the earlier "only continuationToken" claim was out of date.
+        #
+        # End-of-collection is the SHORT-PAGE rule (no `response` block): a page holding fewer than
+        # pageSize items is the last. Deliberately NOT the Link-header signal — GitHub omits the Link
+        # header entirely when the results fit on one page, and a declared-but-absent header is
+        # reported as Indeterminate (an error), which would fail the common single-page case.
+        # Running out of maxPages is likewise Indeterminate, never "not found", so it can never cause
+        # a duplicate create: 50 x 100 = 5000 PRs before the walk gives up.
+        #
+        # Neither `page` nor `per_page` is a declared OAS parameter of pulls/list and neither is
+        # added: the paginator sets both on the URL directly, so nothing new becomes a spec field and
+        # excludedSpecFields (oasgen-immutable, [pull_number]) stays unchanged.
+        pagination:
+          type: pageNumber
+          pageNumber:
+            request:
+              pageIn: query
+              pagePath: page
+              startPage: 1
+              sizeIn: query
+              sizePath: per_page
+              pageSize: 100
+            maxPages: 50
         responseTransform:
           inline: |
             . as $r

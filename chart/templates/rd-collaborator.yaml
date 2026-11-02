@@ -26,9 +26,10 @@ spec:
     # When they differ, this field is what shows it.
     additionalStatusFields:
       - role_name
-    # affiliation and per_page are pinned by the findby verb's static `queries` below. Excluding them
-    # keeps them out of the generated CRD: every OAS parameter of every verb otherwise becomes a spec
-    # field, and a user-settable `affiliation: all` would silently break observe (see below).
+    # affiliation is pinned by the findby verb's static `queries` below and per_page by its
+    # `pagination` block (sizePath). Excluding them keeps them out of the generated CRD: every OAS
+    # parameter of every verb otherwise becomes a spec field, and a user-settable `affiliation: all`
+    # would silently break observe (see below).
     excludedSpecFields:
       - affiliation
       - per_page
@@ -92,14 +93,39 @@ spec:
           # access through the organization or a team — the false-exists bug this verb exists to avoid.
           - name: affiliation
             value: direct
-          # GitHub's maximum page size. No pagination strategy is configured, deliberately: the
-          # controller's only strategy, continuationToken, takes a response header's value verbatim
-          # and re-sends it as a query parameter, whereas GitHub's Link header is a list of bracketed
-          # URLs with rel labels, not a bare token. Declaring it would send that string as ?page=.
-          # So a repository with more than 100 DIRECT collaborators observes only the first 100 —
-          # far beyond any repository a Krateo blueprint provisions, but stated rather than hidden.
-          - name: per_page
-            value: "100"
+        # Walk EVERY page. per_page is no longer a static query — the pageNumber paginator sets both
+        # per_page (sizePath) and page (pagePath) on the URL itself, so a repository with more than
+        # 100 DIRECT collaborators is now observed in full instead of only the first page (the stale
+        # note this replaces claimed the opposite).
+        #
+        # Why pageNumber and not continuationToken: GitHub paginates with a Link header (a list of
+        # bracketed, rel-labelled URLs), not a bare token a continuation scheme could re-send as a
+        # query parameter. pageNumber just increments ?page, which is what GitHub's list endpoints
+        # take. The strategy has existed since oasgen-provider 0.24.0 (#142), well under the chart's
+        # 0.38.0 floor — the earlier "only continuationToken" claim was out of date.
+        #
+        # End-of-collection is the SHORT-PAGE rule (no `response` block): a page holding fewer than
+        # pageSize items is the last. Deliberately NOT the Link-header signal — GitHub omits the Link
+        # header entirely when the results fit on one page, and a declared-but-absent header is
+        # reported as Indeterminate (an error), which would fail the common single-page case.
+        # Running out of maxPages is likewise Indeterminate, never "not found", so it can never cause
+        # a duplicate create: 50 x 100 = 5000 direct collaborators before the walk gives up.
+        #
+        # `page` is not declared as an OAS parameter and is intentionally NOT added: the paginator
+        # sets it on the URL directly, so it never becomes a spec field, and excludedSpecFields
+        # (oasgen-immutable) stays unchanged. per_page remains an OAS parameter + excludedSpecFields
+        # entry — the paginator sets its value, it is still not user-settable.
+        pagination:
+          type: pageNumber
+          pageNumber:
+            request:
+              pageIn: query
+              pagePath: page
+              startPage: 1
+              sizeIn: query
+              sizePath: per_page
+              pageSize: 100
+            maxPages: 50
         fieldMapping:
           # GitHub reports role_name in the DISPLAY vocabulary (read/triage/write/maintain/admin)
           # while the PUT body takes pull/triage/push/maintain/admin. Three values coincide; `read`
