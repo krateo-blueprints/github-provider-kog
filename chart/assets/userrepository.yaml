@@ -1,0 +1,244 @@
+openapi: 3.0.3
+info:
+  version: 2022-11-28
+  title: GitHub v3 REST API - User Repositories
+servers:
+  - url: https://api.github.com
+paths:
+  # The authenticated user's own repositories. This kind has NO hand-set owner: GitHub decides the
+  # owner of a POST /user/repos from the TOKEN, so a CR-supplied owner could only ever disagree with
+  # it. The owner is read back from GitHub instead (status.owner.login) and used for the item verbs.
+  "/user/repos":
+    # CREATE is user-scoped: the repository is created in the token's own account. This is the
+    # sibling of Repository's org-scoped create — a separate kind because a RestDefinition has
+    # exactly ONE create verb and cannot choose /orgs/{org}/repos vs /user/repos at runtime.
+    post:
+      summary: Create a repository for the authenticated user
+      operationId: repos/create-for-authenticated-user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                homepage:
+                  type: string
+                private:
+                  type: boolean
+                visibility:
+                  type: string
+                has_issues:
+                  type: boolean
+                has_wiki:
+                  type: boolean
+                has_projects:
+                  type: boolean
+                # CREATE-ONLY and load-bearing, exactly as in Repository: a repo created with
+                # auto_init=false has no commit and no default branch, so a later GitRef or
+                # RepoContent aimed at it fails until someone pushes by hand.
+                auto_init:
+                  type: boolean
+                  default: true
+                gitignore_template:
+                  type: string
+                license_template:
+                  type: string
+      responses:
+        '201':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
+    # FINDBY — the observe used while status.owner.login is still empty (first observe before the
+    # create, or a CR whose status was lost). It needs no owner at all: it lists the token user's
+    # repositories and matches the identifier `name`. The query parameters below are pinned by the
+    # findby verb's static `queries` / `pagination` and kept out of the CRD via excludedSpecFields.
+    get:
+      summary: List repositories for the authenticated user
+      operationId: repos/list-for-authenticated-user
+      parameters:
+        - $ref: '#/components/parameters/affiliation'
+        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/direction'
+        - $ref: '#/components/parameters/per_page'
+        - $ref: '#/components/parameters/page'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Repository'
+  # GET/PATCH address the repo as /repos/{owner}/{name}. `owner` is NOT a spec field
+  # (excludedSpecFields): both verbs source it from status.owner.login, which GitHub reports on the
+  # create, get and findby responses. Before that status exists the get cannot be built, so the
+  # controller observes through the findby above instead. There is NO delete verb: deleting the CR
+  # ORPHANS the repository, it does not destroy it — the same deliberate choice Repository makes,
+  # so the oasgen-provider #125 CRD cascade (uninstall / RD-drop) can never delete a user's
+  # repositories. Restore delete only with the #125 guard and a per-CR opt-in.
+  "/repos/{owner}/{name}":
+    get:
+      summary: Get a repository
+      operationId: repos/get-user-repo
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
+    patch:
+      summary: Update a repository
+      operationId: repos/update-user-repo
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/name'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                # `name`, `private` and `visibility` are accepted by GitHub's PATCH but are
+                # DELIBERATELY NOT MODELLED HERE, for the identical reasons documented at length in
+                # repository.yaml: compared in the `updatable` set, `name` would let drift RENAME a
+                # live repo (307 redirect trap) and `private`/`visibility` would let a re-rendered
+                # consumer value flip the exposure of repositories that already exist (irreversible).
+                # All three remain CREATE-body fields, so the CRD and create-time behaviour are
+                # unchanged; only reconciling them as drift is gone, which is correct.
+                # hack/assert-drift-invariants.py asserts this absence.
+                description:
+                  type: string
+                homepage:
+                  type: string
+                has_issues:
+                  type: boolean
+                has_wiki:
+                  type: boolean
+                has_projects:
+                  type: boolean
+                default_branch:
+                  type: string
+                archived:
+                  type: boolean
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    name:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+    # GitHub's GET /user/repos lists every repository the token can reach — owned, collaborated
+    # on, and org-member repositories alike — so a bare name match could bind to an org repo of the
+    # same name. affiliation=owner restricts it to repos the user OWNS, where names are unique.
+    affiliation:
+      name: affiliation
+      in: query
+      required: false
+      schema:
+        type: string
+    sort:
+      name: sort
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [created, updated, pushed, full_name]
+    direction:
+      name: direction
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [asc, desc]
+    per_page:
+      name: per_page
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 30
+    page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 1
+  schemas:
+    Repository:
+      type: object
+      properties:
+        id:
+          type: integer
+        node_id:
+          type: string
+        name:
+          type: string
+        full_name:
+          type: string
+        # The owner GitHub actually assigned (the token's account). Captured to status.owner.login
+        # and fed back into the get/update path — the reason this kind needs no hand-set owner.
+        owner:
+          type: object
+          properties:
+            login:
+              type: string
+        html_url:
+          type: string
+        clone_url:
+          type: string
+        ssh_url:
+          type: string
+        default_branch:
+          type: string
+        private:
+          type: boolean
+        visibility:
+          type: string
+        description:
+          type: string
+        homepage:
+          type: string
+        has_issues:
+          type: boolean
+        has_wiki:
+          type: boolean
+        has_projects:
+          type: boolean
+        archived:
+          type: boolean
+security:
+  - accessToken: []

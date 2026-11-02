@@ -1,11 +1,11 @@
 # github-provider-kog — LLM doc index
-# One line per file (the 30 kinds other than Repository pair their RestDefinition with its
+# One line per file (the 31 kinds other than Repository pair their RestDefinition with its
 # OpenAPI spec on one line — they are 1:1). A Krateo KOG provider (oasgen-provider ≥ 0.38.0)
-# exposing 31 GitHub REST resources as github.krateo.io Kubernetes kinds: repositories,
+# exposing 32 GitHub REST resources as github.krateo.io Kubernetes kinds: repositories,
 # access, repository configuration, CI/CD, work tracking and governance. The chart ships
 # RestDefinitions + trimmed OpenAPI specs and NOTHING else — no Deployment, no Service, no
 # image, no proxy, so it has no runtime component of its own; oasgen-provider generates the
-# CRDs and auto-deploys a rest-dynamic-controller per kind. All 31 kinds are NATIVE: every
+# CRDs and auto-deploys a rest-dynamic-controller per kind. All 32 kinds are NATIVE: every
 # verb goes straight to GitHub.
 # Git-write kinds: GitRef, RepoContent and PullRequest were the transport of the legacy
 # blueprint-publish path, superseded by the frontend's SCM-agnostic default
@@ -22,11 +22,11 @@
 # crypto and no dependent lookup in a RestDefinition; variables are NOT secrets and ARE
 # covered), and VulnerabilityAlerts (its GET returns 404 when off and 204 with NO BODY when
 # on, so no status schema can be derived — unlike AutomatedSecurityFixes, whose GET has one).
-docs/index.md: the map — what the provider is, the 31 kinds by family, the repo layout, links to the whole bundle
-docs/overview.md: how it works — RestDefinitions + OpenAPI specs → oasgen CRDs + controllers, and why the chart itself runs nothing (all 31 kinds native)
+docs/index.md: the map — what the provider is, the 32 kinds by family, the repo layout, links to the whole bundle
+docs/overview.md: how it works — RestDefinitions + OpenAPI specs → oasgen CRDs + controllers, and why the chart itself runs nothing (all 32 kinds native)
 docs/usage.md: install as a Krateo component, provision the token Secret (per-kind PAT rights differ) + one Configuration per kind, drive the kinds, verify
-docs/configuration.md: the surface — the one value resourceGroup, the per-kind RestDefinition mappings (identifiers, excludedSpecFields, compareScope: 24 updatable / 2 default fullSpec / 1 explicit fullSpec / 3 identifiersAndStatus), invariants
-docs/api.md: the generated github.krateo.io CRDs (31 resource kinds + a <Kind>Configuration each) and the CompositionDefinition derived from values.schema.json
+docs/configuration.md: the surface — the one value resourceGroup, the per-kind RestDefinition mappings (identifiers, excludedSpecFields, compareScope: 25 updatable / 3 default fullSpec / 1 explicit fullSpec / 3 identifiersAndStatus), invariants
+docs/api.md: the generated github.krateo.io CRDs (32 resource kinds + a <Kind>Configuration each) and the CompositionDefinition derived from values.schema.json
 docs/examples.md: index of the runnable examples
 docs/release.md: how a release ships — one plain-semver tag drives release-oci; the chart is the only artifact (no image in this repo)
 docs/log.md: curated history
@@ -35,18 +35,19 @@ docs/design-gitref.md: restoring GitRef natively (now shipped) — what the kind
 docs/design-repocontent.md: restoring RepoContent natively (now shipped) — the plugin's put/get handlers behaviour by behaviour against the 0.23.0 replacement (branch→?ref fieldMapping, responseTransforms, status.sha auto-populating the update body, the %252F double-escape fixed upstream as #113): fully native today, the only loss a bounded 422-retry
 docs/design-pullrequest.md: restoring PullRequest natively (now shipped) — the plugin's single job was flattening head/base on observe; one whole-document responseTransform on the get verb plus compareScope: updatable brings the kind back whole, and fixes the fork case the plugin got wrong
 examples/blueprint-authoring/README.md: the runnable example — the one-time token + <Kind>Configuration wiring, then github.krateo.io CRs applied in order against a scratch repo
-README.md: the repo front door — what it is (the 31 kinds grouped by family, what is deliberately not covered, and the git-write kinds with their design docs — RepoContent, PullRequest and GitRef all returned), install, configure, examples, docs, develop & release
+README.md: the repo front door — what it is (the 32 kinds grouped by family, what is deliberately not covered, and the git-write kinds with their design docs — RepoContent, PullRequest and GitRef all returned), install, configure, examples, docs, develop & release
 # Source (read at the same tag; the docs above are derived from these):
 chart/Chart.yaml: chart metadata; version is the CHART_VERSION placeholder, appVersion tracks the OpenAPI/mapping revision
-chart/values.yaml: the single value resourceGroup (the group all 31 generated CRDs land under), with its rationale
+chart/values.yaml: the single value resourceGroup (the group all 32 generated CRDs land under), with its rationale
 chart/values.schema.json: the typed schema the CDC derives the component CRD from (scalar resourceGroup only)
-chart/templates/configmap-<kind>.yaml: one ConfigMap per kind wrapping chart/assets/<kind>.yaml; all 31 are a plain .Files.Get, copied verbatim — no template action anywhere in the assets
-chart/samples/configurations.yaml: the 31 <Kind>Configuration CRs, all sharing the name github-blueprints-config and one gh-token Secret (whose PAT needs org repo-create rights for Repository and org admin rights for the org-scoped kinds)
+chart/templates/configmap-<kind>.yaml: one ConfigMap per kind wrapping chart/assets/<kind>.yaml; all 32 are a plain .Files.Get, copied verbatim — no template action anywhere in the assets
+chart/samples/configurations.yaml: the 32 <Kind>Configuration CRs — 31 share the name github-blueprints-config and one gh-token Secret; UserRepository's is github-user-config with its own gh-user-token, because its repos are created in the token's account (whose PAT needs org repo-create rights for Repository and org admin rights for the org-scoped kinds)
 chart/samples/test-<kind>.yaml: one applyable test CR per kind, with the per-kind caveats in comments
 # The destination repository (native, like every other kind):
 chart/templates/rd-repository.yaml: the Repository RestDefinition (all four verbs native; compareScope updatable — DEFENSIVE, not load-bearing: the comparison SKIPS any spec key the observe response omits, so the create-only fields could never have drifted under fullSpec either, and the two scopes should agree today; the in-file comment corrects that earlier claim)
 chart/assets/repository.yaml: the Repository OpenAPI spec (org-scoped create only, auto_init defaults true, path params named org/name)
-# The other 30 kinds — rd-<kind>.yaml carries the identifiers/compareScope reasoning, assets/<kind>.yaml the
+chart/templates/rd-userrepository.yaml + chart/assets/userrepository.yaml: UserRepository — the user-owned sibling of Repository (create POST /user/repos in the TOKEN's account; owner read back to status.owner.login, never hand-set; observe via get /repos/{owner}/{name} or, before status exists, a paginated findby on GET /user/repos?affiliation=owner; no delete verb), compareScope updatable
+# The other 31 kinds — rd-<kind>.yaml carries the identifiers/compareScope reasoning, assets/<kind>.yaml the
 # trimmed field set and the measured GitHub quirks. <kind> is the kind name lowercased.
 # access:
 chart/templates/rd-team.yaml + chart/assets/team.yaml: Team — org team keyed by the server-derived slug (get/update/delete read it from status.slug, a rename converges via the PATCH response); the update declares BOTH 201 and 200, because a real change answers 201; compareScope updatable

@@ -20,7 +20,7 @@ triggers one workflow.
    `oci://ghcr.io/krateo-blueprints/charts`. A collision guard refuses to push to a
    bare registry root, so the chart cannot collide with a same-named image.
 
-That is the whole release. The chart renders 31 ConfigMaps + 31 RestDefinitions and
+That is the whole release. The chart renders 32 ConfigMaps + 32 RestDefinitions and
 nothing else — no Deployment, no Service, no image reference — so there is no second
 artifact and no co-versioning invariant to keep. The companion plugin, its image and
 `release-image.yaml` were deleted with the three kinds that needed them — the reason and

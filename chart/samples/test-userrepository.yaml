@@ -1,0 +1,33 @@
+# Create a repository owned by the authenticated user, the user-owned sibling of Repository.
+# Create is POST /user/repos; observe and update read the owner back from GitHub.
+#
+# THE OWNER IS THE TOKEN'S ACCOUNT. There is no `owner` field to set: GitHub assigns the owner of
+# a POST /user/repos from the credential, so the repository lands in the account that owns the
+# token behind `configurationRef`. Point this CR at a Configuration carrying the intended user's
+# own token — NOT a shared org/automation PAT, or every UserRepository lands in that PAT owner's
+# personal account. The owner GitHub assigned is reported on status.owner.login.
+#
+# `name` is the identifier. If a repository of that name already exists in the token's account it
+# is ADOPTED (matched on observe), not duplicated. Adoption is safe against loss — there is no
+# delete verb, so deleting this CR never deletes the repo, adopted or created — but the CR's
+# UPDATABLE fields (description, homepage, has_issues/has_wiki/has_projects, default_branch,
+# archived) are then reconciled onto that pre-existing repository. private/visibility are
+# create-only, so adoption never changes an existing repo's exposure.
+#
+# There is no delete verb: deleting this CR stops Krateo tracking the repo but never deletes it
+# on GitHub (same safety as Repository). `private`/`visibility` are honoured at create and NOT
+# reconciled afterward (changing them here will not flip an existing repo's exposure).
+apiVersion: github.krateo.io/v2022-11-28
+kind: UserRepository
+metadata:
+  name: test-user-repo
+  namespace: krateo-system
+  annotations:
+    krateo.io/connector-verbose: "true"
+spec:
+  configurationRef:
+    name: github-user-config         # a Configuration whose token belongs to the intended user
+  name: demo-user-repo
+  description: "Created for the authenticated user via Krateo"
+  private: true
+  auto_init: true                    # ensures a first commit + default branch

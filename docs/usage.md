@@ -1,7 +1,7 @@
 ---
 type: Usage
 title: github-provider-kog — usage
-description: How to run the provider — install it as a Krateo component, provision the GitHub token Secret and one Configuration CR per kind (all 31 may share a single name), create the destination repository with Repository, drive the other 30 kinds group by group (access, repository configuration, CI/CD, work tracking, governance), and verify the generated CRDs and controllers. The chart ships no runtime component of its own.
+description: How to run the provider — install it as a Krateo component, provision the GitHub token Secret and one Configuration CR per kind (all 32 may share a single name), create the destination repository with Repository, drive the other 31 kinds group by group (access, repository configuration, CI/CD, work tracking, governance), and verify the generated CRDs and controllers. The chart ships no runtime component of its own.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, install, oasgen-provider, github]
 timestamp: 2026-09-09T00:00:00Z
@@ -17,11 +17,11 @@ A Krateo cluster with `oasgen-provider` **≥ 0.38.0** running (it provides
 0.9.x carried the four kinds the chart started with, but the floor is now **0.38.0**:
 0.38.0 is where the `GitRef` pattern admission guard reaches the generated CRD. `GitRef`'s
 create resolves its base sha with `dependentLookups`, a primitive that landed in 0.36.0.
-24 of the 31 kinds also set `compareScope: updatable`, a value
+25 of the 32 kinds also set `compareScope: updatable`, a value
 `RestDefinition` CRDs below 0.23.0 reject on apply so their kinds never appear — the
 earlier floor, now subsumed by 0.38.0.
 
-Nothing else is required. The chart renders 31 ConfigMaps and 31 RestDefinitions and
+Nothing else is required. The chart renders 32 ConfigMaps and 32 RestDefinitions and
 nothing more: there is no Deployment, no Service and no image of its own to pull. Every
 verb of every kind is a native call to `api.github.com`, made by the
 rest-dynamic-controller oasgen-provider generates.
@@ -69,7 +69,7 @@ A classic token needs `repo`; a fine-grained token needs the organization permis
 token scoped for one repository's settings drives those kinds and fails on `Repository`
 alone.
 
-The 31 kinds spread the same way: a single PAT can drive the whole chart, but the rights
+The 32 kinds spread the same way: a single PAT can drive the whole chart, but the rights
 it needs grow with the groups you actually use.
 
 | kinds | what the token must be allowed to do | classic scope |
@@ -77,6 +77,7 @@ it needs grow with the groups you actually use.
 | `Issue`, `PullRequest`, `Label`, `Milestone`, `Release`, `RepoDeployment`, `RepoContent` | write issues, labels, releases, deployments and file contents on one repository | `repo` |
 | `RepoWebhook`, `DeployKey`, `Environment`, `DeploymentBranchPolicy`, `RepoRuleset`, `BranchProtection`, `Autolink`, `Collaborator`, `AutomatedSecurityFixes`, `ActionsVariableRepo`, `EnvironmentVariable`, `Workflow` | administer one repository's settings | `repo` |
 | `Repository` | create and delete repositories in the organization | `repo`, and the org must permit the token to create repositories |
+| `UserRepository` | create and configure repositories under the token's own user account | `repo` |
 | `Team`, `TeamMembership`, `TeamRepo`, `OrgMembership`, `OrgWebhook`, `OrgRuleset`, `ActionsVariableOrg`, `RunnerGroup`, `CustomProperty`, `CodeSecurityConfig` | administer the organization | `admin:org`, on top of `repo` |
 
 Fine-grained tokens do not map onto that column: they grant one permission per area —
@@ -88,12 +89,14 @@ token that drives the repository-scoped kinds perfectly to `403` on the org-scop
 until it is widened.
 
 Then one Configuration per kind. They may all share a name — the kind is implied by the
-resource that references it — which is why `chart/samples/configurations.yaml` ships all
-31 under the same `github-blueprints-config`:
+resource that references it — which is why `chart/samples/configurations.yaml` ships 31
+of the 32 under the same `github-blueprints-config` — all but `UserRepository`, whose
+repositories are created in the token's own account, so it gets its own Configuration
+carrying the intended user's token:
 
 ```yaml
 apiVersion: github.krateo.io/v1alpha1
-kind: RepositoryConfiguration    # one of 31: TeamConfiguration, RepoRulesetConfiguration,
+kind: RepositoryConfiguration    # one of 32: TeamConfiguration, RepoRulesetConfiguration,
                                  # LabelConfiguration, EnvironmentConfiguration,
                                  # CustomPropertyConfiguration, …
 metadata:
@@ -124,7 +127,7 @@ is created and stored by an operator, never handled by the browser or snowplow.
 ## Create the destination repository
 
 `Repository` creates the repo every other repository-scoped kind then configures, so it
-comes **first**. Like all 31 kinds it is fully native: create (`POST /orgs/{org}/repos`)
+comes **first**. Like all 32 kinds it is fully native: create (`POST /orgs/{org}/repos`)
 and get/update (`GET`/`PATCH /repos/{org}/{name}`) go straight to
 `api.github.com`. See `chart/samples/test-repository.yaml`:
 
@@ -177,11 +180,12 @@ Five things to know before you apply it:
   than defensive: GitHub echoes both fields on every `GET`, so `fullSpec` — which is also
   what you get by deleting the line — would compare them straight back in
   ([configuration](./configuration.md)).
-- **Only the org-scoped create is modelled.** GitHub's other create endpoint,
-  `POST /user/repos` for user-owned repos, is deliberately absent: a RestDefinition has
-  one create verb and cannot choose between two paths, and Krateo destinations are
-  org-owned. Create the repo under an organization, or create it outside Krateo and
-  point the repository-scoped kinds at it.
+- **Org-scoped and user-scoped creates are separate kinds.** This `Repository` kind maps
+  the org-scoped create (`POST /orgs/{org}/repos`); GitHub's other create endpoint,
+  `POST /user/repos` for user-owned repos, is its own kind, `UserRepository` — a
+  RestDefinition has one create verb and cannot choose between two paths at runtime. Krateo
+  destinations are normally org-owned; use `UserRepository` when the destination belongs to
+  the token's own account.
 
 `Repository` has **no delete verb**, so deleting the CR orphans the repository
 on GitHub. The full spec/status field list is in [api](./api.md).
@@ -221,11 +225,11 @@ and lifts `sha`/`html_url` to the root with `responseTransform`s, and drops a st
 on create with `requestTransform: del(.sha)` — the `status.sha` the update and delete
 bodies need is auto-populated, so no pre-call read is required.
 
-What is left in the chart is 31 native kinds and no runtime component at all.
+What is left in the chart is 32 native kinds and no runtime component at all.
 
-## The other 30 kinds
+## The other 31 kinds
 
-`Repository` creates the destination; the other 30 kinds cover the rest of a repository's
+`Repository` creates the destination; the other 31 kinds cover the rest of a repository's
 and an organization's configuration. They share a shape — reference a
 `<Kind>Configuration`, name the target with GitHub's own path parameters (`owner`/`repo`,
 or `org`), set the fields, apply — and every verb of every one of them is native
@@ -527,7 +531,7 @@ spec:
 
 ```console
 $ # oasgen should generate a CRD per kind, plus a <Kind>Configuration CRD for each
-$ kubectl get crd | grep -c github.krateo.io     # 62 = 31 kinds + 31 Configurations
+$ kubectl get crd | grep -c github.krateo.io     # 64 = 32 kinds + 32 Configurations
 $ kubectl get restdefinitions.ogen.krateo.io -n krateo-system
 $ # and a rest-dynamic-controller Deployment per kind it has reconciled
 $ kubectl get deploy -n krateo-system \
@@ -535,9 +539,9 @@ $ kubectl get deploy -n krateo-system \
 ```
 
 Every Deployment that shows up there was generated by oasgen-provider, because the chart
-ships none of its own: the release renders 31 ConfigMaps and 31 RestDefinitions and
+ships none of its own: the release renders 32 ConfigMaps and 32 RestDefinitions and
 nothing else.
 
 Set `krateo.io/connector-verbose: "true"` on a resource CR (as every sample does) and read
 that kind's own controller's logs. There is one log to check per kind and no second place
-to look: with all 31 kinds native, nothing sits in front of them.
+to look: with all 32 kinds native, nothing sits in front of them.

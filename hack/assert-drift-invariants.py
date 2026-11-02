@@ -35,6 +35,9 @@ echoes is compared regardless of the update body, and GitHub echoes `private`, `
 `name` on every GET. So `compareScope: updatable` is load-bearing on Repository, and removing the
 line is the same regression as re-adding the field.
 
+UserRepository (0.1.6) is Repository's user-owned sibling and is asserted identically: same three
+fields out of its PATCH body, same load-bearing `compareScope: updatable`.
+
 Exit 1 if any invariant is broken.
 """
 import sys
@@ -54,6 +57,19 @@ ASSET_INVARIANTS = [
             "visibility": "same hazard as `private`, and the more likely re-entry path (#11)",
         },
     ),
+    # UserRepository is Repository's user-owned sibling (create POST /user/repos) and carries the
+    # identical hazard: GitHub echoes name/private/visibility on every GET of a user repo too.
+    (
+        "chart/assets/userrepository.yaml",
+        "/repos/{owner}/{name}",
+        "patch",
+        "/user/repos",
+        {
+            "name": "drift would RENAME a live user repository (same 307 redirect trap as Repository)",
+            "private": "drift would flip the exposure of user repositories that already exist — irreversible",
+            "visibility": "same hazard as `private`, and the more likely re-entry path",
+        },
+    ),
 ]
 
 # (template, kind, required compareScope, why it is load-bearing)
@@ -64,6 +80,13 @@ COMPARESCOPE_INVARIANTS = [
         "updatable",
         "GitHub echoes name/private/visibility on every GET, so the default fullSpec would compare "
         "them back into the drift set even though the PATCH body omits them",
+    ),
+    (
+        "chart/templates/rd-userrepository.yaml",
+        "UserRepository",
+        "updatable",
+        "same as Repository: GitHub echoes name/private/visibility on every GET of a user repo, so "
+        "the default fullSpec would compare them back into the drift set",
     ),
 ]
 
