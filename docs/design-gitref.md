@@ -588,8 +588,11 @@ Traps specific to this kind, in the order they bite:
    CR was the 0.21.1 behaviour; 0.23.0's arbiter fixed the wedge and made the failure quiet.)
 7. **Shape A only — cold start must actually reach `findby`.** If the get's path parameter is
    named `ref` it auto-populates from `spec.ref` (`builder.go:441-446`), `IsResourceKnown`
-   returns true, and `findby` is never called. It must be a distinct name (`short_ref`) and it
-   must be in `excludedSpecFields`, or it becomes a required, author-supplied spec field.
+   returns true, and `findby` is never called. It must be a distinct name (`short_ref`) so the get
+   path parameter does not auto-populate from a spec field — it is sourced from status instead.
+   `short_ref` is a get/update/delete path parameter, never a create parameter, so it is not a spec
+   field regardless; the `excludedSpecFields: [short_ref]` entry is a belt-and-suspenders no-op
+   recording that it is never author-supplied.
 8. **`identifiers` and `additionalStatusFields` are immutable**
    (`types.go:493, 497`, `self == oldSelf`). Iterating on the status shape means deleting and
    recreating the RestDefinition, which takes the generated CRD and every `GitRef` CR with it.

@@ -21,9 +21,11 @@ spec:
       - html_url
     # `ref` is GitHub's query-parameter name for the branch on the get verb. The CR expresses the
     # branch ONCE, as spec.branch (which the PUT/DELETE bodies genuinely take), and the get verb's
-    # fieldMapping relocates it onto `?ref`. Without this exclusion every OAS parameter becomes a
-    # spec field and authors would face a ref/branch pair to keep in sync. IMMUTABLE once the CRD
-    # is generated (oasgen-provider #290) — getting it in on the first apply matters.
+    # fieldMapping relocates it onto `?ref`. `ref` is a get query parameter, not a create parameter,
+    # so it was never a spec field — oasgen builds the spec from the create operation alone — and
+    # this excludedSpecFields entry is a redundant no-op oasgen warns about; it is kept because
+    # excludedSpecFields is IMMUTABLE once the CRD is generated (oasgen-provider #290) and it records
+    # the intent that authors never face a ref/branch pair to keep in sync.
     excludedSpecFields:
       - ref
     # Default fullSpec, deliberately — do NOT set `updatable` here (and note the default IS

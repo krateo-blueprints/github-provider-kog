@@ -60,7 +60,9 @@ paths:
     # FINDBY — the observe used while status.owner.login is still empty (first observe before the
     # create, or a CR whose status was lost). It needs no owner at all: it lists the token user's
     # repositories and matches the identifier `name`. The query parameters below are pinned by the
-    # findby verb's static `queries` / `pagination` and kept out of the CRD via excludedSpecFields.
+    # findby verb's static `queries` / `pagination`. Being findby (list) parameters, not create
+    # parameters, they were never spec fields anyway (oasgen builds the spec from the create
+    # operation alone); their excludedSpecFields entries are redundant no-ops kept for immutability.
     get:
       summary: List repositories for the authenticated user
       operationId: repos/list-for-authenticated-user
@@ -79,8 +81,10 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Repository'
-  # GET/PATCH address the repo as /repos/{owner}/{name}. `owner` is NOT a spec field
-  # (excludedSpecFields): both verbs source it from status.owner.login, which GitHub reports on the
+  # GET/PATCH address the repo as /repos/{owner}/{name}. `owner` is NOT a spec field — it is a
+  # get/update path parameter, not a create parameter, so oasgen never puts it on the spec (its
+  # excludedSpecFields entry is a redundant no-op): both verbs source it from status.owner.login,
+  # which GitHub reports on the
   # create, get and findby responses. Before that status exists the get cannot be built, so the
   # controller observes through the findby above instead. There is NO delete verb: deleting the CR
   # ORPHANS the repository, it does not destroy it — the same deliberate choice Repository makes,

@@ -204,10 +204,12 @@ Not one of them has a hop in front of `api.github.com`. That is possible because
 RestDefinition expresses more than a path table, and the quirks that would otherwise
 need a proxy are handled at the mapping layer:
 
-- **Server-assigned identifiers.** `excludedSpecFields` keeps an id the author cannot
-  know out of the CR spec, and `requestFieldMapping` sources it from status instead —
+- **Server-assigned identifiers.** An id the author cannot know is a path parameter on the item
+  verbs only, never a create parameter, so oasgen (which builds the spec from the create operation
+  alone) never makes it a spec field; `requestFieldMapping` sources it from status instead —
   `hook_id`, `ruleset_id`, `release_id`, `runner_group_id`, `branch_policy_id`,
-  `milestone_number`, `issue_number`, `team_slug`.
+  `milestone_number`, `issue_number`, `team_slug`. The matching `excludedSpecFields` entry is a
+  redundant no-op kept for immutability (#290).
 - **Static per-verb headers and queries.** `TeamRepo`'s observe sends
   `Accept: application/vnd.github.v3.repository+json`; without it GitHub answers 204 and
   there is nothing to observe. `Collaborator`'s observe pins `affiliation=direct`, the
