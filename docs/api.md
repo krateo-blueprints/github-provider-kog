@@ -349,13 +349,25 @@ and it is handled entirely in the RestDefinition, by two jq transforms:
   is spelled. A CRD field typed `object` cannot hold null (oasgen does not carry OAS
   `nullable` through), so the CR expresses "off" by omission and a `requestTransform`
   turns omission into the explicit `null` the API demands. It tests `has()` rather than
-  using `//`, so a deliberate `enforce_admins: false` is not rewritten to null.
+  using `//`, so a deliberate `enforce_admins: false` is not rewritten to null. The same
+  transform also drops `required_status_checks.contexts` from the body whenever the CR set
+  the `checks` form, so the two never fight (GitHub allows only one, and `checks` wins).
 - **Response** (`get`): a whole-document `responseTransform` rewrites GitHub's answer back
   into the CR domain once, at the reconcile chokepoint, before status population and drift
   comparison — `{"enabled": bool}` wrappers flattened to bare booleans (nine controls),
-  the status-check wrapper reduced to `{strict, contexts}`, `restrictions`
-  users/teams/apps reduced to `login`/`slug` strings, and an unset control (key absent)
-  normalised to `null`, which is what the spec omitting it means.
+  the status-check wrapper reduced to `{strict, contexts, checks}`, `restrictions`
+  users/teams/apps reduced to `login`/`slug` strings, the review object's
+  `dismissal_restrictions` and `bypass_pull_request_allowances` reduced the same way, and
+  an unset control (key absent) normalised to `null`, which is what the spec omitting it
+  means.
+
+`required_status_checks` takes **either** `contexts` (plain check names) **or** `checks`
+(`[{context, app_id}]`, pinning the reporting GitHub App); set one, not both. The review
+object can carry `dismissal_restrictions` and `bypass_pull_request_allowances`
+(`{users, teams, apps}` login/slug lists, org-owned repos only) — modelling these is what
+stops a reconcile from wiping dismissal/bypass actors set out-of-band, since the PUT
+replaces the whole review object. All of these are additive: a CR that sets none of them
+behaves exactly as before.
 
 Every list in that transform is **sorted**, because the comparison is order-sensitive and
 GitHub does not return these in the order they were sent. Write the lists in the CR sorted
@@ -368,10 +380,12 @@ status silently disagree with drift. The conditions already carry the signal tha
 Available means the branch is protected exactly as the spec says. `url` is the only field
 that survives the transform unchanged, which is why it is the identifier.
 
-Because that PUT replaces the whole protection document, the CR **owns** it: the unmodelled
-sub-controls `required_pull_request_reviews.dismissal_restrictions` /
-`.bypass_pull_request_allowances` and the `required_status_checks` `checks` (app_id) form,
-if set in the UI, are wiped when any modelled field drifts — a capability gap, in
+Because that PUT replaces the whole protection document, the CR **owns** it: a sub-control
+the CR cannot express is wiped when any modelled field drifts. That is why
+`required_pull_request_reviews.dismissal_restrictions` / `.bypass_pull_request_allowances`
+and the `required_status_checks` `checks` (`app_id`) form are now **modelled** — a CR that
+carries them keeps them across reconciles instead of losing them. The whole-value hazard
+and the sub-controls still left unmodelled are in
 [configuration → Updates send whole values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
 
 ### Shorter caveats, by kind

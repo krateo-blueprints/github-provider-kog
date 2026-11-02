@@ -45,21 +45,49 @@ paths:
                   properties:
                     strict:
                       type: boolean
-                    # `contexts` is the check-name list. GitHub's newer `checks` form (context +
-                    # app_id) is deliberately NOT modelled: the API returns BOTH forms and keeps
-                    # them derived from each other, so exposing both would ask the author to keep
-                    # two representations of one list in sync.
+                    # TWO forms of the same check-name list; set EXACTLY ONE of them.
                     #
-                    # ORDER MATTERS. The drift comparison is order-sensitive on arrays, and the
-                    # get responseTransform sorts this list, so write the contexts SORTED —
-                    # otherwise every reconcile reports drift and re-PUTs the same document.
+                    # `contexts` is the plain check-name list. `checks` is GitHub's newer form,
+                    # pairing each context with an optional `app_id` that pins which GitHub App's
+                    # report satisfies the check. GitHub keeps the two derived from each other and
+                    # documents that only one may be populated (and at least one must be) — so the
+                    # update `requestTransform` in rd-branchprotection.yaml DROPS `contexts` from
+                    # the body whenever `checks` is present, which is also GitHub's own precedence
+                    # (`checks` wins). Setting both in the CR is tolerated: only `checks` is sent.
+                    #
+                    # They do not fight on READ either: the get responseTransform emits BOTH forms,
+                    # and the drift comparison only looks at the keys the CR actually set (response
+                    # keys absent from spec are skipped), so a contexts-only CR never drifts against
+                    # the derived `checks`, and vice-versa.
+                    #
+                    # ORDER MATTERS. The drift comparison is order-sensitive on arrays, and the get
+                    # responseTransform sorts both lists — `contexts` by name, `checks` by
+                    # (context, app_id) — so write whichever you use SORTED the same way, otherwise
+                    # every reconcile reports drift and re-PUTs the same document.
                     contexts:
                       type: array
                       items:
                         type: string
+                    checks:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          context:
+                            type: string
+                          app_id:
+                            type: integer
+                        required:
+                          - context
+                  # Only `strict` is required at the CRD layer. GitHub requires at least one of
+                  # `contexts`/`checks` to be populated when required_status_checks is set, but
+                  # that is an either/or the CRD cannot express; an empty required_status_checks is
+                  # rejected LOUDLY by GitHub (422), not silently, so it is left to the API.
+                  # `contexts` was required here before `checks` existed; relaxing it is what lets
+                  # an author pick the `checks` form instead — it does not loosen any existing CR,
+                  # which still sets strict + contexts exactly as before.
                   required:
                     - strict
-                    - contexts
                 # Defaulted so the assembled body is NEVER empty. rest-dynamic-controller skips a
                 # requestTransform on an empty body (fieldmapping.ApplyRequestTransform returns
                 # early), and an empty body would then reach GitHub without the four required
@@ -80,14 +108,53 @@ paths:
                       type: integer
                     require_last_push_approval:
                       type: boolean
+                    # Who may DISMISS reviews, and who may BYPASS the PR requirement. Both take the
+                    # same {users, teams, apps} shape as top-level `restrictions` — login/slug
+                    # STRINGS on the PUT, user/team/app OBJECTS on the GET — so the get
+                    # responseTransform normalizes them to string lists exactly as it does
+                    # `restrictions` (map(.login)/map(.slug), sorted). Both are optional: omit to
+                    # leave unset (which GitHub treats as "off" since the whole review object is
+                    # replaced), or pass the object to set them. ORG-OWNED REPOSITORIES ONLY for
+                    # the user/team entries, same as `restrictions`. Same ordering caveat: the
+                    # responseTransform sorts each list, so write them sorted.
+                    #
+                    # Modelling these is the point of this whole block: before, a review object
+                    # the CR set but could not express these on would WIPE any dismissal /
+                    # bypass actors configured out-of-band, because the PUT replaces the review
+                    # object wholesale. Now the CR can carry them, so they survive a reconcile.
+                    dismissal_restrictions:
+                      type: object
+                      properties:
+                        users:
+                          type: array
+                          items:
+                            type: string
+                        teams:
+                          type: array
+                          items:
+                            type: string
+                        apps:
+                          type: array
+                          items:
+                            type: string
+                    bypass_pull_request_allowances:
+                      type: object
+                      properties:
+                        users:
+                          type: array
+                          items:
+                            type: string
+                        teams:
+                          type: array
+                          items:
+                            type: string
+                        apps:
+                          type: array
+                          items:
+                            type: string
                 # Who may push to the branch. ORG-OWNED REPOSITORIES ONLY — GitHub rejects
                 # restrictions on a user-owned repo. Same ordering caveat as `contexts`: the
                 # responseTransform sorts these lists, so write them sorted.
-                #
-                # dismissal_restrictions / bypass_pull_request_allowances (the same users/teams/
-                # apps shape, nested under required_pull_request_reviews) are NOT modelled: each
-                # would need its own object-to-login normalization for a control a platform CR
-                # rarely sets. They can be added later without breaking this shape.
                 restrictions:
                   type: object
                   properties:
@@ -213,6 +280,17 @@ components:
               type: array
               items:
                 type: string
+            # The responseTransform emits `checks` alongside `contexts` (normalized to
+            # {context, app_id}, sorted), so the CR-domain shape documented here carries both.
+            checks:
+              type: array
+              items:
+                type: object
+                properties:
+                  context:
+                    type: string
+                  app_id:
+                    type: integer
         enforce_admins:
           type: boolean
         required_pull_request_reviews:
@@ -226,6 +304,38 @@ components:
               type: integer
             require_last_push_approval:
               type: boolean
+            # Normalized from GitHub's user/team/app OBJECTS to login/slug STRING lists, sorted,
+            # exactly like top-level `restrictions` below.
+            dismissal_restrictions:
+              type: object
+              properties:
+                users:
+                  type: array
+                  items:
+                    type: string
+                teams:
+                  type: array
+                  items:
+                    type: string
+                apps:
+                  type: array
+                  items:
+                    type: string
+            bypass_pull_request_allowances:
+              type: object
+              properties:
+                users:
+                  type: array
+                  items:
+                    type: string
+                teams:
+                  type: array
+                  items:
+                    type: string
+                apps:
+                  type: array
+                  items:
+                    type: string
         restrictions:
           type: object
           properties:

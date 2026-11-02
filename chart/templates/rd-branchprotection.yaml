@@ -30,10 +30,12 @@ spec:
     # `identifiersAndStatus` would be actively wrong here: it would compare only `url`, so editing
     # `enforce_admins` or `required_status_checks` on a live CR would silently never be pushed.
     #
-    # Ownership note: the PUT replaces the WHOLE protection document, so unmodelled sub-controls set
-    # in the UI (required_pull_request_reviews.dismissal_restrictions / .bypass_pull_request_allowances,
-    # and the required_status_checks `checks` app_id form) are wiped when any modelled field drifts.
-    # See docs/configuration.md "Updates send whole values — what a CR owns".
+    # Ownership note: the PUT replaces the WHOLE protection document, so a sub-control the CR cannot
+    # express is wiped when any modelled field drifts. required_pull_request_reviews.dismissal_restrictions
+    # / .bypass_pull_request_allowances and the required_status_checks `checks` (context + app_id) form
+    # are now MODELLED (see the asset and the transforms below), so a CR that carries them keeps them;
+    # only sub-controls the CR still does not model stay exposed. See docs/configuration.md "Updates
+    # send whole values — what a CR owns".
     compareScope: updatable
     configurationFields: []
     verbsDescription:
@@ -48,7 +50,14 @@ spec:
         requestTransform:
           inline: |
             . + {
-              required_status_checks: (if has("required_status_checks") then .required_status_checks else null end),
+              required_status_checks: (
+                if has("required_status_checks") then
+                  # GitHub documents that only ONE of contexts/checks may be populated and that
+                  # `checks` wins. When the CR set `checks`, drop `contexts` so the two never
+                  # fight on the wire. `type == "object"` guards `has` against a non-object value.
+                  (.required_status_checks | if (type == "object") and has("checks") then del(.contexts) else . end)
+                else null end
+              ),
               enforce_admins: (if has("enforce_admins") then .enforce_admins else null end),
               required_pull_request_reviews: (if has("required_pull_request_reviews") then .required_pull_request_reviews else null end),
               restrictions: (if has("restrictions") then .restrictions else null end)
@@ -61,7 +70,14 @@ spec:
         requestTransform:
           inline: |
             . + {
-              required_status_checks: (if has("required_status_checks") then .required_status_checks else null end),
+              required_status_checks: (
+                if has("required_status_checks") then
+                  # GitHub documents that only ONE of contexts/checks may be populated and that
+                  # `checks` wins. When the CR set `checks`, drop `contexts` so the two never
+                  # fight on the wire. `type == "object"` guards `has` against a non-object value.
+                  (.required_status_checks | if (type == "object") and has("checks") then del(.contexts) else . end)
+                else null end
+              ),
               enforce_admins: (if has("enforce_admins") then .enforce_admins else null end),
               required_pull_request_reviews: (if has("required_pull_request_reviews") then .required_pull_request_reviews else null end),
               restrictions: (if has("restrictions") then .restrictions else null end)
@@ -74,8 +90,10 @@ spec:
         # once, at the reconcile chokepoint, before status population and drift comparison:
         #
         #   {"enabled": bool} objects        -> bare booleans      (nine controls)
-        #   status-check wrapper + urls      -> {strict, contexts}
+        #   status-check wrapper + urls      -> {strict, contexts, checks}
         #   restrictions users/teams/apps    -> login / slug strings
+        #   review dismissal_restrictions /  -> login / slug strings (same shape, nested under
+        #     bypass_pull_request_allowances     required_pull_request_reviews)
         #   an unset control (key ABSENT)    -> null, which is what the spec omitting it means
         #
         # Every list is sorted, because the comparison is order-sensitive and GitHub does not
@@ -91,7 +109,13 @@ spec:
               required_status_checks: (
                 if .required_status_checks == null then null else {
                   strict: (.required_status_checks.strict // false),
-                  contexts: ((.required_status_checks.contexts // []) | sort)
+                  contexts: ((.required_status_checks.contexts // []) | sort),
+                  # GitHub returns BOTH forms; emit both. A CR that set only one of them
+                  # compares only that key (the comparison skips response keys absent from spec),
+                  # so the derived other form never shows as drift. Projected to {context, app_id}
+                  # to drop GitHub's extra per-check fields, then sorted by (context, app_id) to
+                  # match a spec written in that order.
+                  checks: ((.required_status_checks.checks // []) | map({context: .context, app_id: .app_id}) | sort_by(.context, .app_id))
                 } end
               ),
               enforce_admins: (.enforce_admins.enabled // false),
@@ -100,7 +124,26 @@ spec:
                   dismiss_stale_reviews: (.required_pull_request_reviews.dismiss_stale_reviews // false),
                   require_code_owner_reviews: (.required_pull_request_reviews.require_code_owner_reviews // false),
                   required_approving_review_count: (.required_pull_request_reviews.required_approving_review_count // 0),
-                  require_last_push_approval: (.required_pull_request_reviews.require_last_push_approval // false)
+                  require_last_push_approval: (.required_pull_request_reviews.require_last_push_approval // false),
+                  # Same object-to-string normalization as `restrictions` below, one level deeper.
+                  # The `== null` guard covers the key being ABSENT (jq indexes a missing key as
+                  # null), so a review object without these normalizes to null and matches a CR
+                  # that omits them. Never `//`-default these: `.users` indexing would error on an
+                  # already-normalized value, and a jq runtime error fails the reconcile.
+                  dismissal_restrictions: (
+                    if .required_pull_request_reviews.dismissal_restrictions == null then null else {
+                      users: ((.required_pull_request_reviews.dismissal_restrictions.users // []) | map(.login) | sort),
+                      teams: ((.required_pull_request_reviews.dismissal_restrictions.teams // []) | map(.slug) | sort),
+                      apps: ((.required_pull_request_reviews.dismissal_restrictions.apps // []) | map(.slug) | sort)
+                    } end
+                  ),
+                  bypass_pull_request_allowances: (
+                    if .required_pull_request_reviews.bypass_pull_request_allowances == null then null else {
+                      users: ((.required_pull_request_reviews.bypass_pull_request_allowances.users // []) | map(.login) | sort),
+                      teams: ((.required_pull_request_reviews.bypass_pull_request_allowances.teams // []) | map(.slug) | sort),
+                      apps: ((.required_pull_request_reviews.bypass_pull_request_allowances.apps // []) | map(.slug) | sort)
+                    } end
+                  )
                 } end
               ),
               restrictions: (
