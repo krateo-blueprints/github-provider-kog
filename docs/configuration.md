@@ -1,7 +1,7 @@
 ---
 type: Configuration
 title: github-provider-kog — configuration
-description: The whole config surface — the single chart value resourceGroup, the 31 RestDefinition mappings grouped by area, the compareScope tally and the reasoning behind each non-default choice, the native normalizations GitHub's REST inconsistencies demand, the OpenAPI ConfigMaps, and the invariants that must hold for a chart that ships no runtime component.
+description: The whole config surface — the single chart value resourceGroup, the 32 RestDefinition mappings grouped by area, the compareScope tally and the reasoning behind each non-default choice, the native normalizations GitHub's REST inconsistencies demand, the OpenAPI ConfigMaps, and the invariants that must hold for a chart that ships no runtime component.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, values, restdefinition, oasgen-provider]
 timestamp: 2026-09-09T00:00:00Z
@@ -19,7 +19,7 @@ The chart surface is deliberately tiny — one scalar. Everything else is fixed 
 
 | key | default | effect |
 |---|---|---|
-| `resourceGroup` | `github.krateo.io` | the API group every generated CRD lands under — 31 resource kinds plus a `<Kind>Configuration` auth kind for each. Referenced by every RestDefinition's `spec.resourceGroup`. |
+| `resourceGroup` | `github.krateo.io` | the API group every generated CRD lands under — 32 resource kinds plus a `<Kind>Configuration` auth kind for each. Referenced by every RestDefinition's `spec.resourceGroup`. |
 | `global` | `{}` (object) | Helm global values, injected by the chart-inspector / when used as a subchart. |
 
 The schema declares **only** a single top-level scalar on purpose: when the chart is
@@ -27,7 +27,7 @@ installed as a Krateo component the CDC derives the CompositionDefinition CRD fr
 schema, and a scalar default materializes cleanly in the component CR (nested-object
 toggles would not) ([api](./api.md)).
 
-There is **no per-kind toggle**. All 31 RestDefinitions are always installed; a
+There is **no per-kind toggle**. All 32 RestDefinitions are always installed; a
 RestDefinition costs nothing until a CR of its kind exists, and a per-kind switch would
 mean nested-object values the CDC cannot materialize.
 
@@ -35,7 +35,7 @@ mean nested-object values the CDC cannot materialize.
 
 Each `chart/templates/rd-<kind>.yaml` declares the API mapping oasgen-provider consumes;
 its in-file comments carry the reasoning behind every choice below. `configurationFields`
-is empty for all 31 — the token wiring comes from the oasgen-generated
+is empty for all 32 — the token wiring comes from the oasgen-generated
 `<Kind>Configuration` + `spec.configurationRef`, never from spec fields. The full
 per-kind verb, identifier, `compareScope` and status listing is in [api](./api.md); what
 follows is the mapping mechanics.
@@ -118,15 +118,16 @@ Three patterns recur across the set and are worth reading once:
 | kind | identifiers | key mapping facts |
 |---|---|---|
 | `Repository` | `name` | create on `/orgs/{org}/repos`, get/update/delete on `/repos/{org}/{name}` — the parameters are renamed `org`/`name` so one pair of spec fields serves the create path, the create body and the item path. `compareScope: updatable`, not the default (below); status carries `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch`. |
+| `UserRepository` | `name` | the user-owned sibling of `Repository`: create is `POST /user/repos` (owned by the token account), get/update address `/repos/{owner}/{name}` with `owner` sourced from `status.owner.login` (`excludedSpecFields` — never hand-set, since GitHub assigns the owner from the token). Before that status exists, observe is a **findby** over `GET /user/repos` pinned to `affiliation=owner` (owned repos, so names are unique) and walked with `pageNumber` pagination (short-page end rule), so a same-name repo already in the token's account is adopted rather than duplicated. **No delete verb** — orphan-not-destroy, the same oasgen #125 reasoning as `Repository`. `name`/`private`/`visibility` are kept out of the PATCH body for the identical reasons (below); `compareScope: updatable`; status as `Repository` plus `owner.login`. |
 
 ### `compareScope` across the chart
 
 `compareScope` takes one of three values — `fullSpec` (the default),
-`identifiersAndStatus`, or `updatable`. Across the 31 kinds:
+`identifiersAndStatus`, or `updatable`. Across the 32 kinds:
 
 | value | kinds | count |
 |---|---|---|
-| `updatable` | `Repository`, `Team`, `TeamRepo`, `TeamMembership`, `Collaborator`, `OrgMembership`, `RepoWebhook`, `OrgWebhook`, `Environment`, `RepoRuleset`, `OrgRuleset`, `BranchProtection`, `ActionsVariableRepo`, `ActionsVariableOrg`, `EnvironmentVariable`, `RunnerGroup`, `DeploymentBranchPolicy`, `Label`, `Milestone`, `Issue`, `PullRequest`, `Release`, `CustomProperty`, `CodeSecurityConfig` | 24 |
+| `updatable` | `Repository`, `UserRepository`, `Team`, `TeamRepo`, `TeamMembership`, `Collaborator`, `OrgMembership`, `RepoWebhook`, `OrgWebhook`, `Environment`, `RepoRuleset`, `OrgRuleset`, `BranchProtection`, `ActionsVariableRepo`, `ActionsVariableOrg`, `EnvironmentVariable`, `RunnerGroup`, `DeploymentBranchPolicy`, `Label`, `Milestone`, `Issue`, `PullRequest`, `Release`, `CustomProperty`, `CodeSecurityConfig` | 25 |
 | default `fullSpec` (unset) | `Workflow`, `AutomatedSecurityFixes`, `RepoContent` | 3 |
 | `fullSpec` (set explicitly) | `Autolink` | 1 |
 | `identifiersAndStatus` | `DeployKey`, `RepoDeployment`, `GitRef` | 3 |
@@ -161,7 +162,7 @@ What genuinely loops is a spec key the response **does** carry, in a different s
 a server-normalised value, that the update verb cannot fix. The controller sees a
 difference, issues an update, the update cannot touch that field, the next observe sees
 the same difference — an update on every reconcile, forever, against a 5000 req/hr
-budget. That is the case `updatable` exists for, and it splits the 23 kinds in two:
+budget. That is the case `updatable` exists for, and it splits the 24 kinds in two:
 
 - **Load-bearing** — the response carries the key, nothing can reconcile it, so it has to
   leave the compared set. `TeamRepo`'s `owner` (a user object against a spec string —
@@ -179,8 +180,8 @@ budget. That is the case `updatable` exists for, and it splits the 23 kinds in t
   `permission` genuinely *is* updatable and stays compared, which is why its loop is only
   narrowed and not closed (below).
 - **Defensive** — every other `updatable` kind, where the extra keys `fullSpec` would
-  compare are create-only fields or path parameters: `Repository`'s `auto_init` /
-  `gitignore_template` / `license_template`, `Release`'s `generate_release_notes`,
+  compare are create-only fields or path parameters: `Repository`'s and `UserRepository`'s
+  `auto_init` / `gitignore_template` / `license_template`, `Release`'s `generate_release_notes`,
   `RunnerGroup`'s `selected_repository_ids` / `runners`,
   `ActionsVariableOrg`'s `selected_repository_ids`, plus `Team`, `TeamMembership`,
   `OrgMembership`, `Label`, `BranchProtection`, `RepoRuleset`, `OrgRuleset`,
@@ -279,9 +280,15 @@ not exist below oasgen-provider **0.23.0**. That setting compared only `name` pl
 `additionalStatusFields`, so editing `description` on an existing CR was silently never
 pushed — a real gap, and closing it is what the change was actually for.
 
+`UserRepository`, the user-owned sibling, takes this subsection's reasoning verbatim: the same
+`updatable`-is-load-bearing requirement, the same `name`/`private`/`visibility` kept out of the
+PATCH body, and the same no-delete-verb orphan-not-destroy stance. It differs only in its create
+path (`POST /user/repos` rather than `/orgs/{org}/repos`) and its item path, whose `owner` is read back from GitHub (`status.owner.login`) rather than set
+in the spec, since GitHub assigns it from the token.
+
 ### Normalization in the RestDefinition
 
-All 31 kinds are native: every verb goes straight to `api.github.com`, and where GitHub's
+All 32 kinds are native: every verb goes straight to `api.github.com`, and where GitHub's
 REST API needs normalizing, the RestDefinition expresses it rather than a hop through
 something the chart would have to run. The mechanisms, and where each is used:
 
@@ -304,7 +311,7 @@ would consume the key and `status.role_name` would silently never populate.
 ## The OpenAPI specs
 
 Each RestDefinition references a trimmed OpenAPI 3.0 spec (`chart/assets/<kind>.yaml`)
-carried as a ConfigMap (`chart/templates/configmap-<kind>.yaml`). All **31** ConfigMaps
+carried as a ConfigMap (`chart/templates/configmap-<kind>.yaml`). All **32** ConfigMaps
 are a plain `.Files.Get`: the assets contain no template action, so nothing is
 `tpl`-rendered and each spec is copied verbatim. No operation anywhere in the set
 overrides `servers` — every verb of every kind keeps `https://api.github.com`.
@@ -319,10 +326,10 @@ needs — a duplicate pair the author has to keep in sync by hand. Naming them `
 get/update/delete path. `customproperty.yaml` applies the same rename, turning GitHub's
 `custom_property_name` into `property_name`.
 
-The same asset trims one endpoint away on purpose: GitHub's user-scoped create,
-`POST /user/repos`, is not modelled. A RestDefinition has exactly one create verb and
-cannot pick between two paths at runtime, and Krateo destination repositories are
-org-owned, so only the org-scoped create is supported ([api](./api.md)).
+`repository.yaml` models only the org-scoped create: GitHub's user-scoped create,
+`POST /user/repos`, is a **separate kind**, `UserRepository`. A RestDefinition has exactly one
+create verb and cannot pick between two paths at runtime, so the user-owned variant is its own
+RestDefinition rather than a branch of this one ([api](./api.md)).
 
 Two capabilities are absent from the asset set because no RestDefinition can express
 them, not because they were overlooked ([api](./api.md)): **secrets** at any scope, which
@@ -332,7 +339,7 @@ are not secrets and are covered at all three scopes.
 
 ## No runtime component
 
-The chart renders 31 ConfigMaps and 31 RestDefinitions, and nothing else — no Deployment,
+The chart renders 32 ConfigMaps and 32 RestDefinitions, and nothing else — no Deployment,
 no Service, no image, no proxy, and no `_helpers.tpl` (it held only the two helpers the
 proxy needed). Installing the chart puts data in the cluster; the only workloads are the
 `rest-dynamic-controller` deployments oasgen-provider creates per kind.
@@ -364,9 +371,9 @@ What each did, and what a native return takes, is written down per kind:
   land on the CRD ([#249](https://github.com/krateo-platformops/oasgen-provider/issues/249),
   merged as #250). `GitRef`'s create resolves its base sha with **dependent lookups**, a
   primitive that landed in 0.36.0 ([#120](https://github.com/krateo-platformops/oasgen-provider/issues/120),
-  merged as #239), and the `compareScope: updatable` that 24 kinds declare does not exist
+  merged as #239), and the `compareScope: updatable` that 25 kinds declare does not exist
   below 0.23.0 — both floors still hold, now subsumed by 0.38.0.
-- **The chart stays free of a runtime component.** It renders 31 ConfigMaps and 31
+- **The chart stays free of a runtime component.** It renders 32 ConfigMaps and 32
   RestDefinitions and nothing else; every kind reaches `api.github.com` directly, no
   asset overrides `servers`, and every ConfigMap is a plain `.Files.Get` with nothing for
   `tpl` to resolve. A kind that needed a hop would reintroduce a Deployment, a Service and
@@ -388,8 +395,9 @@ What each did, and what a native return takes, is written down per kind:
   paths and delete round-trip all confirmed against the real GitHub API.
 - **The token is provisioned out-of-band, and its rights are the union of the kinds in
   use.** The chart holds no credential; the portal write-path only references the
-  `<Kind>Configuration` CRs ([usage](./usage.md)). One PAT can drive all 31 kinds, and
-  `chart/samples/configurations.yaml` ships all 31 Configuration CRs under a single name
+  `<Kind>Configuration` CRs ([usage](./usage.md)). One PAT can drive all 32 kinds, and
+  `chart/samples/configurations.yaml` ships 31 of the 32 Configuration CRs under a single name
+  (`UserRepository`'s has its own, since its repositories are created in the token's account)
   — but `Repository` needs repository creation in the org (classic `repo` scope, or a
   fine-grained token with org **Administration: read & write**), and the org-scoped kinds — `Team`, `TeamMembership`,
   `TeamRepo`, `OrgMembership`, `OrgWebhook`, `OrgRuleset`, `ActionsVariableOrg`,

@@ -10,8 +10,15 @@
 # Then one <Kind>Configuration per kind, each pointing at that Secret. oasgen 0.9.x
 # generates these Configuration CRDs from the OAS securityScheme and auto-adds a
 # spec.configurationRef field to every resource CR. All of them may share a name (the
-# kind is implied by the resource that references it) — which is why all 31 below carry
-# the same `github-blueprints-config`, and why one PAT can drive the whole chart.
+# kind is implied by the resource that references it) — which is why 31 of the 32 below
+# carry the same `github-blueprints-config`, and why one PAT can drive the whole chart.
+#
+# The one exception is UserRepository: its repositories are created in the TOKEN's own
+# account (GitHub assigns the owner of POST /user/repos from the credential), so it gets its
+# own Configuration and Secret carrying the intended user's token:
+#
+#   kubectl create secret generic gh-user-token -n krateo-system \
+#     --from-literal=token=<THAT_USER'S_PAT>    # scope: repo (create/administer own repos)
 #
 # You only need the Configuration for the kinds you actually use; the rest are inert.
 ---
@@ -25,6 +32,21 @@ spec:
     bearer:
       tokenRef:
         name: gh-token
+        namespace: krateo-system
+        key: token
+---
+apiVersion: github.krateo.io/v1alpha1
+kind: UserRepositoryConfiguration
+metadata:
+  # NOT the shared github-blueprints-config: a UserRepository is created in the account that
+  # owns this token, so this must be the intended user's own token, not a shared/automation PAT.
+  name: github-user-config
+  namespace: krateo-system
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: gh-user-token
         namespace: krateo-system
         key: token
 ---

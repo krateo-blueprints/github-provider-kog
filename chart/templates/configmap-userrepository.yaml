@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-userrepository
+  namespace: {{ .Release.Namespace }}
+data:
+  # Plain .Files.Get, like every other kind in this chart — the asset carries no template action
+  # and no servers override, so nothing is tpl-rendered and the spec is copied verbatim.
+  userrepository.yaml: |
+{{ .Files.Get "assets/userrepository.yaml" | indent 4 }}
