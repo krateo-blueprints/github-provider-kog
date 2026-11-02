@@ -338,6 +338,21 @@ spec:
         require_code_owner_review: false
         require_last_push_approval: false
         required_review_thread_resolution: true
+    - type: merge_queue                 # all seven keys are required together
+      parameters:
+        merge_method: SQUASH            # MERGE | SQUASH | REBASE
+        grouping_strategy: ALLGREEN     # ALLGREEN | HEADGREEN
+        check_response_timeout_minutes: 60
+        min_entries_to_merge: 1
+        min_entries_to_merge_wait_minutes: 5
+        max_entries_to_merge: 5
+        max_entries_to_build: 5
+    - type: commit_message_pattern      # one of the five *_pattern rules
+      parameters:
+        operator: starts_with           # starts_with | ends_with | contains | regex
+        pattern: "JIRA-"
+        name: require-ticket-prefix     # optional human label; not the ruleset's name
+        negate: false                   # optional
 ```
 
 - **`parameters` is a union keyed by `type`.** Set only the keys belonging to that rule

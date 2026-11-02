@@ -430,7 +430,14 @@ that survives the transform unchanged, which is why it is the identifier.
   compared element-by-element, in order — list them in a stable order. Extra keys GitHub
   fills into a rule's `parameters` (defaults such as `do_not_enforce_on_create`) are
   ignored, since the comparison walks only keys the CR declares, so a partially-specified
-  rule does not read as drift.
+  rule does not read as drift. The modelled `rules` types are `creation`, `deletion`,
+  `update`, `non_fast_forward`, `required_linear_history`, `required_signatures`,
+  `pull_request`, `required_status_checks`, `required_deployments`, `merge_queue`, and the
+  five pattern rules (`commit_message_pattern`, `commit_author_email_pattern`,
+  `committer_email_pattern`, `branch_name_pattern`, `tag_name_pattern`); each echoes its
+  parameters back verbatim, so none loops. Still unmodelled (configure in the UI): the
+  product-reference rules (`workflows`, `code_scanning`, `license_compliance_scanning`,
+  `copilot_code_review`) and the Enterprise-only push rules.
 - **`DeploymentBranchPolicy` cannot change `type`.** The create body is `{name, type}`;
   the update body is `{name}` alone — GitHub cannot move a policy between `branch` and
   `tag` after creation. `type` is therefore not compared (the controller could not fix it)

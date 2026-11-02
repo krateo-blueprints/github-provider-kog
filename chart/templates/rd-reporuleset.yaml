@@ -45,7 +45,11 @@ spec:
     # order reads as drift, and the PUT re-sends the CR's order without settling it — so list
     # them in a stable order. Extra keys GitHub adds inside a rule's `parameters` (defaults it
     # fills in, e.g. do_not_enforce_on_create) are ignored — the comparison only walks keys the
-    # CR declares — so a partially-specified rule does not read as drift.
+    # CR declares — so a partially-specified rule does not read as drift. Every rule type modelled
+    # in the asset (now including merge_queue and the five *_pattern rules) echoes its parameters
+    # back verbatim on GET — merge_method / grouping_strategy / operator keep their casing, the
+    # pattern `name`/`pattern` strings are stored as sent — so none introduces a permanent drift
+    # loop.
     configurationFields: []
     verbsDescription:
       - action: create

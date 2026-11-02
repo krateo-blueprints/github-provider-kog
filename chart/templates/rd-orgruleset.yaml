@@ -33,7 +33,9 @@ spec:
     # ^ Same reasoning as rd-reporuleset.yaml: the update body carries every create field, so
     # this is a tightening rather than a rescue. It keeps the `org` path parameter out of the
     # drift comparison by construction, and the array-ordering caveat there applies here too —
-    # `rules` and `bypass_actors` are compared element-by-element in order.
+    # `rules` and `bypass_actors` are compared element-by-element in order. The rule types the
+    # asset models (now including merge_queue and the five *_pattern rules) echo their parameters
+    # back verbatim on GET, so none introduces a permanent drift loop.
     configurationFields: []
     verbsDescription:
       - action: create

@@ -244,22 +244,33 @@ components:
     #                          (do_not_enforce_on_create is optional)
     #   update                 update_allows_fetch_and_merge
     #   required_deployments   required_deployment_environments
+    #   merge_queue            check_response_timeout_minutes, grouping_strategy,
+    #                          max_entries_to_build, max_entries_to_merge, merge_method,
+    #                          min_entries_to_merge, min_entries_to_merge_wait_minutes (all seven;
+    #                          GitHub requires the whole set together)
+    #   *_pattern (the five)   operator, pattern (required pair); name, negate (optional)
     # The parameterless types — creation, deletion, non_fast_forward, required_linear_history,
     # required_signatures — take no `parameters` key at all.
     #
-    # MODELLED (the branch-protection replacement set — what a platform team actually writes):
+    # MODELLED (the declarative set a platform team actually writes):
     #   creation, deletion, update, non_fast_forward, required_linear_history,
-    #   required_signatures, pull_request, required_status_checks, required_deployments.
+    #   required_signatures, pull_request, required_status_checks, required_deployments,
+    #   merge_queue, commit_message_pattern, commit_author_email_pattern,
+    #   committer_email_pattern, branch_name_pattern, tag_name_pattern.
+    #
+    # On the five *_pattern rules, and the "name/pattern would collide" note this comment used to
+    # carry: there is NO collision, and it was removed after checking the generator source. Those
+    # keys live at rules[].parameters.{name,pattern} — two levels below the ruleset's own
+    # top-level `name` — and oasgen's ONLY name-merge logic (addParametersToSpec, #108/#257)
+    # reconciles a ROOT-level body property against a path/query/header PARAMETER of the same
+    # name; it never walks nested body keys and never merges body-to-body. A property literally
+    # named `pattern` is read from the `properties` map by its key and is a different thing from
+    # the `pattern` validation keyword (libopenapi_adapter populates Properties and Pattern from
+    # separate inputs). Verified against oasgen 0.43.0 (what clusters run) and current, and by
+    # generating the CRD and validating sample CRs. So the five pattern rules and merge_queue are
+    # modelled as plain additional optional keys in the same union.
     #
     # LEFT OUT, and why:
-    #   merge_queue                     — seven co-required parameters, all of which GitHub
-    #                                     requires together, for a feature configured per-repo in
-    #                                     the UI far more often than declaratively.
-    #   commit_message_pattern,         — five near-identical {name, negate, operator, pattern}
-    #   commit_author_email_pattern,      rules. Cheap to add later; omitted now because their
-    #   committer_email_pattern,          `name`/`pattern` keys would read as the ruleset's own
-    #   branch_name_pattern,              name inside a union `parameters` object.
-    #   tag_name_pattern
     #   workflows, code_scanning,       — reference other GitHub products by identifiers this
     #   license_compliance_scanning,      provider cannot resolve (Actions workflow files keyed by
     #   copilot_code_review               repository_id + path, code-scanning tool names, Copilot).
@@ -291,6 +302,12 @@ components:
               - pull_request
               - required_status_checks
               - required_deployments
+              - merge_queue
+              - commit_message_pattern
+              - commit_author_email_pattern
+              - committer_email_pattern
+              - branch_name_pattern
+              - tag_name_pattern
           parameters:
             type: object
             properties:
@@ -338,6 +355,50 @@ components:
                 type: array
                 items:
                   type: string
+              # type: merge_queue — all seven keys are required together by GitHub; the flattened
+              # union cannot enforce that, so a partial set is a 422 (loud), not a silent ignore.
+              # GitHub also range-checks the integers (timeouts 1-360 / 0-360, entry counts 0-100);
+              # those bounds are left to the API rather than duplicated as CRD constraints.
+              check_response_timeout_minutes:
+                type: integer
+              grouping_strategy:
+                type: string
+                enum:
+                  - ALLGREEN
+                  - HEADGREEN
+              max_entries_to_build:
+                type: integer
+              max_entries_to_merge:
+                type: integer
+              merge_method:
+                type: string
+                enum:
+                  - MERGE
+                  - SQUASH
+                  - REBASE
+              min_entries_to_merge:
+                type: integer
+              min_entries_to_merge_wait_minutes:
+                type: integer
+              # types: commit_message_pattern, commit_author_email_pattern,
+              # committer_email_pattern, branch_name_pattern, tag_name_pattern — the five share one
+              # {name, negate, operator, pattern} shape. `operator` and `pattern` are the required
+              # pair; `name` (a human label for the rule) and `negate` are optional. `name` here is
+              # the pattern rule's own label at rules[].parameters.name — NOT the ruleset's
+              # top-level `name`, and it cannot collide with it (see the comment above).
+              name:
+                type: string
+              negate:
+                type: boolean
+              operator:
+                type: string
+                enum:
+                  - starts_with
+                  - ends_with
+                  - contains
+                  - regex
+              pattern:
+                type: string
     # Response schema. It carries the fields the status is built from and nothing else: drift
     # comparison reads the LIVE response body, never this schema, so `rules`, `conditions` and
     # `bypass_actors` need no response-side declaration and are not duplicated here.
