@@ -45,11 +45,15 @@ spec:
     # order reads as drift, and the PUT re-sends the CR's order without settling it — so list
     # them in a stable order. Extra keys GitHub adds inside a rule's `parameters` (defaults it
     # fills in, e.g. do_not_enforce_on_create) are ignored — the comparison only walks keys the
-    # CR declares — so a partially-specified rule does not read as drift. Every rule type modelled
-    # in the asset (now including merge_queue and the five *_pattern rules) echoes its parameters
-    # back verbatim on GET — merge_method / grouping_strategy / operator keep their casing, the
-    # pattern `name`/`pattern` strings are stored as sent — so none introduces a permanent drift
-    # loop.
+    # CR declares — so a partially-specified rule does not read as drift. That "walks only the
+    # CR's keys" guarantee is the comparator ranging over the CR map: krateo-rest-dynamic-controller
+    # internal/tools/comparison/comparison.go:43 (`for key, value := range mg`), skipping any
+    # response-only key at :47-53. Per GitHub's current REST `repository-rule` schema/docs (NOT a
+    # live capture), the parameters a CR sets round-trip identically on GET for every modelled type,
+    # merge_queue and the five *_pattern rules included — merge_method / grouping_strategy / operator
+    # keep their documented casing, the pattern `name`/`pattern` strings are stored as sent. The
+    # defaults GitHub fills for optional keys a CR omits (a pattern rule's `negate: false`, and
+    # `name`) are exactly the unwalked response-only keys above, so none introduces a drift loop.
     #
     # Ownership note: the PUT re-sends the WHOLE `rules` array, so a UI-added rule of one of the 8
     # still-unmodelled rule types on this CR-managed ruleset is DELETED on the next reconcile (the

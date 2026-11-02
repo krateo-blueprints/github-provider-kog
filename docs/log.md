@@ -13,34 +13,45 @@ Curated history; release notes live in GitHub Releases.
 
 ## 2026-11-03 — feat: model merge_queue and the five pattern ruleset rules
 
-Closed six of the fourteen `RepoRuleset`/`OrgRuleset` rule-type capability gaps the 2026-11-02
-whole-value audit flagged as **data loss** (a rule type a CR cannot express is deleted on reconcile
-because the PUT re-sends the whole `rules` array): `merge_queue` and the five pattern rules
-`commit_message_pattern`, `commit_author_email_pattern`, `committer_email_pattern`,
-`branch_name_pattern`, `tag_name_pattern`. Modelled rule types go from 9 to 15; eight remain
+**The claimed "collision" was not real.** The `RepoRuleset`/`OrgRuleset` asset comment had omitted
+the five pattern rules because their `name`/`pattern` parameter keys "would collide with the
+ruleset's own name inside a union `parameters` object". Checked against the oasgen-provider monorepo
+at tag **0.43.0** (what clusters run) and current `main`: there is no such collision. oasgen's ONLY
+name-merge logic is `addParametersToSpec` in `internal/tools/oas2jsonschema/spec_builder.go`
+(`propertyExists`/`propertyNamed`, #108/#257): it reconciles a **root-level** request-body property
+against a **path/query/header parameter** of the same name (e.g. `ruleset_id`, `owner`, `org`). It
+iterates only the root `schema.Properties`, never nested body keys, and never merges body against
+body. The pattern keys live at `rules[].parameters.{name,pattern}`, two levels below the top-level
+ruleset `name`, so that merge cannot reach them; and a property literally named `pattern` is read
+from the `properties` map by its key (`libopenapi_adapter.go`), a different field from the `pattern`
+validation keyword. Proven by generating the CRD and validating CRs (below), where the pattern
+`name`/`pattern` coexist with the top-level `name` with no error. The misleading comment was replaced
+with this explanation.
+
+With the collision disproved, six of the fourteen rule-type capability gaps the 2026-11-02
+whole-value audit flagged as **data loss** (a rule type a CR cannot express is deleted on reconcile,
+because the PUT re-sends the whole `rules` array) are now closed: `merge_queue` and the five pattern
+rules `commit_message_pattern`, `commit_author_email_pattern`, `committer_email_pattern`,
+`branch_name_pattern`, `tag_name_pattern`. They were added to the existing `{type, parameters}`
+union, every key optional, with each type's GitHub-required set documented — **purely additive**, so
+the nine existing types keep an identical shape. Modelled rule types go from 9 to 15; eight remain
 unmodelled by design — the four product-reference rules (`workflows`, `code_scanning`,
 `license_compliance_scanning`, `copilot_code_review`, which key other GitHub products by IDs this
 provider cannot resolve) and the four Enterprise-only push-target rules (`file_path_restriction`,
 `max_file_path_length`, `file_extension_restriction`, `max_file_size`).
 
-The asset comment had claimed the pattern rules' `name`/`pattern` keys "would collide with the
-ruleset's own name inside a union `parameters` object", and omitted them for that reason. Checked
-against the oasgen-provider monorepo at tag **0.43.0** (what clusters run) and current `main`: there
-is **no collision**. oasgen's only name-merge logic (`addParametersToSpec` in
-`internal/tools/oas2jsonschema/spec_builder.go`, #108/#257) reconciles a **root-level** request-body
-property against a **path/query/header parameter** of the same name; it never walks nested body keys
-and never merges body-against-body. The pattern keys live at `rules[].parameters.{name,pattern}`,
-two levels below the top-level ruleset `name`, so the merge cannot reach them, and a property
-literally named `pattern` is parsed from the `properties` map by its key — a different field from the
-`pattern` validation keyword (`libopenapi_adapter`). So the six types were added to the existing
-`{type, parameters}` union, every key optional, with each type's GitHub-required set documented, and
-the misleading comment was replaced with the corrected explanation. The change is **purely additive**:
-the nine existing types keep an identical shape.
-
-GitHub echoes the new parameters verbatim on GET (`merge_method`/`grouping_strategy`/`operator` keep
-casing; pattern `name`/`pattern` stored as sent), and the comparator walks only keys the CR declares,
-so neither new type introduces a permanent-drift loop. `compareScope: updatable` and the positional
-array comparison are unchanged. Verified against GitHub's current REST `repository-rule` schema.
+**Round-trip, and how we know.** From GitHub's current REST `repository-rule` schema and docs
+(docs.github.com/rest/repos/rules), not a live capture — no ruleset was created on a real org in this
+work. The schema stores the request values and the GET returns them in the same shape, so the
+parameters a CR sets round-trip identically (`merge_method`/`grouping_strategy`/`operator` are stored
+with their documented casing; the pattern `pattern`/`name` strings as sent). GitHub does fill
+defaults on GET for optional keys the CR leaves out — a pattern rule gets `negate: false`, and `name`
+comes back as an empty/absent label — but that is harmless here: the drift comparator iterates only
+the keys the CR declares and skips any response key the CR did not set
+(`krateo-rest-dynamic-controller internal/tools/comparison/comparison.go:43`, the `for key, value :=
+range mg` loop over the CR map, with response-only keys skipped at `:47-53`). So a default GitHub
+adds to a key the CR never set is never visited, and neither new type introduces a permanent-drift
+loop. `compareScope: updatable` and the positional array comparison are unchanged.
 
 Proof: `helm lint` + render (32 RestDefinitions + 32 ConfigMaps); `hack/assert-drift-invariants.py`
 and `hack/preflight-refs.py` pass; strict server dry-run of both RestDefinitions on krateo-057
