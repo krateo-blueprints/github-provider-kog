@@ -11,6 +11,29 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-03 — feat(branchprotection): model the review sub-restrictions and the `checks` form
+
+Closed the `BranchProtection` capability gap the whole-value audit named the day before. Because the
+protection update is a whole-document PUT whose `requestTransform` nulls every omitted control, any
+sub-control the CR could not express was wiped from a live branch the moment any modelled field drifted.
+Three are now modelled, additively: `required_pull_request_reviews.dismissal_restrictions` and
+`.bypass_pull_request_allowances` (`{users, teams, apps}`), and `required_status_checks.checks`
+(`[{context, app_id}]`) alongside the existing `contexts`.
+
+GitHub returns the two review sub-objects as user/team/app **objects** on GET but takes login/slug
+**strings** on PUT, so the whole-document `responseTransform` normalizes them to sorted string lists
+exactly as it already does for top-level `restrictions`, and emits `checks` projected to
+`{context, app_id}` and sorted — each guarded with the `if x == null then null else … end` form, never
+`//` on an already-normalized value, so a jq runtime error still fails the reconcile. `contexts` and
+`checks` are two representations of one list that GitHub keeps mutually exclusive (`checks` wins), so the
+`requestTransform` drops `contexts` whenever the CR set `checks`, and `required_status_checks.required`
+was relaxed from `[strict, contexts]` to `[strict]` so the `checks` form is selectable; the drift
+comparison only looks at the keys the CR actually set, so a `contexts`-only or `checks`-only CR never
+drifts against the derived other form. No oasgen-immutable field changed; a CR that sets none of the new
+fields produces a byte-identical request body and an identical drift outcome. Verified with real gojq,
+an idempotency round-trip, the oasgen-provider 0.43.0 CRD renderer, and a strict server-side dry-run.
+This moves those sub-controls out of the data-loss class in the 2026-11-02 "what a CR owns" section.
+
 ## 2026-11-02 — docs: whole-value update semantics and what a CR owns
 
 A whole-map overwrite audit of the chart established that `rest-dynamic-controller` assembles an
