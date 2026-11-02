@@ -66,7 +66,7 @@ allowed to do does differ by group — the per-group rights table is in
 [usage](./usage.md), which also works each group's fields and gotchas through.
 
 ```console
-$ kubectl apply -f chart/samples/configurations.yaml    # all 32, one shared name
+$ kubectl apply -f chart/samples/configurations.yaml    # all 32; 31 share one name (UserRepository has its own)
 ```
 
 ### Access

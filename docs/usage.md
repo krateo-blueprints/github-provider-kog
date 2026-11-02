@@ -89,8 +89,10 @@ token that drives the repository-scoped kinds perfectly to `403` on the org-scop
 until it is widened.
 
 Then one Configuration per kind. They may all share a name — the kind is implied by the
-resource that references it — which is why `chart/samples/configurations.yaml` ships all
-32 under the same `github-blueprints-config`:
+resource that references it — which is why `chart/samples/configurations.yaml` ships 31
+of the 32 under the same `github-blueprints-config` — all but `UserRepository`, whose
+repositories are created in the token's own account, so it gets its own Configuration
+carrying the intended user's token:
 
 ```yaml
 apiVersion: github.krateo.io/v1alpha1

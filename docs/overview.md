@@ -331,8 +331,9 @@ token is never handled by the browser or snowplow ([usage](./usage.md)).
 
 One PAT can drive the whole chart. Each of the 32 kinds gets its own
 `<Kind>Configuration`, but they may all carry the same name — `chart/samples/`
-ships all 32 as `github-blueprints-config` — so a single token Secret backs every kind
-in use. What that token must be allowed to do differs by kind:
+ships 31 of the 32 as `github-blueprints-config` — so a single token Secret backs every kind
+in use except `UserRepository`, which creates repositories in the token's own account and so
+gets its own Configuration carrying the intended user's token. What that token must be allowed to do differs by kind:
 
 - `Repository` needs repo creation in the org — classic `repo`, or the fine-grained org
   permission **Administration: read & write**;

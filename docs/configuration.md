@@ -118,7 +118,7 @@ Three patterns recur across the set and are worth reading once:
 | kind | identifiers | key mapping facts |
 |---|---|---|
 | `Repository` | `name` | create on `/orgs/{org}/repos`, get/update/delete on `/repos/{org}/{name}` — the parameters are renamed `org`/`name` so one pair of spec fields serves the create path, the create body and the item path. `compareScope: updatable`, not the default (below); status carries `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch`. |
-| `UserRepository` | `name` | the user-owned sibling of `Repository`: create is `POST /user/repos` (owned by the token account), get/update address `/repos/{owner}/{name}` with `owner` a spec field (the user's login, item-path only — not on the create path). **No delete verb** — orphan-not-destroy, the same oasgen #125 reasoning as `Repository`. `name`/`private`/`visibility` are kept out of the PATCH body for the identical reasons (below); `compareScope: updatable`; same status set as `Repository`. |
+| `UserRepository` | `name` | the user-owned sibling of `Repository`: create is `POST /user/repos` (owned by the token account), get/update address `/repos/{owner}/{name}` with `owner` sourced from `status.owner.login` (`excludedSpecFields` — never hand-set, since GitHub assigns the owner from the token). Before that status exists, observe is a **findby** over `GET /user/repos` pinned to `affiliation=owner` (owned repos, so names are unique) and walked with `pageNumber` pagination (short-page end rule), so a same-name repo already in the token's account is adopted rather than duplicated. **No delete verb** — orphan-not-destroy, the same oasgen #125 reasoning as `Repository`. `name`/`private`/`visibility` are kept out of the PATCH body for the identical reasons (below); `compareScope: updatable`; status as `Repository` plus `owner.login`. |
 
 ### `compareScope` across the chart
 
@@ -283,8 +283,8 @@ pushed — a real gap, and closing it is what the change was actually for.
 `UserRepository`, the user-owned sibling, takes this subsection's reasoning verbatim: the same
 `updatable`-is-load-bearing requirement, the same `name`/`private`/`visibility` kept out of the
 PATCH body, and the same no-delete-verb orphan-not-destroy stance. It differs only in its create
-path (`POST /user/repos` rather than `/orgs/{org}/repos`) and its item path (`owner`, the token
-user's login, in place of `org`).
+path (`POST /user/repos` rather than `/orgs/{org}/repos`) and its item path, whose `owner` is read back from GitHub (`status.owner.login`) rather than set
+in the spec, since GitHub assigns it from the token.
 
 ### Normalization in the RestDefinition
 
@@ -396,7 +396,8 @@ What each did, and what a native return takes, is written down per kind:
 - **The token is provisioned out-of-band, and its rights are the union of the kinds in
   use.** The chart holds no credential; the portal write-path only references the
   `<Kind>Configuration` CRs ([usage](./usage.md)). One PAT can drive all 32 kinds, and
-  `chart/samples/configurations.yaml` ships all 32 Configuration CRs under a single name
+  `chart/samples/configurations.yaml` ships 31 of the 32 Configuration CRs under a single name
+  (`UserRepository`'s has its own, since its repositories are created in the token's account)
   — but `Repository` needs repository creation in the org (classic `repo` scope, or a
   fine-grained token with org **Administration: read & write**), and the org-scoped kinds — `Team`, `TeamMembership`,
   `TeamRepo`, `OrgMembership`, `OrgWebhook`, `OrgRuleset`, `ActionsVariableOrg`,

@@ -140,7 +140,7 @@ authoring one are written out in full below the tables.
 | kind | verbs | identifiers | `compareScope` | status |
 |---|---|---|---|---|
 | `Repository` | create `POST /orgs/{org}/repos`; get/update `GET`/`PATCH /repos/{org}/{name}`. **No delete verb** — deleting the CR orphans the repository, it does not destroy it (see below) | `name` | `updatable` | `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
-| `UserRepository` | create `POST /user/repos`; get/update `GET`/`PATCH /repos/{owner}/{name}` — **no delete verb** | `name` | `updatable` | `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
+| `UserRepository` | create `POST /user/repos`; get/update `GET`/`PATCH /repos/{owner}/{name}` with `owner` from `status.owner.login`; **findby** `GET /user/repos?affiliation=owner` (paginated) before status exists — **no delete verb** | `name` | `updatable` | `owner.login`, `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
 
 ### `Repository` — create the destination repository
 
@@ -530,8 +530,10 @@ that, not `CodeSecurityConfiguration` — yields `CodeSecurityConfigConfiguratio
 than a doubled `…ConfigurationConfiguration`.
 
 All 32 may share a single name — the kind is implied by the resource that references it.
-That is why `chart/samples/configurations.yaml` now ships all 32 under the same
-`github-blueprints-config`, and why **one PAT can drive the whole chart**. You only need
+That is why `chart/samples/configurations.yaml` ships 31 of the 32 under the same
+`github-blueprints-config`, and why **one PAT can drive the whole chart** — except
+`UserRepository`, whose repositories are created in the token's own account, so its sample
+Configuration (`github-user-config`) carries the intended user's token instead. You only need
 the Configuration for the kinds you actually use; the rest are inert. The referenced
 `Secret` is provisioned out-of-band ([usage](./usage.md)); the chart ships none of this.
 

@@ -8,12 +8,34 @@ spec:
   resourceGroup: {{ .Values.resourceGroup }}
   resource:
     kind: UserRepository
-    # The user-owned sibling of Repository: create is POST /user/repos (owned by the token's
-    # account), item verbs address /repos/{owner}/{name}. A separate kind because a
-    # RestDefinition has one create verb and cannot pick /orgs/{org}/repos vs /user/repos.
+    # The user-owned sibling of Repository: create is POST /user/repos, item verbs address
+    # /repos/{owner}/{name}. A separate kind because a RestDefinition has one create verb and
+    # cannot pick /orgs/{org}/repos vs /user/repos.
+    #
+    # IDENTITY IS THE TOKEN. GitHub assigns the owner of a POST /user/repos from the credential, not
+    # from the request, so the repository lands in the account that owns the token on the
+    # Configuration this CR references. With the sample setup (every Configuration sharing one PAT)
+    # that is the PAT owner's personal account, whoever authored the CR — so give UserRepository its
+    # own Configuration, carrying the intended user's token.
     identifiers:
       - name
+    # `owner` is a path parameter of get/update, which oasgen would otherwise turn into a REQUIRED
+    # spec field. It is excluded and sourced from status.owner.login instead, so it can only ever be
+    # absent (no status yet) or the owner GitHub really assigned — never a hand-set value that
+    # disagrees with the token. (A hand-set owner that disagreed used to create the repo in the
+    # token's account, then 404 on observe, re-create, and wedge on 422 "name already exists".)
+    # The query parameters are those of the findby list, pinned below; excluding them keeps them
+    # out of the CRD, the same as Collaborator's affiliation/per_page.
+    # excludedSpecFields is IMMUTABLE once the CRD is generated (oasgen-provider #290).
+    excludedSpecFields:
+      - owner
+      - affiliation
+      - sort
+      - direction
+      - per_page
+      - page
     additionalStatusFields:
+      - owner.login
       - id
       - node_id
       - full_name
@@ -24,20 +46,70 @@ spec:
     # updatable is LOAD-BEARING, identical to Repository: `private`/`visibility` are create-body
     # fields the PATCH deliberately omits, and fullSpec would compare GitHub's GET echo of them
     # back into the drift set and flip the exposure of repositories that already exist. Do NOT
-    # change to fullSpec and do not delete the line (the default IS fullSpec). hack/assert-drift-
-    # invariants.py asserts the same guarantee for Repository.
+    # change to fullSpec and do not delete the line (the default IS fullSpec).
+    # hack/assert-drift-invariants.py asserts this, for Repository and for this kind.
     compareScope: updatable
     configurationFields: []
     verbsDescription:
       - action: create
         method: POST
         path: /user/repos
+      # GET — the steady-state observe, once status.owner.login exists. Before that (first observe,
+      # or a lost status) the owner mapping finds nothing, the get cannot be built, the controller
+      # treats the identity as not yet known and observes through the findby below instead. The
+      # same get-then-findby recovery PullRequest uses for a missing status.number.
       - action: get
         method: GET
         path: /repos/{owner}/{name}
+        requestFieldMapping:
+          - inPath: owner
+            inCustomResource: status.owner.login
+      # FINDBY — lists the token user's own repositories and matches `name`. It needs no owner, so
+      # it works before any status exists, and its match fills status.owner.login for the get.
+      # A repository of that name that ALREADY exists in the token's account is ADOPTED, not
+      # duplicated.
+      - action: findby
+        method: GET
+        path: /user/repos
+        queries:
+          # Without this GitHub lists every repo the token can reach (collaborator and org-member
+          # repos too), so a name could match some other account's repository. Owned repos only,
+          # where a name is unique.
+          - name: affiliation
+            value: owner
+          # Newest first: a repository this kind just created is on page 1, so recovery is cheap.
+          - name: sort
+            value: created
+          - name: direction
+            value: desc
+        # Walk every page. Unlike Collaborator/PullRequest (which predate it and read one page), the
+        # pageNumber strategy exists since oasgen-provider 0.24.0 (#142, under the 0.38.0 floor).
+        # Without it, a user owning more than 100 repos would read "not found" for one sitting on
+        # page 2 and the controller would create it again.
+        #
+        # End-of-collection is the SHORT-PAGE rule (no `response` block): a page holding fewer
+        # than pageSize items is the last. Deliberately NOT the Link-header signal — GitHub omits
+        # the Link header entirely when the results fit on one page, and a declared header that is
+        # absent is reported as Indeterminate (an error), which would fail the common case.
+        # Running out of maxPages is likewise Indeterminate, never "not found", so it cannot cause
+        # a duplicate create: 50 x 100 = 5000 owned repositories before the walk gives up.
+        pagination:
+          type: pageNumber
+          pageNumber:
+            request:
+              pageIn: query
+              pagePath: page
+              startPage: 1
+              sizeIn: query
+              sizePath: per_page
+              pageSize: 100
+            maxPages: 50
       - action: update
         method: PATCH
         path: /repos/{owner}/{name}
+        requestFieldMapping:
+          - inPath: owner
+            inCustomResource: status.owner.login
     # NO DELETE VERB, DELIBERATELY — same as Repository. Deleting this CR ORPHANS the GitHub
     # repository; it does not destroy it. oasgen-provider deletes a RestDefinition's CRD
     # unconditionally (SkipCRD:false), cascade-deleting every CR and running every finalizer; with

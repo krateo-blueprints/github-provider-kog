@@ -5,11 +5,13 @@ info:
 servers:
   - url: https://api.github.com
 paths:
-  # CREATE is user-scoped: POST /user/repos creates a repository owned by the authenticated
-  # user (the token's account). This is the sibling of Repository's org-scoped create — a
-  # separate kind because a RestDefinition has exactly ONE create verb and cannot choose
-  # /orgs/{org}/repos vs /user/repos at runtime. No path parameter: the owner is the token.
+  # The authenticated user's own repositories. This kind has NO hand-set owner: GitHub decides the
+  # owner of a POST /user/repos from the TOKEN, so a CR-supplied owner could only ever disagree with
+  # it. The owner is read back from GitHub instead (status.owner.login) and used for the item verbs.
   "/user/repos":
+    # CREATE is user-scoped: the repository is created in the token's own account. This is the
+    # sibling of Repository's org-scoped create — a separate kind because a RestDefinition has
+    # exactly ONE create verb and cannot choose /orgs/{org}/repos vs /user/repos at runtime.
     post:
       summary: Create a repository for the authenticated user
       operationId: repos/create-for-authenticated-user
@@ -55,13 +57,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Repository'
-  # GET/PATCH address the repo as /repos/{owner}/{name}. `owner` is the authenticated user's
-  # login — a spec field the author sets to their own username (it is NOT on the create path,
-  # which is /user/repos, so unlike Repository's `org` it serves the item path only). `name`
-  # serves both the create body and the item path. There is NO delete verb: deleting the CR
-  # ORPHANS the repository, it does not destroy it — the same deliberate choice Repository
-  # makes, so the oasgen-provider #125 CRD cascade (uninstall / RD-drop) can never delete a
-  # user's repositories. Restore delete only with the #125 guard and a per-CR opt-in.
+    # FINDBY — the observe used while status.owner.login is still empty (first observe before the
+    # create, or a CR whose status was lost). It needs no owner at all: it lists the token user's
+    # repositories and matches the identifier `name`. The query parameters below are pinned by the
+    # findby verb's static `queries` / `pagination` and kept out of the CRD via excludedSpecFields.
+    get:
+      summary: List repositories for the authenticated user
+      operationId: repos/list-for-authenticated-user
+      parameters:
+        - $ref: '#/components/parameters/affiliation'
+        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/direction'
+        - $ref: '#/components/parameters/per_page'
+        - $ref: '#/components/parameters/page'
+      responses:
+        '200':
+          description: Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Repository'
+  # GET/PATCH address the repo as /repos/{owner}/{name}. `owner` is NOT a spec field
+  # (excludedSpecFields): both verbs source it from status.owner.login, which GitHub reports on the
+  # create, get and findby responses. Before that status exists the get cannot be built, so the
+  # controller observes through the findby above instead. There is NO delete verb: deleting the CR
+  # ORPHANS the repository, it does not destroy it — the same deliberate choice Repository makes,
+  # so the oasgen-provider #125 CRD cascade (uninstall / RD-drop) can never delete a user's
+  # repositories. Restore delete only with the #125 guard and a per-CR opt-in.
   "/repos/{owner}/{name}":
     get:
       summary: Get a repository
@@ -96,6 +120,7 @@ paths:
                 # consumer value flip the exposure of repositories that already exist (irreversible).
                 # All three remain CREATE-body fields, so the CRD and create-time behaviour are
                 # unchanged; only reconciling them as drift is gone, which is correct.
+                # hack/assert-drift-invariants.py asserts this absence.
                 description:
                   type: string
                 homepage:
@@ -135,6 +160,43 @@ components:
       required: true
       schema:
         type: string
+    # GitHub's GET /user/repos lists every repository the token can reach — owned, collaborated
+    # on, and org-member repositories alike — so a bare name match could bind to an org repo of the
+    # same name. affiliation=owner restricts it to repos the user OWNS, where names are unique.
+    affiliation:
+      name: affiliation
+      in: query
+      required: false
+      schema:
+        type: string
+    sort:
+      name: sort
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [created, updated, pushed, full_name]
+    direction:
+      name: direction
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [asc, desc]
+    per_page:
+      name: per_page
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 30
+    page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 1
   schemas:
     Repository:
       type: object
@@ -147,6 +209,13 @@ components:
           type: string
         full_name:
           type: string
+        # The owner GitHub actually assigned (the token's account). Captured to status.owner.login
+        # and fed back into the get/update path — the reason this kind needs no hand-set owner.
+        owner:
+          type: object
+          properties:
+            login:
+              type: string
         html_url:
           type: string
         clone_url:
