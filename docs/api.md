@@ -368,6 +368,12 @@ status silently disagree with drift. The conditions already carry the signal tha
 Available means the branch is protected exactly as the spec says. `url` is the only field
 that survives the transform unchanged, which is why it is the identifier.
 
+Because that PUT replaces the whole protection document, the CR **owns** it: the unmodelled
+sub-controls `required_pull_request_reviews.dismissal_restrictions` /
+`.bypass_pull_request_allowances` and the `required_status_checks` `checks` (app_id) form,
+if set in the UI, are wiped when any modelled field drifts — a capability gap, in
+[configuration → Updates send whole values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
+
 ### Shorter caveats, by kind
 
 - **`Label` cannot be renamed.** GitHub renames a label by PATCHing `new_name` while the
@@ -425,12 +431,18 @@ that survives the transform unchanged, which is why it is the identifier.
   nests them under the `anyOf`-typed `protection_rules` array). The comparator ignores a
   spec key the response does not carry, so they cannot loop — they simply are not
   observed, and editing those three in the GitHub UI will not be reverted.
-  `deployment_branch_policy` **is** returned top-level and is genuinely reconciled.
+  `deployment_branch_policy` **is** returned top-level and is genuinely reconciled. Not
+  being *compared* is not the same as being safe: because they are re-sent from spec, a PUT
+  fired by `deployment_branch_policy` drift still overwrites an out-of-band value — the
+  silent case in [configuration → Updates send whole values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
 - **`RepoRuleset` / `OrgRuleset` array order matters.** `rules` and `bypass_actors` are
   compared element-by-element, in order — list them in a stable order. Extra keys GitHub
   fills into a rule's `parameters` (defaults such as `do_not_enforce_on_create`) are
   ignored, since the comparison walks only keys the CR declares, so a partially-specified
-  rule does not read as drift.
+  rule does not read as drift. Order sensitivity also means an out-of-band rule of an
+  unmodelled type lengthens the array, reads as drift and is deleted by the replacing PUT —
+  the CR owns `rules` wholesale; see [configuration → Updates send whole
+  values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
 - **`DeploymentBranchPolicy` cannot change `type`.** The create body is `{name, type}`;
   the update body is `{name}` alone — GitHub cannot move a policy between `branch` and
   `tag` after creation. `type` is therefore not compared (the controller could not fix it)
@@ -448,7 +460,9 @@ that survives the transform unchanged, which is why it is the identifier.
   *update body* so it is never compared, while the PATCH still **sends** it — the request
   body is assembled by top-level key, so the whole `config` map rides along. That matters:
   GitHub replaces `config` wholesale, and a PATCH omitting the secret would silently remove
-  the webhook's HMAC signing.
+  the webhook's HMAC signing. The CR is therefore **authoritative** for the secret — a value
+  set out-of-band is cleared on the next `config` PATCH; see [configuration → Updates send
+  whole values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
 - **`TeamRepo` needs a static `Accept` header to be observable at all.** Without
   `application/vnd.github.v3.repository+json` the GET answers 204 No Content; with it the
   same endpoint returns the repository object carrying the team's `permissions`, from which

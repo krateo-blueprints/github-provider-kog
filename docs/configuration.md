@@ -293,6 +293,93 @@ PATCH body, and the same no-delete-verb orphan-not-destroy stance. It differs on
 path (`POST /user/repos` rather than `/orgs/{org}/repos`) and its item path, whose `owner` is read back from GitHub (`status.owner.login`) rather than set
 in the spec, since GitHub assigns it from the token.
 
+### Updates send whole values — what a CR owns
+
+`compareScope` governs what is **compared** (what can *trigger* an update); it does not
+govern what is **sent**. Those are two different layers, and conflating them hides a real
+hazard. When `rest-dynamic-controller` assembles an update/PUT body it does so **by
+top-level spec key** (`internal/tools/client/builder`, `processFields`): for every
+top-level key present in spec it forwards the key's **whole value**. So an object, map or
+array spec field is sent **entire on every update**, regardless of scope — once an update
+fires for any reason, the complete value from spec goes on the wire. `compareScope:
+updatable` narrows what can *start* that update; it cannot make the update send a subset.
+
+The consequence is a single rule: **a CR-managed object/array is OWNED by the CR.** Where
+GitHub *replaces* that value rather than merging it (a PUT on the whole resource, or
+GitHub's wholesale-replace of a nested object such as a webhook `config`), anything present
+on GitHub but absent from the CR is removed the moment an update fires. And because arrays
+are compared **positionally** (length + order — see the `RepoRuleset`/`OrgRuleset` note
+above and [api](./api.md)), an element added out-of-band does not slip past the comparison:
+it lengthens the array, reads as drift, and triggers the very replacing PUT that deletes
+it. (The opposite direction is quiet — a response key *absent from spec* is skipped by the
+comparison, so GitHub-side extras that the CR does not name do not by themselves loop.)
+
+This is distinct from the false-drift-loop reasoning that fills most of this page. A false
+drift loop is an update that *cannot converge*; this is an update that converges by
+**deleting** state the CR never knew about. The exposed kinds, by what the loss means:
+
+| class | kind — field | what is lost |
+|---|---|---|
+| **DATA LOSS — capability gap** (the CR cannot express it, so it is removed on the next update) | `RepoRuleset` / `OrgRuleset` — `rules` | a UI-added rule of any of the **14 unmodelled rule types** (`merge_queue`; the five pattern rules `commit_message_pattern`, `commit_author_email_pattern`, `committer_email_pattern`, `branch_name_pattern`, `tag_name_pattern`; `workflows`, `code_scanning`, `license_compliance_scanning`, `copilot_code_review`; the push-target rules `file_path_restriction`, `max_file_path_length`, `file_extension_restriction`, `max_file_size`) on a CR-managed ruleset is deleted on reconcile and cannot be re-added through the CR. `OrgRuleset` is org-wide. The 9 modelled types are listed in [api](./api.md). |
+| | `BranchProtection` — unmodelled sub-controls | `required_pull_request_reviews.dismissal_restrictions` and `.bypass_pull_request_allowances`, and the `required_status_checks` `checks` (context + `app_id`) form, are not modelled; set in the UI, they are wiped when any modelled field drifts and fires the whole-document PUT. |
+| | `RepoWebhook` / `OrgWebhook` — unmodelled `config` keys | `config.token` / `config.digest` (RepoWebhook) and `config.username` / `config.password` (OrgWebhook) are not modelled; set out-of-band, they are cleared by the wholesale `config` replace. |
+| **SILENT** (expressible, but invisible when reverted) | `RepoWebhook` / `OrgWebhook` — `config.secret` | **the most important case.** A secret set outside the CR — GitHub UI, Terraform, a secret manager — is **cleared** on any `config` PATCH, because GitHub replaces the `config` object wholesale and the forwarded `spec.config` does not carry it. The field reads back masked (`********`), so the operator cannot even observe the drift. See the webhook-secret guidance below. |
+| | `Environment` — `reviewers`, `wait_timer`, `prevent_self_review` | all three are write-only — GitHub does not echo them (returned nested under `protection_rules`, which this OAS does not model), so they are never compared and their loss is invisible. They are re-sent from spec on any `deployment_branch_policy`-triggered PUT, overwriting an out-of-band value. (Complements the observability note in [api](./api.md): not being compared means a UI edit is not *actively* reverted, but a PUT fired by a sibling field still overwrites it from spec.) |
+| **Declarative by design** (the CR CAN express it; a revert is normal Kubernetes behaviour, visible and intended) | ruleset `bypass_actors` / `conditions.ref_name`; `BranchProtection` `restrictions` (users/teams/apps) and `required_status_checks.contexts`; webhook `events`; `RunnerGroup` `selected_workflows`; `CustomProperty` `allowed_values` | an out-of-band addition is reverted to the CR's declared set on the next reconcile. This is ordinary declarative management — the CR is the source of truth — not a capability gap. |
+
+So the practical guidance for the first two classes is the same as for any declaratively
+managed resource, sharpened: **do not keep, on a CR-managed ruleset / branch protection /
+webhook / environment, state that the CR cannot express.** For a ruleset that must also
+carry an unmodelled rule type, either model the whole ruleset outside this provider or
+split the unmodelled rules onto a separate ruleset no CR manages — a CR-managed object does
+not share ownership of its array fields with the UI.
+
+> Confidence: the top-level-key body assembly and the positional array comparison are
+> asserted by [api](./api.md) and the `rd-<kind>.yaml` comments (rest-dynamic-controller
+> internals). The webhook-`config.secret` **clearing** specifically is **MEDIUM-HIGH**
+> confidence — grounded in GitHub's documented wholesale-replace model for the webhook
+> `config` object and the asset authors' explicit statement, **not** live-verified here.
+
+#### The webhook secret: the CR is authoritative
+
+Because the whole `spec.config` map is forwarded on every webhook update and GitHub
+replaces `config` wholesale, the secret survives **only if the CR carries it**. Therefore:
+
+- **Treat the CR as the single source of truth for the webhook secret.** Set it in
+  `spec.config.secret` and never rotate it out-of-band (UI, Terraform, a secret manager) —
+  an out-of-band value is cleared on the next `config` PATCH, silently disabling HMAC
+  signing on a live hook with nothing failing and nothing logged.
+- **Treat `RepoWebhook` / `OrgWebhook` CRs as sensitive:** RBAC on the kind, encryption at
+  rest for etcd, and never the plaintext secret in Git. The value lives in the CR in clear
+  text (see [usage](./usage.md)).
+
+Why it is not sourced from a Kubernetes `Secret` today: `rest-dynamic-controller`'s
+`secretRef` resolver *could* inject `config.secret` from a Secret (it is stripped from the
+outgoing body before send, and it is re-injected into every write body, so it would
+actually be immune to this whole-config hazard). The blocker is **optionality, not
+capability**: the resolver is all-or-nothing — it errors when the pointer path is absent on
+the CR, with no absent/`when` guard (unlike `dependentLookup`, which has one) — so declaring
+it would make the secret **mandatory** and break both secretless webhooks and existing
+plaintext CRs. An upstream absent-guard (parity with `dependentLookup`'s
+`when.customResourceFieldAbsent`) is tracked in
+[krateo-platformops/oasgen-provider#383](https://github.com/krateo-platformops/oasgen-provider/issues/383),
+**held** until a constraint on which Secrets a resolver may read is designed — an
+implementation exists on a branch (it would wire the existing `guardSkips(r.When, mg)`,
+today used only by `dependentLookup`, into the `secretRef` branch), with no PR and no
+release. Once it ships, an **optional**
+`config.secretRef` can be added additively, with no immutable-field change (the pointer is
+not in the update body schema, so it is never compared). That planned optional
+`config.secretRef` will document the **namespace as the trust boundary** — as
+`configurationRef` already is for the GitHub token: anyone who can create a webhook CR in
+namespace *N* can make GitHub sign with any Secret in *N*. No timeline or version is
+promised.
+
+Regardless of how the secret is supplied, use a **random secret of at least 32 bytes**:
+that defeats *offline guessing* of the secret from captured signed deliveries. It does
+**not** stop *replay* of genuine signed deliveries — entropy does not cover that — so the
+receiver must also verify `repository.full_name` in the payload (and may pin the
+`X-GitHub-Hook-ID` header) to reject deliveries replayed from, or meant for, another hook.
+
 ### Normalization in the RestDefinition
 
 All 32 kinds are native: every verb goes straight to `api.github.com`, and where GitHub's

@@ -34,6 +34,10 @@ spec:
     # this is a tightening rather than a rescue. It keeps the `org` path parameter out of the
     # drift comparison by construction, and the array-ordering caveat there applies here too —
     # `rules` and `bypass_actors` are compared element-by-element in order.
+    #
+    # Ownership note: the PUT re-sends the WHOLE `rules` array (org-wide), so a UI-added rule of one
+    # of the 14 unmodelled rule types is DELETED on reconcile. See docs/configuration.md
+    # "Updates send whole values — what a CR owns".
     configurationFields: []
     verbsDescription:
       - action: create
