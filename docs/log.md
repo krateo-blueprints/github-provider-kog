@@ -11,6 +11,30 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-02 — `Collaborator` and `PullRequest` findby now paginate
+
+Both findby verbs — `Collaborator` (`GET /repos/{owner}/{repo}/collaborators`) and `PullRequest`
+(`GET /repos/{owner}/{repo}/pulls`) — read only the first page: they pinned `per_page=100` as a
+static query and configured no pagination, on the now-stale belief that the controller's only
+strategy was `continuationToken` (which re-sends a response header verbatim and cannot read GitHub's
+Link header). The `pageNumber` strategy has in fact existed since **oasgen-provider 0.24.0** (#142),
+under the chart's 0.38.0 floor.
+
+Consequence of the old behaviour: a repository with **more than 100 PRs** could leave a created PR on
+page 2 invisible to findby recovery, so the reconciler re-created it and GitHub wedged on 422 *"pull
+request already exists"*; **more than 100 direct collaborators** made observe misread the grant.
+
+**Fix.** Each findby gains a `pagination` block (`type: pageNumber`, `pagePath: page`,
+`sizePath: per_page`, `pageSize: 100`, `maxPages: 50`) and drops the `per_page` static query — the
+paginator now sets both `page` and `per_page` on the URL. End-of-collection is the **short-page** rule
+(no `response` block): the Link-header signal is deliberately avoided because GitHub omits that header
+on single-page results and a declared-but-absent header is reported as Indeterminate. Exhausting
+`maxPages` is also Indeterminate, never not-found, so it can never cause a duplicate create
+(50 × 100 = 5000 items before the walk gives up). The seven oasgen-immutable fields are unchanged on
+both kinds; `page` is not declared as an OAS parameter (the paginator sets it directly), so
+`excludedSpecFields` is untouched. Verified with `helm lint`/`template` (31 kinds), the drift and
+preflight hacks, and a strict server dry-run against krateo-057.
+
 ## 2026-10-31 — `RepoContent` restored natively (31st kind)
 
 `RepoContent` — the last git-write kind still out (`Repository` → `GitRef` → `RepoContent` per file →
