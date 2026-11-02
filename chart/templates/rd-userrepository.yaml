@@ -67,7 +67,9 @@ spec:
       # FINDBY — lists the token user's own repositories and matches `name`. It needs no owner, so
       # it works before any status exists, and its match fills status.owner.login for the get.
       # A repository of that name that ALREADY exists in the token's account is ADOPTED, not
-      # duplicated.
+      # duplicated. Safe against loss (no delete verb: deleting the CR never deletes an adopted
+      # repo), but its updatable fields are then reconciled to the CR's spec. This list walk runs
+      # only while status.owner.login is empty; once set, observe is the single get above.
       - action: findby
         method: GET
         path: /user/repos
