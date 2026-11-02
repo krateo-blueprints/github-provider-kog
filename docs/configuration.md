@@ -364,7 +364,9 @@ plaintext CRs. An upstream absent-guard (parity with `dependentLookup`'s
 `when.customResourceFieldAbsent`) is tracked in
 [krateo-platformops/oasgen-provider#383](https://github.com/krateo-platformops/oasgen-provider/issues/383),
 **held** until a constraint on which Secrets a resolver may read is designed — an
-implementation exists on a branch, with no PR and no release. Once it ships, an **optional**
+implementation exists on a branch (it would wire the existing `guardSkips(r.When, mg)`,
+today used only by `dependentLookup`, into the `secretRef` branch), with no PR and no
+release. Once it ships, an **optional**
 `config.secretRef` can be added additively, with no immutable-field change (the pointer is
 not in the update body schema, so it is never compared). That planned optional
 `config.secretRef` will document the **namespace as the trust boundary** — as
