@@ -68,6 +68,15 @@ spec:
         requestFieldMapping:
           - inPath: owner
             inCustomResource: status.owner.login
+          # `name` is keyed on status.name (the name GitHub assigned), not spec.name — the #386
+          # fix, same as Repository and the Team model. GitHub normalises a disallowed character on
+          # create (POST body name="my repo" -> repo "my-repo"); status.name (the `name` identifier)
+          # holds "my-repo". Without this the GET is built from spec.name "my repo", 404s while the
+          # repo exists, re-creates, and loops on 422 "name already exists". The mapping overwrites
+          # the path param only when present: pre-create (status absent) the findby below recovers;
+          # post-create the GET addresses the real name.
+          - inPath: name
+            inCustomResource: status.name
       # FINDBY — lists the token user's own repositories and matches `name`. It needs no owner, so
       # it works before any status exists, and its match fills status.owner.login for the get.
       # A repository of that name that ALREADY exists in the token's account is ADOPTED, not
@@ -116,6 +125,11 @@ spec:
         requestFieldMapping:
           - inPath: owner
             inCustomResource: status.owner.login
+          # Same status-keying as the get: the PATCH must address the name GitHub assigned. `name`
+          # is OUT of the PATCH body (see assets/userrepository.yaml), so it is not in the
+          # `updatable` compare set and keying on status.name cannot trigger a rename-back loop.
+          - inPath: name
+            inCustomResource: status.name
     # NO DELETE VERB, DELIBERATELY — same as Repository. Deleting this CR ORPHANS the GitHub
     # repository; it does not destroy it. oasgen-provider deletes a RestDefinition's CRD
     # unconditionally (SkipCRD:false), cascade-deleting every CR and running every finalizer; with

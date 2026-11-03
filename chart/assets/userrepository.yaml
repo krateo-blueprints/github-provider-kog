@@ -84,8 +84,10 @@ paths:
   # GET/PATCH address the repo as /repos/{owner}/{name}. `owner` is NOT a spec field — it is a
   # get/update path parameter, not a create parameter, so oasgen never puts it on the spec (its
   # excludedSpecFields entry is a redundant no-op): both verbs source it from status.owner.login,
-  # which GitHub reports on the
-  # create, get and findby responses. Before that status exists the get cannot be built, so the
+  # which GitHub reports on the create, get and findby responses. `name` is sourced from
+  # status.name (the name GitHub assigned) on both verbs too — the oasgen-provider #386 fix — so a
+  # name GitHub normalised on create ("my repo" -> "my-repo") is still addressable; see
+  # rd-userrepository.yaml. Before that status exists the get cannot be built, so the
   # controller observes through the findby above instead. There is NO delete verb: deleting the CR
   # ORPHANS the repository, it does not destroy it — the same deliberate choice Repository makes,
   # so the oasgen-provider #125 CRD cascade (uninstall / RD-drop) can never delete a user's
