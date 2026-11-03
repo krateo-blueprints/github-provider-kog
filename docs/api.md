@@ -139,8 +139,8 @@ authoring one are written out in full below the tables.
 
 | kind | verbs | identifiers | `compareScope` | status |
 |---|---|---|---|---|
-| `Repository` | create `POST /orgs/{org}/repos`; get/update `GET`/`PATCH /repos/{org}/{name}`. **No delete verb** — deleting the CR orphans the repository, it does not destroy it (see below) | `name` | `updatable` | `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
-| `UserRepository` | create `POST /user/repos`; get/update `GET`/`PATCH /repos/{owner}/{name}` with `owner` from `status.owner.login`; **findby** `GET /user/repos?affiliation=owner` (paginated) before status exists — **no delete verb** | `name` | `updatable` | `owner.login`, `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
+| `Repository` | create `POST /orgs/{org}/repos`; get/update `GET`/`PATCH /repos/{org}/{name}` with `name` from `status.name` (the name GitHub assigned). **No delete verb** — deleting the CR orphans the repository, it does not destroy it (see below) | `name` | `updatable` | `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
+| `UserRepository` | create `POST /user/repos`; get/update `GET`/`PATCH /repos/{owner}/{name}` with `owner` from `status.owner.login` and `name` from `status.name`; **findby** `GET /user/repos?affiliation=owner` (paginated) before status exists — **no delete verb** | `name` | `updatable` | `owner.login`, `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
 
 ### `Repository` — create the destination repository
 
@@ -171,9 +171,24 @@ is exactly what makes "create-only" expressible.
 
 The path parameters are named `org` and `name`, not GitHub's `owner`/`repo`, on
 purpose: the same two CR fields then serve the create path (`/orgs/{org}/repos`), the
-create body (`name`) and the get/update/delete path (`/repos/{org}/{name}`), so the
+create body (`name`) and the get/update path (`/repos/{org}/{name}`), so the
 generated CRD carries **one** pair of fields instead of an `org`/`owner` duplicate the
 author has to keep in sync ([configuration](./configuration.md)).
+
+The get/update path parameter `name` is sourced from **`status.name`** — the name GitHub
+actually assigned — not from `spec.name`, mapped `inPath: name` ← `inCustomResource:
+status.name` on both verbs (the `Team` model, keyed on `status.slug`). GitHub normalises a
+disallowed character in a repo name on create — `POST` body `name: "my repo"` creates the repo
+`my-repo` — and a `GET /repos/{org}/my%20repo` by `spec.name` then 404s **while the repo exists**,
+so the controller re-creates and loops on GitHub's 422 "name already exists". Keying the get on the
+assigned name addresses the real repository instead (oasgen-provider
+[#386](https://github.com/krateo-platformops/oasgen-provider/issues/386)). Before the first create
+`status.name` is absent, so the parameter falls back to `spec.name` and the `GET` 404s correctly
+(the repo does not exist yet) → one create → `status.name` is set → every later observe addresses
+it. This is also what makes an out-of-band **rename** converge: the redirect-following `GET` reports
+the new name, `status.name` tracks it, and the next observe addresses it directly. It is safe only
+because `name` is out of the `PATCH` body (next paragraph): were it compared, tracking the real name
+would PATCH it back to `spec.name` every reconcile.
 
 `auto_init` defaults to `true` and is load-bearing. A repository created with
 `auto_init: false` has no commit and therefore no default branch, so whatever writes

@@ -106,6 +106,12 @@ paths:
                 # `name` remains a path parameter and a create-body field, so creating and
                 # addressing a repository are unaffected. Only reconciling a rename is gone, and
                 # it should be: renaming is a deliberate act, not drift.
+                #
+                # Addressing is keyed on status.name (the name GitHub assigned), not spec.name —
+                # the get/update verbs in rd-repository.yaml map inPath name <- status.name
+                # (oasgen-provider #386). Keeping `name` OUT of this PATCH body is what makes that
+                # safe: were it in the body it would re-enter the `updatable` compare set, and
+                # tracking the real name would then PATCH it back to spec.name every reconcile.
                 description:
                   type: string
                 homepage:
