@@ -359,8 +359,18 @@ components:
               # union cannot enforce that, so a partial set is a 422 (loud), not a silent ignore.
               # GitHub also range-checks the integers (timeouts 1-360 / 0-360, entry counts 0-100);
               # those bounds are left to the API rather than duplicated as CRD constraints.
+              # CONSTRAINT (verified live 2026-11-03): a ruleset carrying a merge_queue rule must
+              # target a CONCRETE ref — its conditions.ref_name must NOT be a wildcard such as ~ALL,
+              # or GitHub 422s "Wildcard ref names are not supported when merge queue is enabled".
+              # Use refs/heads/<branch> or ~DEFAULT_BRANCH.
               check_response_timeout_minutes:
                 type: integer
+                description: >-
+                  merge_queue parameter. All seven merge_queue keys are required together.
+                  A ruleset carrying a merge_queue rule must target a concrete ref: its
+                  conditions.ref_name must not be a wildcard such as ~ALL (GitHub returns 422
+                  "Wildcard ref names are not supported when merge queue is enabled"). Use
+                  refs/heads/<branch> or ~DEFAULT_BRANCH.
               grouping_strategy:
                 type: string
                 enum:

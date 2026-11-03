@@ -40,18 +40,24 @@ unmodelled by design — the four product-reference rules (`workflows`, `code_sc
 provider cannot resolve) and the four Enterprise-only push-target rules (`file_path_restriction`,
 `max_file_path_length`, `file_extension_restriction`, `max_file_size`).
 
-**Round-trip, and how we know.** From GitHub's current REST `repository-rule` schema and docs
-(docs.github.com/rest/repos/rules), not a live capture — no ruleset was created on a real org in this
-work. The schema stores the request values and the GET returns them in the same shape, so the
-parameters a CR sets round-trip identically (`merge_method`/`grouping_strategy`/`operator` are stored
-with their documented casing; the pattern `pattern`/`name` strings as sent). GitHub does fill
-defaults on GET for optional keys the CR leaves out — a pattern rule gets `negate: false`, and `name`
-comes back as an empty/absent label — but that is harmless here: the drift comparator iterates only
-the keys the CR declares and skips any response key the CR did not set
+**Round-trip — verified live.** Captured 2026-11-03 on a throwaway public repo
+(`krateo-blueprints/kog-rt-20261103`, deleted and confirmed gone at the end). A branch-target ruleset
+carrying five of the new types plus two controls, and a separate tag-target ruleset for
+`tag_name_pattern`, were POSTed, GET back, and PUT a second time. Results: the `rules` array came back
+in the **exact submit order** (the central positional-comparison risk did not materialise); enum
+casing was **verbatim** (`merge_method: SQUASH`, `grouping_strategy: HEADGREEN`, operators
+`regex`/`ends_with`/`contains`/`starts_with`) and pattern strings were stored exactly as sent,
+regex escapes included (`^(JIRA-[0-9]+):\s.+`, `^v[0-9]+\.[0-9]+\.[0-9]+$`); the keys GitHub adds for
+omitted optional fields (a pattern rule's `negate: false` and empty `name`; pull_request's
+response-only `required_reviewers`/`dismissal_restriction`) were **skipped** by the comparator, which
+iterates only the keys the CR declares and skips any response-only key
 (`krateo-rest-dynamic-controller internal/tools/comparison/comparison.go:43`, the `for key, value :=
-range mg` loop over the CR map, with response-only keys skipped at `:47-53`). So a default GitHub
-adds to a key the CR never set is never visited, and neither new type introduces a permanent-drift
-loop. `compareScope: updatable` and the positional array comparison are unchanged.
+range mg` loop over the CR map, with response-only keys skipped at `:47-53`); and a second PUT+GET was
+**byte-identical**. Zero drift across all six new types and the two controls. The five pattern rules
+are **not** Enterprise-gated — they worked on a **Team-plan** org. One constraint surfaced: a
+`merge_queue` rule `422`s (`Wildcard ref names are not supported when merge queue is enabled`) when the
+ruleset's `conditions.ref_name` is a wildcard such as `~ALL`; it must target a concrete ref (e.g.
+`refs/heads/main`). `compareScope: updatable` and the positional array comparison are unchanged.
 
 Proof: `helm lint` + render (32 RestDefinitions + 32 ConfigMaps); `hack/assert-drift-invariants.py`
 and `hack/preflight-refs.py` pass; strict server dry-run of both RestDefinitions on krateo-057
