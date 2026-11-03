@@ -11,6 +11,62 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-03 — feat: model merge_queue and the five pattern ruleset rules
+
+**The claimed "collision" was not real.** The `RepoRuleset`/`OrgRuleset` asset comment had omitted
+the five pattern rules because their `name`/`pattern` parameter keys "would collide with the
+ruleset's own name inside a union `parameters` object". Checked against the oasgen-provider monorepo
+at tag **0.43.0** (what clusters run) and current `main`: there is no such collision. oasgen's ONLY
+name-merge logic is `addParametersToSpec` in `internal/tools/oas2jsonschema/spec_builder.go`
+(`propertyExists`/`propertyNamed`, #108/#257): it reconciles a **root-level** request-body property
+against a **path/query/header parameter** of the same name (e.g. `ruleset_id`, `owner`, `org`). It
+iterates only the root `schema.Properties`, never nested body keys, and never merges body against
+body. The pattern keys live at `rules[].parameters.{name,pattern}`, two levels below the top-level
+ruleset `name`, so that merge cannot reach them; and a property literally named `pattern` is read
+from the `properties` map by its key (`libopenapi_adapter.go`), a different field from the `pattern`
+validation keyword. Proven by generating the CRD and validating CRs (below), where the pattern
+`name`/`pattern` coexist with the top-level `name` with no error. The misleading comment was replaced
+with this explanation.
+
+With the collision disproved, six of the fourteen rule-type capability gaps the 2026-11-02
+whole-value audit flagged as **data loss** (a rule type a CR cannot express is deleted on reconcile,
+because the PUT re-sends the whole `rules` array) are now closed: `merge_queue` and the five pattern
+rules `commit_message_pattern`, `commit_author_email_pattern`, `committer_email_pattern`,
+`branch_name_pattern`, `tag_name_pattern`. They were added to the existing `{type, parameters}`
+union, every key optional, with each type's GitHub-required set documented — **purely additive**, so
+the nine existing types keep an identical shape. Modelled rule types go from 9 to 15; eight remain
+unmodelled by design — the four product-reference rules (`workflows`, `code_scanning`,
+`license_compliance_scanning`, `copilot_code_review`, which key other GitHub products by IDs this
+provider cannot resolve) and the four Enterprise-only push-target rules (`file_path_restriction`,
+`max_file_path_length`, `file_extension_restriction`, `max_file_size`).
+
+**Round-trip — verified live.** Captured 2026-11-03 on a throwaway public repo
+(`krateo-blueprints/kog-rt-20261103`, deleted and confirmed gone at the end). A branch-target ruleset
+carrying five of the new types plus two controls, and a separate tag-target ruleset for
+`tag_name_pattern`, were POSTed, GET back, and PUT a second time. Results: the `rules` array came back
+in the **exact submit order** (the central positional-comparison risk did not materialise); enum
+casing was **verbatim** (`merge_method: SQUASH`, `grouping_strategy: HEADGREEN`, operators
+`regex`/`ends_with`/`contains`/`starts_with`) and pattern strings were stored exactly as sent,
+regex escapes included (`^(JIRA-[0-9]+):\s.+`, `^v[0-9]+\.[0-9]+\.[0-9]+$`); the keys GitHub adds for
+omitted optional fields (a pattern rule's `negate: false` and empty `name`; pull_request's
+response-only `required_reviewers`/`dismissal_restriction`) were **skipped** by the comparator, which
+iterates only the keys the CR declares and skips any response-only key
+(`krateo-rest-dynamic-controller internal/tools/comparison/comparison.go:43`, the `for key, value :=
+range mg` loop over the CR map, with response-only keys skipped at `:47-53`); and a second PUT+GET was
+**byte-identical**. Zero drift across all six new types and the two controls. The five pattern rules
+are **not** Enterprise-gated — they worked on a **Team-plan** org. One constraint surfaced: a
+`merge_queue` rule `422`s (`Wildcard ref names are not supported when merge queue is enabled`) when the
+ruleset's `conditions.ref_name` is a wildcard such as `~ALL`; it must target a concrete ref (e.g.
+`refs/heads/main`). `compareScope: updatable` and the positional array comparison are unchanged.
+
+Proof: `helm lint` + render (32 RestDefinitions + 32 ConfigMaps); `hack/assert-drift-invariants.py`
+and `hack/preflight-refs.py` pass; strict server dry-run of both RestDefinitions on krateo-057
+accepted (never applied); the `RepoRuleset`/`OrgRuleset` CRDs generated with `oasgen-render` at tag
+0.43.0 accept one valid CR per new rule type plus a `pull_request` regression control, and reject
+wrong-typed, bad-enum, unknown-type and missing-`type` samples; field-by-field immutable-field diff
+vs `origin/main` shows zero changes (`kind`, `identifiers`, `configurationFields`,
+`excludedSpecFields`, `resourceGroup`, `additionalStatusFields`, `includedSpecFields` all unchanged).
+
 ## 2026-11-02 — docs: whole-value update semantics and what a CR owns
 
 A whole-map overwrite audit of the chart established that `rest-dynamic-controller` assembles an
