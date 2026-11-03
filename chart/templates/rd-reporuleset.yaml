@@ -45,11 +45,22 @@ spec:
     # order reads as drift, and the PUT re-sends the CR's order without settling it — so list
     # them in a stable order. Extra keys GitHub adds inside a rule's `parameters` (defaults it
     # fills in, e.g. do_not_enforce_on_create) are ignored — the comparison only walks keys the
-    # CR declares — so a partially-specified rule does not read as drift.
+    # CR declares — so a partially-specified rule does not read as drift. That "walks only the
+    # CR's keys" guarantee is the comparator ranging over the CR map: krateo-rest-dynamic-controller
+    # internal/tools/comparison/comparison.go:43 (`for key, value := range mg`), skipping any
+    # response-only key at :47-53. Verified live 2026-11-03 on a throwaway public repo (since
+    # deleted): the `rules` array came back in the EXACT submit order, casing was verbatim
+    # (merge_method SQUASH, grouping_strategy HEADGREEN, the operators, and pattern strings
+    # including regex escapes), the GitHub-added keys were skipped by the comparator (a pattern
+    # rule's `negate: false` and empty `name` where the CR omitted them; pull_request's
+    # response-only `required_reviewers`/`dismissal_restriction`), and a second PUT+GET was
+    # byte-identical — 0 drift across all modelled types, merge_queue and the five *_pattern rules
+    # included. (The merge_queue `parameters` object came back with its keys reordered, but it is a
+    # map, compared key-by-key, so order there does not matter.)
     #
-    # Ownership note: the PUT re-sends the WHOLE `rules` array, so a UI-added rule of one of the 14
-    # unmodelled rule types on this CR-managed ruleset is DELETED on the next reconcile (the CR
-    # cannot express it). See docs/configuration.md "Updates send whole values — what a CR owns".
+    # Ownership note: the PUT re-sends the WHOLE `rules` array, so a UI-added rule of one of the 8
+    # still-unmodelled rule types on this CR-managed ruleset is DELETED on the next reconcile (the
+    # CR cannot express it). See docs/configuration.md "Updates send whole values — what a CR owns".
     configurationFields: []
     verbsDescription:
       - action: create
