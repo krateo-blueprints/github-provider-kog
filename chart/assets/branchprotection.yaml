@@ -80,14 +80,57 @@ paths:
                       type: integer
                     require_last_push_approval:
                       type: boolean
+                    # Who may DISMISS reviews, and who may BYPASS the PR requirement. Both take the
+                    # same {users, teams, apps} shape as top-level `restrictions` — login/slug
+                    # STRINGS on the PUT, user/team/app OBJECTS on the GET — so the get
+                    # responseTransform normalizes them to string lists exactly as it does
+                    # `restrictions` (map(.login)/map(.slug), sorted). ORG-OWNED REPOSITORIES ONLY
+                    # for the user/team entries, same as `restrictions`. Same ordering caveat: the
+                    # responseTransform sorts each list, so write them sorted.
+                    #
+                    # OMISSION DOES NOT CLEAR THEM. Unlike the four top-level controls, these two
+                    # nested actor lists are NOT part of the wholesale replace: VERIFIED LIVE on
+                    # 2026-11-03, a PUT whose required_pull_request_reviews omits them LEAVES the
+                    # previously-set actors in place (GitHub retains them). To CLEAR them, the CR
+                    # must send the object with explicit empty `users`/`teams`/`apps` — omitting is
+                    # "leave as is", not "off". A CR that never sets them never compares them (the
+                    # drift walk skips keys the spec omits), so this is safe for existing CRs.
+                    #
+                    # Modelling these lets the CR DECLARATIVELY MANAGE them — set, update, or clear
+                    # (explicit empties) — which the CR previously could not express at all.
+                    dismissal_restrictions:
+                      type: object
+                      properties:
+                        users:
+                          type: array
+                          items:
+                            type: string
+                        teams:
+                          type: array
+                          items:
+                            type: string
+                        apps:
+                          type: array
+                          items:
+                            type: string
+                    bypass_pull_request_allowances:
+                      type: object
+                      properties:
+                        users:
+                          type: array
+                          items:
+                            type: string
+                        teams:
+                          type: array
+                          items:
+                            type: string
+                        apps:
+                          type: array
+                          items:
+                            type: string
                 # Who may push to the branch. ORG-OWNED REPOSITORIES ONLY — GitHub rejects
                 # restrictions on a user-owned repo. Same ordering caveat as `contexts`: the
                 # responseTransform sorts these lists, so write them sorted.
-                #
-                # dismissal_restrictions / bypass_pull_request_allowances (the same users/teams/
-                # apps shape, nested under required_pull_request_reviews) are NOT modelled: each
-                # would need its own object-to-login normalization for a control a platform CR
-                # rarely sets. They can be added later without breaking this shape.
                 restrictions:
                   type: object
                   properties:
@@ -226,6 +269,38 @@ components:
               type: integer
             require_last_push_approval:
               type: boolean
+            # Normalized from GitHub's user/team/app OBJECTS to login/slug STRING lists, sorted,
+            # exactly like top-level `restrictions` below.
+            dismissal_restrictions:
+              type: object
+              properties:
+                users:
+                  type: array
+                  items:
+                    type: string
+                teams:
+                  type: array
+                  items:
+                    type: string
+                apps:
+                  type: array
+                  items:
+                    type: string
+            bypass_pull_request_allowances:
+              type: object
+              properties:
+                users:
+                  type: array
+                  items:
+                    type: string
+                teams:
+                  type: array
+                  items:
+                    type: string
+                apps:
+                  type: array
+                  items:
+                    type: string
         restrictions:
           type: object
           properties:

@@ -369,8 +369,29 @@ and it is handled entirely in the RestDefinition, by two jq transforms:
   into the CR domain once, at the reconcile chokepoint, before status population and drift
   comparison — `{"enabled": bool}` wrappers flattened to bare booleans (nine controls),
   the status-check wrapper reduced to `{strict, contexts}`, `restrictions`
-  users/teams/apps reduced to `login`/`slug` strings, and an unset control (key absent)
-  normalised to `null`, which is what the spec omitting it means.
+  users/teams/apps reduced to `login`/`slug` strings, the review object's
+  `dismissal_restrictions` and `bypass_pull_request_allowances` reduced the same way, and
+  an unset control (key absent) normalised to `null`, which is what the spec omitting it
+  means.
+
+Status checks are managed through `contexts` (plain check names). GitHub's newer `checks`
+(`[{context, app_id}]`) form, which pins the reporting GitHub App, is **not modelled yet**:
+GitHub keeps `checks` and `contexts` derived from each other, so a CR that set both would
+drift-loop (GitHub derives `contexts` from the `checks` it accepts, and the derived value never
+matches a different `contexts` the CR also declared), and that misconfiguration cannot be
+rejected at admission — oasgen carries neither `oneOf`/`not` nor `x-kubernetes-validations` from
+the asset into the generated CRD. It is held until oasgen supports admission-time cross-field
+validation (CEL passthrough requested in
+[oasgen-provider#396](https://github.com/krateo-platformops/oasgen-provider/issues/396)); see
+[configuration → Updates send whole values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
+
+The review object can carry `dismissal_restrictions` and `bypass_pull_request_allowances`
+(`{users, teams, apps}` login/slug lists, org-owned repos only). Unlike the four top-level
+controls, **omitting these from the review object does not clear them** — verified live on
+2026-11-03, GitHub retains previously-set actors when the PUT's review object omits them. To
+clear them a CR sends the object with explicit empty `users`/`teams`/`apps`; modelling them is
+what lets a CR express and manage them at all. All of these are additive: a CR that sets none of
+them behaves exactly as before.
 
 Every list in that transform is **sorted**, because the comparison is order-sensitive and
 GitHub does not return these in the order they were sent. Write the lists in the CR sorted
@@ -383,10 +404,12 @@ status silently disagree with drift. The conditions already carry the signal tha
 Available means the branch is protected exactly as the spec says. `url` is the only field
 that survives the transform unchanged, which is why it is the identifier.
 
-Because that PUT replaces the whole protection document, the CR **owns** it: the unmodelled
-sub-controls `required_pull_request_reviews.dismissal_restrictions` /
-`.bypass_pull_request_allowances` and the `required_status_checks` `checks` (app_id) form,
-if set in the UI, are wiped when any modelled field drifts — a capability gap, in
+Because that PUT replaces the whole protection document, the CR **owns** it: a sub-control
+the CR cannot express is wiped when any modelled field drifts. That is why
+`required_pull_request_reviews.dismissal_restrictions` / `.bypass_pull_request_allowances`
+are now **modelled** — a CR that carries them keeps them across reconciles instead of losing
+them. The `required_status_checks` `checks` (`app_id`) form is still unmodelled (held, as
+above). The whole-value hazard and the sub-controls still left unmodelled are in
 [configuration → Updates send whole values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
 
 ### Shorter caveats, by kind

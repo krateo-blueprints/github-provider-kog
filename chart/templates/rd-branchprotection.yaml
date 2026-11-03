@@ -30,10 +30,16 @@ spec:
     # `identifiersAndStatus` would be actively wrong here: it would compare only `url`, so editing
     # `enforce_admins` or `required_status_checks` on a live CR would silently never be pushed.
     #
-    # Ownership note: the PUT replaces the WHOLE protection document, so unmodelled sub-controls set
-    # in the UI (required_pull_request_reviews.dismissal_restrictions / .bypass_pull_request_allowances,
-    # and the required_status_checks `checks` app_id form) are wiped when any modelled field drifts.
-    # See docs/configuration.md "Updates send whole values — what a CR owns".
+    # Ownership note: the PUT replaces the WHOLE protection document, so a sub-control the CR cannot
+    # express is wiped when any modelled field drifts. required_pull_request_reviews.dismissal_restrictions
+    # and .bypass_pull_request_allowances are now MODELLED (see the asset and the responseTransform
+    # below), so a CR that carries them keeps them. The required_status_checks `checks` (context +
+    # app_id) form is deliberately still NOT modelled: a CR could set both `checks` and `contexts`, and
+    # GitHub derives one from the other so the pair would drift-loop — and that cannot be rejected at
+    # admission because oasgen carries no oneOf/not/x-kubernetes-validations into the generated CRD. It
+    # is held until oasgen supports admission-time cross-field validation (krateo-platformops/
+    # oasgen-provider#396). See docs/configuration.md
+    # "Updates send whole values — what a CR owns".
     compareScope: updatable
     configurationFields: []
     verbsDescription:
@@ -76,6 +82,8 @@ spec:
         #   {"enabled": bool} objects        -> bare booleans      (nine controls)
         #   status-check wrapper + urls      -> {strict, contexts}
         #   restrictions users/teams/apps    -> login / slug strings
+        #   review dismissal_restrictions /  -> login / slug strings (same shape, nested under
+        #     bypass_pull_request_allowances     required_pull_request_reviews)
         #   an unset control (key ABSENT)    -> null, which is what the spec omitting it means
         #
         # Every list is sorted, because the comparison is order-sensitive and GitHub does not
@@ -100,7 +108,26 @@ spec:
                   dismiss_stale_reviews: (.required_pull_request_reviews.dismiss_stale_reviews // false),
                   require_code_owner_reviews: (.required_pull_request_reviews.require_code_owner_reviews // false),
                   required_approving_review_count: (.required_pull_request_reviews.required_approving_review_count // 0),
-                  require_last_push_approval: (.required_pull_request_reviews.require_last_push_approval // false)
+                  require_last_push_approval: (.required_pull_request_reviews.require_last_push_approval // false),
+                  # Same object-to-string normalization as `restrictions` below, one level deeper.
+                  # The `== null` guard covers the key being ABSENT (jq indexes a missing key as
+                  # null), so a review object without these normalizes to null and matches a CR
+                  # that omits them. Never `//`-default these: `.users` indexing would error on an
+                  # already-normalized value, and a jq runtime error fails the reconcile.
+                  dismissal_restrictions: (
+                    if .required_pull_request_reviews.dismissal_restrictions == null then null else {
+                      users: ((.required_pull_request_reviews.dismissal_restrictions.users // []) | map(.login) | sort),
+                      teams: ((.required_pull_request_reviews.dismissal_restrictions.teams // []) | map(.slug) | sort),
+                      apps: ((.required_pull_request_reviews.dismissal_restrictions.apps // []) | map(.slug) | sort)
+                    } end
+                  ),
+                  bypass_pull_request_allowances: (
+                    if .required_pull_request_reviews.bypass_pull_request_allowances == null then null else {
+                      users: ((.required_pull_request_reviews.bypass_pull_request_allowances.users // []) | map(.login) | sort),
+                      teams: ((.required_pull_request_reviews.bypass_pull_request_allowances.teams // []) | map(.slug) | sort),
+                      apps: ((.required_pull_request_reviews.bypass_pull_request_allowances.apps // []) | map(.slug) | sort)
+                    } end
+                  )
                 } end
               ),
               restrictions: (
