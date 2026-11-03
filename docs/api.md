@@ -381,7 +381,8 @@ drift-loop (GitHub derives `contexts` from the `checks` it accepts, and the deri
 matches a different `contexts` the CR also declared), and that misconfiguration cannot be
 rejected at admission — oasgen carries neither `oneOf`/`not` nor `x-kubernetes-validations` from
 the asset into the generated CRD. It is held until oasgen supports admission-time cross-field
-validation (CEL passthrough requested from oasgen-provider); see
+validation (CEL passthrough requested in
+[oasgen-provider#396](https://github.com/krateo-platformops/oasgen-provider/issues/396)); see
 [configuration → Updates send whole values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
 
 The review object can carry `dismissal_restrictions` and `bypass_pull_request_allowances`

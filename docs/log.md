@@ -28,7 +28,8 @@ other, so a CR that set both would drift-loop — and that misconfiguration cann
 admission because oasgen carries no `oneOf`/`not`/`x-kubernetes-validations` from the asset into the
 generated CRD (verified against the 0.43.0 renderer and oasgen source: `libopenapi_adapter.go` reads
 only `allOf`, the domain `Schema` type has no `OneOf`/`Not`/`XValidations`). It will be added once
-oasgen supports admission-time cross-field validation (CEL passthrough requested from oasgen-provider).
+oasgen supports admission-time cross-field validation (CEL passthrough requested in
+[oasgen-provider#396](https://github.com/krateo-platformops/oasgen-provider/issues/396)).
 Status checks remain managed through `contexts`, exactly as before.
 
 Verified live on 2026-11-03 (public org-repo round-trip): dismissal/bypass users round-trip case-exact,

@@ -37,7 +37,8 @@ spec:
     # app_id) form is deliberately still NOT modelled: a CR could set both `checks` and `contexts`, and
     # GitHub derives one from the other so the pair would drift-loop — and that cannot be rejected at
     # admission because oasgen carries no oneOf/not/x-kubernetes-validations into the generated CRD. It
-    # is held until oasgen supports admission-time cross-field validation. See docs/configuration.md
+    # is held until oasgen supports admission-time cross-field validation (krateo-platformops/
+    # oasgen-provider#396). See docs/configuration.md
     # "Updates send whole values — what a CR owns".
     compareScope: updatable
     configurationFields: []
