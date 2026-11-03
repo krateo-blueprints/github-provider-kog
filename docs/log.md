@@ -41,6 +41,40 @@ replace); a CR clears them with explicit empty `users`/`teams`/`apps`. No oasgen
 changed; a CR that sets none of the new fields produces a byte-identical request body and an identical
 drift outcome. This moves those sub-controls out of the data-loss class in the 2026-11-02 "what a CR
 owns" section.
+## 2026-11-03 — fix: Repository/UserRepository key get+update on status.name (oasgen #386)
+
+`Repository` and `UserRepository` keyed the get/update path parameter `name` on `spec.name`.
+GitHub normalises a disallowed character in a repo name on create — `POST` body `name: "my repo"`
+creates the repo `my-repo` — so a `GET /repos/{org}/my%20repo` by `spec.name` 404s **while the repo
+exists**. `rest-dynamic-controller` reads a present-but-404 key as "does not exist" and re-creates,
+GitHub answers 422 "name already exists", and the reconcile loops forever (oasgen-provider
+[#386](https://github.com/krateo-platformops/oasgen-provider/issues/386)).
+
+Fixed by the `Team` model: get and update now map `inPath: name` ← `status.name` (the name GitHub
+actually assigned, already captured because `name` is the identifier). `Repository` uses
+`fieldMapping`, `UserRepository` extends its existing `requestFieldMapping` (alongside
+`owner` ← `status.owner.login`). Mechanics, traced against rest-dynamic-controller 0.43.0 (the
+cluster version) and HEAD:
+
+- **No PATCH loop.** The mapping only changes the path parameter, not the drift comparison. `name`
+  is deliberately out of the PATCH body (the 0.2.2 decision), so it is not in the `updatable`
+  compare set; `spec.name "my repo"` is never compared against the observed `my-repo`, so tracking
+  the real name never triggers a rename-back PATCH. This was the main risk to rule out, and it is
+  why the fix is the status-keying alone — no admission `pattern` and no change to the compare set.
+- **Pre-create** `status.name` is absent, so the parameter falls back to `spec.name` and the `GET`
+  404s correctly (the repo does not exist yet) → one create → `status.name` set → every later
+  observe addresses the assigned name. `UserRepository`'s findby is unchanged and still recovers a
+  lost/pre-create status.
+- **Out-of-band rename** now converges: the redirect-following `GET` reports the new name,
+  `status.name` tracks it, the next observe addresses it directly, and the old-name-reused
+  wrong-bind goes away.
+
+No change to `identifiers`, `excludedSpecFields`, `additionalStatusFields`, `compareScope`,
+`configurationFields` or `resourceGroup` (immutable / append-only surfaces untouched). All 15
+`Repository` CRs on krateo-057 already carry `status.name` equal to `spec.name`, so the roll is a
+no-op for them. `hack/assert-drift-invariants.py` gains a presence assertion that both verbs keep
+the `status.name` mapping, so removing it (which silently re-opens #386) now fails the `lint`
+workflow.
 
 ## 2026-11-03 — feat: model merge_queue and the five pattern ruleset rules
 

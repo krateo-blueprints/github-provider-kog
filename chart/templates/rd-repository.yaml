@@ -54,12 +54,36 @@ spec:
       - action: create
         method: POST
         path: /orgs/{org}/repos
+      # GET/UPDATE key the repo on the name GitHub ACTUALLY assigned (status.name), not on
+      # spec.name — the Team model (rd-team.yaml, team_slug <- status.slug). This is the #386 fix.
+      #
+      # GitHub normalises a disallowed character in a repo name on create: POST body name="my repo"
+      # creates the repo "my-repo", and status.name (the `name` identifier, populated from the
+      # create response) is "my-repo". WITHOUT this mapping the observe GET is built from spec.name
+      # "my repo" and 404s while the repo exists, so the controller re-creates, GitHub answers 422
+      # "name already exists", and the reconcile loops forever (oasgen-provider #386).
+      #
+      # The mapping runs LAST in BuildCallConfig and OVERWRITES the path parameter, but only when
+      # its source is present (builder.go applyFieldMapping: a missing source skips, no error):
+      #   - pre-create, status.name is absent, so `name` falls back to spec.name and the GET 404s
+      #     because the repo genuinely does not exist yet -> one create, then status.name is set;
+      #   - thereafter the GET/PATCH address status.name (the real name) -> 200, no re-create.
+      # It also makes an out-of-band rename converge: the redirect-following GET (#132) reports the
+      # new name, status.name tracks it, and the next observe addresses it directly — and because
+      # `name` is deliberately OUT of the PATCH body (see assets/repository.yaml), it is NOT in the
+      # `updatable` compare set, so tracking the real name never triggers a rename-back PATCH loop.
       - action: get
         method: GET
         path: /repos/{org}/{name}
+        fieldMapping:
+          - inPath: name
+            inCustomResource: status.name
       - action: update
         method: PATCH
         path: /repos/{org}/{name}
+        fieldMapping:
+          - inPath: name
+            inCustomResource: status.name
     # NO DELETE VERB, DELIBERATELY. Deleting this CR ORPHANS the GitHub repository; it does not
     # destroy it. rest-dynamic-controller handles an absent delete verb by releasing the finalizer
     # and leaving the external resource alone (restResources.go Delete: `apiCall == nil` -> log

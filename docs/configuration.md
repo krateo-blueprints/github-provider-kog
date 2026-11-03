@@ -124,8 +124,8 @@ Three patterns recur across the set and are worth reading once:
 
 | kind | identifiers | key mapping facts |
 |---|---|---|
-| `Repository` | `name` | create on `/orgs/{org}/repos`, get/update/delete on `/repos/{org}/{name}` — the parameters are renamed `org`/`name` so one pair of spec fields serves the create path, the create body and the item path. `compareScope: updatable`, not the default (below); status carries `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch`. |
-| `UserRepository` | `name` | the user-owned sibling of `Repository`: create is `POST /user/repos` (owned by the token account), get/update address `/repos/{owner}/{name}` with `owner` sourced from `status.owner.login` (`excludedSpecFields` — never hand-set, since GitHub assigns the owner from the token). Before that status exists, observe is a **findby** over `GET /user/repos` pinned to `affiliation=owner` (owned repos, so names are unique) and walked with `pageNumber` pagination (short-page end rule), so a same-name repo already in the token's account is adopted rather than duplicated. **No delete verb** — orphan-not-destroy, the same oasgen #125 reasoning as `Repository`. `name`/`private`/`visibility` are kept out of the PATCH body for the identical reasons (below); `compareScope: updatable`; status as `Repository` plus `owner.login`. |
+| `Repository` | `name` | create on `/orgs/{org}/repos`, get/update on `/repos/{org}/{name}` (no delete verb) — the parameters are renamed `org`/`name` so one pair of spec fields serves the create path, the create body and the item path. The item path `name` is sourced from **`status.name`** via `fieldMapping` (the name GitHub assigned), not `spec.name`: GitHub normalises a disallowed character on create (`"my repo"` → `my-repo`), and a `GET` by `spec.name` would 404 while the repo exists and loop on re-create (oasgen #386). Pre-create, `status.name` is absent and the parameter falls back to `spec.name`, which 404s correctly (the repo does not exist yet) → one create → status set. `compareScope: updatable`, not the default (below); status carries `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch`. |
+| `UserRepository` | `name` | the user-owned sibling of `Repository`: create is `POST /user/repos` (owned by the token account), get/update address `/repos/{owner}/{name}` with `owner` sourced from `status.owner.login` (`excludedSpecFields` — never hand-set, since GitHub assigns the owner from the token) and `name` sourced from `status.name` (the name GitHub assigned, the same oasgen #386 fix as `Repository`). Before that status exists, observe is a **findby** over `GET /user/repos` pinned to `affiliation=owner` (owned repos, so names are unique) and walked with `pageNumber` pagination (short-page end rule), so a same-name repo already in the token's account is adopted rather than duplicated. **No delete verb** — orphan-not-destroy, the same oasgen #125 reasoning as `Repository`. `name`/`private`/`visibility` are kept out of the PATCH body for the identical reasons (below); `compareScope: updatable`; status as `Repository` plus `owner.login`. |
 
 ### `compareScope` across the chart
 
@@ -273,7 +273,10 @@ body**, and those are the load-bearing ones:
   and the next reconcile PATCHed repositories that already existed. For exposure that is
   unrecoverable — forks, clones, caches and search indexing survive a flip back.
 - `name` (0.2.2). Compared, it made drift reconciliation willing to *rename* a live
-  repository, which GitHub's rename redirect surfaced as a 307.
+  repository, which GitHub's rename redirect surfaced as a 307. Keeping it out of the body is
+  also what makes the item verbs safe to key on `status.name` (the oasgen #386 fix above):
+  addressing tracks the name GitHub assigned, and because `name` is never in the compare set,
+  tracking it can never PATCH it back to `spec.name`.
 
 GitHub echoes all three on every `GET`. So for this kind `updatable` is **load-bearing, not
 defensive**: under the default `fullSpec` they would be compared back into the drift set
