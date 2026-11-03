@@ -368,20 +368,21 @@ and it is handled entirely in the RestDefinition, by two jq transforms:
 - **Response** (`get`): a whole-document `responseTransform` rewrites GitHub's answer back
   into the CR domain once, at the reconcile chokepoint, before status population and drift
   comparison — `{"enabled": bool}` wrappers flattened to bare booleans (nine controls),
-  the status-check wrapper reduced to `{strict, contexts, checks}`, `restrictions`
+  the status-check wrapper reduced to `{strict, contexts}`, `restrictions`
   users/teams/apps reduced to `login`/`slug` strings, the review object's
   `dismissal_restrictions` and `bypass_pull_request_allowances` reduced the same way, and
   an unset control (key absent) normalised to `null`, which is what the spec omitting it
   means.
 
-`required_status_checks` takes **either** `contexts` (plain check names) **or** `checks`
-(`[{context, app_id}]`, pinning the reporting GitHub App) — **set exactly one.** GitHub keeps
-the two derived from each other (`checks` wins when both are sent), so a CR that declares both
-with different names drift-loops: GitHub derives `contexts` from your `checks`, and the derived
-value never matches the `contexts` you also declared. This cannot be rejected at admission —
-oasgen carries neither `oneOf`/`not` nor `x-kubernetes-validations` from the asset into the
-generated CRD — so "set exactly one" is a contract the author must honour, not one the API
-server enforces.
+Status checks are managed through `contexts` (plain check names). GitHub's newer `checks`
+(`[{context, app_id}]`) form, which pins the reporting GitHub App, is **not modelled yet**:
+GitHub keeps `checks` and `contexts` derived from each other, so a CR that set both would
+drift-loop (GitHub derives `contexts` from the `checks` it accepts, and the derived value never
+matches a different `contexts` the CR also declared), and that misconfiguration cannot be
+rejected at admission — oasgen carries neither `oneOf`/`not` nor `x-kubernetes-validations` from
+the asset into the generated CRD. It is held until oasgen supports admission-time cross-field
+validation (CEL passthrough requested from oasgen-provider); see
+[configuration → Updates send whole values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
 
 The review object can carry `dismissal_restrictions` and `bypass_pull_request_allowances`
 (`{users, teams, apps}` login/slug lists, org-owned repos only). Unlike the four top-level
@@ -405,9 +406,9 @@ that survives the transform unchanged, which is why it is the identifier.
 Because that PUT replaces the whole protection document, the CR **owns** it: a sub-control
 the CR cannot express is wiped when any modelled field drifts. That is why
 `required_pull_request_reviews.dismissal_restrictions` / `.bypass_pull_request_allowances`
-and the `required_status_checks` `checks` (`app_id`) form are now **modelled** — a CR that
-carries them keeps them across reconciles instead of losing them. The whole-value hazard
-and the sub-controls still left unmodelled are in
+are now **modelled** — a CR that carries them keeps them across reconciles instead of losing
+them. The `required_status_checks` `checks` (`app_id`) form is still unmodelled (held, as
+above). The whole-value hazard and the sub-controls still left unmodelled are in
 [configuration → Updates send whole values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
 
 ### Shorter caveats, by kind

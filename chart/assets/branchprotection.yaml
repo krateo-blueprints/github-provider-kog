@@ -45,56 +45,21 @@ paths:
                   properties:
                     strict:
                       type: boolean
-                    # TWO forms of the same check-name list. SET EXACTLY ONE. `contexts` is the
-                    # plain check-name list; `checks` is GitHub's newer form, pairing each context
-                    # with an optional `app_id` that pins which GitHub App's report satisfies the
-                    # check. GitHub keeps the two derived from each other and documents that only
-                    # one may be populated (`checks` wins when both are sent).
+                    # `contexts` is the check-name list. GitHub's newer `checks` form (context +
+                    # app_id) is deliberately NOT modelled: the API returns BOTH forms and keeps
+                    # them derived from each other, so exposing both would ask the author to keep
+                    # two representations of one list in sync.
                     #
-                    # SETTING BOTH IS A MISCONFIGURATION that drift-loops, and it CANNOT be rejected
-                    # at admission: oasgen does not carry `oneOf`/`not`/`x-kubernetes-validations`
-                    # into the generated CRD (the OAS->domain conversion reads only `allOf`;
-                    # verified against the 0.43.0 renderer and oasgen source), so there is no
-                    # schema construct that makes the API server refuse both. The mechanics of the
-                    # loop: GitHub derives `contexts` from whatever `checks` you set, so a CR that
-                    # ALSO declared a different `contexts` is compared (the drift walk reads every
-                    # key the spec sets) against GitHub's derived value, never matches, and re-PUTs
-                    # forever. A requestTransform that stripped `contexts` would hide the wire
-                    # ambiguity but NOT this comparison loop, so it is deliberately not done — the
-                    # single rule "set exactly one" is the only safe contract. Setting just one is
-                    # safe: the get responseTransform emits BOTH forms, and the drift comparison
-                    # skips the form the CR did not set (response keys absent from spec are
-                    # skipped), so a contexts-only or checks-only CR never drifts against the
-                    # derived other form.
-                    #
-                    # ORDER MATTERS. The drift comparison is order-sensitive on arrays, and the get
-                    # responseTransform sorts both lists — `contexts` by name, `checks` by
-                    # (context, app_id) — so write whichever you use SORTED the same way, otherwise
-                    # every reconcile reports drift and re-PUTs the same document.
+                    # ORDER MATTERS. The drift comparison is order-sensitive on arrays, and the
+                    # get responseTransform sorts this list, so write the contexts SORTED —
+                    # otherwise every reconcile reports drift and re-PUTs the same document.
                     contexts:
                       type: array
                       items:
                         type: string
-                    checks:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          context:
-                            type: string
-                          app_id:
-                            type: integer
-                        required:
-                          - context
-                  # Only `strict` is required at the CRD layer. GitHub requires at least one of
-                  # `contexts`/`checks` to be populated when required_status_checks is set, but
-                  # that is an either/or the CRD cannot express; an empty required_status_checks is
-                  # rejected LOUDLY by GitHub (422), not silently, so it is left to the API.
-                  # `contexts` was required here before `checks` existed; relaxing it is what lets
-                  # an author pick the `checks` form instead — it does not loosen any existing CR,
-                  # which still sets strict + contexts exactly as before.
                   required:
                     - strict
+                    - contexts
                 # Defaulted so the assembled body is NEVER empty. rest-dynamic-controller skips a
                 # requestTransform on an empty body (fieldmapping.ApplyRequestTransform returns
                 # early), and an empty body would then reach GitHub without the four required
@@ -291,17 +256,6 @@ components:
               type: array
               items:
                 type: string
-            # The responseTransform emits `checks` alongside `contexts` (normalized to
-            # {context, app_id}, sorted), so the CR-domain shape documented here carries both.
-            checks:
-              type: array
-              items:
-                type: object
-                properties:
-                  context:
-                    type: string
-                  app_id:
-                    type: integer
         enforce_admins:
           type: boolean
         required_pull_request_reviews:

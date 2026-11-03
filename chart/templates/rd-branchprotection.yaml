@@ -32,10 +32,13 @@ spec:
     #
     # Ownership note: the PUT replaces the WHOLE protection document, so a sub-control the CR cannot
     # express is wiped when any modelled field drifts. required_pull_request_reviews.dismissal_restrictions
-    # / .bypass_pull_request_allowances and the required_status_checks `checks` (context + app_id) form
-    # are now MODELLED (see the asset and the transforms below), so a CR that carries them keeps them;
-    # only sub-controls the CR still does not model stay exposed. See docs/configuration.md "Updates
-    # send whole values — what a CR owns".
+    # and .bypass_pull_request_allowances are now MODELLED (see the asset and the responseTransform
+    # below), so a CR that carries them keeps them. The required_status_checks `checks` (context +
+    # app_id) form is deliberately still NOT modelled: a CR could set both `checks` and `contexts`, and
+    # GitHub derives one from the other so the pair would drift-loop — and that cannot be rejected at
+    # admission because oasgen carries no oneOf/not/x-kubernetes-validations into the generated CRD. It
+    # is held until oasgen supports admission-time cross-field validation. See docs/configuration.md
+    # "Updates send whole values — what a CR owns".
     compareScope: updatable
     configurationFields: []
     verbsDescription:
@@ -76,7 +79,7 @@ spec:
         # once, at the reconcile chokepoint, before status population and drift comparison:
         #
         #   {"enabled": bool} objects        -> bare booleans      (nine controls)
-        #   status-check wrapper + urls      -> {strict, contexts, checks}
+        #   status-check wrapper + urls      -> {strict, contexts}
         #   restrictions users/teams/apps    -> login / slug strings
         #   review dismissal_restrictions /  -> login / slug strings (same shape, nested under
         #     bypass_pull_request_allowances     required_pull_request_reviews)
@@ -95,13 +98,7 @@ spec:
               required_status_checks: (
                 if .required_status_checks == null then null else {
                   strict: (.required_status_checks.strict // false),
-                  contexts: ((.required_status_checks.contexts // []) | sort),
-                  # GitHub returns BOTH forms; emit both. A CR that set only one of them
-                  # compares only that key (the comparison skips response keys absent from spec),
-                  # so the derived other form never shows as drift. Projected to {context, app_id}
-                  # to drop GitHub's extra per-check fields, then sorted by (context, app_id) to
-                  # match a spec written in that order.
-                  checks: ((.required_status_checks.checks // []) | map({context: .context, app_id: .app_id}) | sort_by(.context, .app_id))
+                  contexts: ((.required_status_checks.contexts // []) | sort)
                 } end
               ),
               enforce_admins: (.enforce_admins.enabled // false),
