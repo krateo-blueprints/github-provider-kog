@@ -33,10 +33,16 @@ spec:
     # ^ Same reasoning as rd-reporuleset.yaml: the update body carries every create field, so
     # this is a tightening rather than a rescue. It keeps the `org` path parameter out of the
     # drift comparison by construction, and the array-ordering caveat there applies here too —
-    # `rules` and `bypass_actors` are compared element-by-element in order.
+    # `rules` and `bypass_actors` are compared element-by-element in order. Verified live
+    # 2026-11-03 on a throwaway public repo (since deleted): order preserved, casing verbatim,
+    # GitHub-added keys skipped, and stable on re-PUT — 0 drift for every modelled type, merge_queue
+    # and the five *_pattern rules included. The defaults GitHub fills for omitted optional keys
+    # (e.g. a pattern rule's `negate: false`, `name`) are never compared, because the comparator
+    # walks only the CR's keys (see rd-reporuleset.yaml; comparison.go:43, skip at :47-53), so none
+    # introduces a permanent drift loop.
     #
     # Ownership note: the PUT re-sends the WHOLE `rules` array (org-wide), so a UI-added rule of one
-    # of the 14 unmodelled rule types is DELETED on reconcile. See docs/configuration.md
+    # of the 8 still-unmodelled rule types is DELETED on reconcile. See docs/configuration.md
     # "Updates send whole values — what a CR owns".
     configurationFields: []
     verbsDescription:

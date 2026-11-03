@@ -327,7 +327,8 @@ spec:
       bypass_mode: always
   conditions:
     ref_name:
-      include: ["~DEFAULT_BRANCH"]
+      include: ["~DEFAULT_BRANCH"]      # concrete ref — required because merge_queue is present
+                                        # (a wildcard such as ~ALL would 422; ~DEFAULT_BRANCH is fine)
   rules:
     - type: non_fast_forward            # no parameters — a bare `- type:` entry
     - type: deletion
@@ -338,13 +339,35 @@ spec:
         require_code_owner_review: false
         require_last_push_approval: false
         required_review_thread_resolution: true
+    - type: merge_queue                 # all seven keys required; needs a concrete ref (see conditions)
+      parameters:
+        merge_method: SQUASH            # MERGE | SQUASH | REBASE
+        grouping_strategy: ALLGREEN     # ALLGREEN | HEADGREEN
+        check_response_timeout_minutes: 60
+        min_entries_to_merge: 1
+        min_entries_to_merge_wait_minutes: 5
+        max_entries_to_merge: 5
+        max_entries_to_build: 5
+    - type: commit_message_pattern      # one of the five *_pattern rules
+      parameters:
+        operator: starts_with           # starts_with | ends_with | contains | regex
+        pattern: "JIRA-"
+        name: require-ticket-prefix     # optional human label; not the ruleset's name
+        negate: false                   # optional
 ```
 
 - **`parameters` is a union keyed by `type`.** Set only the keys belonging to that rule
   type — and, when the type has required keys, *all* of them: flattening the union drops
   GitHub's per-type `required` list, so the CRD cannot enforce it and a partial
   `pull_request` object is a `422`, not a silent ignore. Rules with no parameters are
-  written as a bare `- type:` entry.
+  written as a bare `- type:` entry. The modelled set (15 types) was round-trip-verified
+  live on 2026-11-03; the five pattern rules are **not** Enterprise-gated and work on a
+  Team-plan org.
+- **`merge_queue` needs a concrete ref.** A ruleset carrying a `merge_queue` rule must set
+  `conditions.ref_name` to a non-wildcard ref — `refs/heads/<branch>` or `~DEFAULT_BRANCH`,
+  not `~ALL` — or GitHub rejects it with `422 Wildcard ref names are not supported when
+  merge queue is enabled`. `tag_name_pattern` likewise belongs on a `target: tag` ruleset
+  (GitHub rejects a tag rule in a branch-target ruleset).
 - **Neither ruleset kind has a `ruleset_id` field.** GitHub assigns it on create; the
   provider carries it in `status.id` and binds get/update/delete from there. `OrgRuleset`
   additionally needs `conditions.repository_name` to say which repositories it covers —
