@@ -11,6 +11,46 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-03 — release 0.7.1 (appVersion 0.1.7): ruleset + branch-protection modelling, #386 fix
+
+Rolls up the five PRs merged since **0.7.0** (#25–#29). `appVersion` moves `0.1.6` → `0.1.7` because
+the trimmed OpenAPI **assets** (the mapping that `appVersion` tracks) changed substantively in three of
+them; the chart `version` is still the release tag. No new kinds — the count stays **32**.
+
+- **#27 — `merge_queue` and five `*_pattern` ruleset rules** (`RepoRuleset`/`OrgRuleset`): modelled rule
+  types go **9 → 15**, closing six of the fourteen whole-value data-loss gaps. Purely additive to the
+  `{type, parameters}` union; the nine existing types keep an identical shape.
+- **#28 — `BranchProtection` review `dismissal_restrictions` and `bypass_pull_request_allowances`**:
+  two review sub-controls the CR could not previously express, normalized GET-object → PUT-string-list by
+  the existing whole-document `responseTransform`. `required_status_checks` is byte-identical to main; the
+  `checks` form is still held pending oasgen-provider#396.
+- **#29 — `Repository`/`UserRepository` get+update keyed on `status.name`** (oasgen-provider#386): fixes
+  the re-create loop when GitHub normalises a repo name on create (e.g. `my repo` → `my-repo`). The
+  mapping changes only the path parameter, not the compare set, so it cannot trigger a rename-back PATCH.
+- **#25, #26 — docs only**: the "every parameter becomes a spec field" correction and the whole-value
+  update-semantics / "what a CR owns" sections. No YAML value changed in either (asset edits in #25 were
+  comment-only).
+
+Each change has its own dated entry below with full mechanics. Upgrade notes for this roll:
+
+- **Plain `helm upgrade` from 0.7.0 — no migration.** A field-by-field diff of every one of the 32
+  `RestDefinition`s between the `0.7.0` tag and this release shows **zero** change to any
+  oasgen-immutable surface: `kind`, `identifiers`, `configurationFields`, `excludedSpecFields` and
+  `resourceGroup` are byte-identical, and `additionalStatusFields` / `includedSpecFields` are unchanged
+  (not even appended). So no RestDefinition crosses an immutable field and the pre-roll gate in
+  [upgrading](./upgrading.md) is a no-op here.
+- **Existing `Repository`/`UserRepository` CRs want `status.name`.** The #386 fix falls back to
+  `spec.name` only until `status.name` is set, then addresses the GitHub-assigned name. Every one of the
+  15 `Repository` CRs on krateo-057 already carries `status.name` (equal to `spec.name`), so the roll is a
+  no-op for them; a CR whose status was wiped simply re-observes once and repopulates it.
+- **`BranchProtection` clear-semantics.** **Omitting** `dismissal_restrictions` or
+  `bypass_pull_request_allowances` from the review object leaves whatever actors are set on GitHub in
+  place — these two nested lists are not part of the wholesale replace. To **clear** them, send explicit
+  empty `users` / `teams` / `apps` lists.
+- **`merge_queue` needs a concrete ref.** A `merge_queue` rule `422`s with *"Wildcard ref names are not
+  supported when merge queue is enabled"* when the ruleset's `conditions.ref_name` is a wildcard such as
+  `~ALL`; target a concrete ref (e.g. `refs/heads/main`).
+
 ## 2026-11-03 — feat(branchprotection): model review dismissal_restrictions and bypass_pull_request_allowances
 
 Modelled two `BranchProtection` sub-controls the CR previously could not express, additively:
