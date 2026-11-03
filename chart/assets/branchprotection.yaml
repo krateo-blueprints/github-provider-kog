@@ -45,20 +45,27 @@ paths:
                   properties:
                     strict:
                       type: boolean
-                    # TWO forms of the same check-name list; set EXACTLY ONE of them.
+                    # TWO forms of the same check-name list. SET EXACTLY ONE. `contexts` is the
+                    # plain check-name list; `checks` is GitHub's newer form, pairing each context
+                    # with an optional `app_id` that pins which GitHub App's report satisfies the
+                    # check. GitHub keeps the two derived from each other and documents that only
+                    # one may be populated (`checks` wins when both are sent).
                     #
-                    # `contexts` is the plain check-name list. `checks` is GitHub's newer form,
-                    # pairing each context with an optional `app_id` that pins which GitHub App's
-                    # report satisfies the check. GitHub keeps the two derived from each other and
-                    # documents that only one may be populated (and at least one must be) — so the
-                    # update `requestTransform` in rd-branchprotection.yaml DROPS `contexts` from
-                    # the body whenever `checks` is present, which is also GitHub's own precedence
-                    # (`checks` wins). Setting both in the CR is tolerated: only `checks` is sent.
-                    #
-                    # They do not fight on READ either: the get responseTransform emits BOTH forms,
-                    # and the drift comparison only looks at the keys the CR actually set (response
-                    # keys absent from spec are skipped), so a contexts-only CR never drifts against
-                    # the derived `checks`, and vice-versa.
+                    # SETTING BOTH IS A MISCONFIGURATION that drift-loops, and it CANNOT be rejected
+                    # at admission: oasgen does not carry `oneOf`/`not`/`x-kubernetes-validations`
+                    # into the generated CRD (the OAS->domain conversion reads only `allOf`;
+                    # verified against the 0.43.0 renderer and oasgen source), so there is no
+                    # schema construct that makes the API server refuse both. The mechanics of the
+                    # loop: GitHub derives `contexts` from whatever `checks` you set, so a CR that
+                    # ALSO declared a different `contexts` is compared (the drift walk reads every
+                    # key the spec sets) against GitHub's derived value, never matches, and re-PUTs
+                    # forever. A requestTransform that stripped `contexts` would hide the wire
+                    # ambiguity but NOT this comparison loop, so it is deliberately not done — the
+                    # single rule "set exactly one" is the only safe contract. Setting just one is
+                    # safe: the get responseTransform emits BOTH forms, and the drift comparison
+                    # skips the form the CR did not set (response keys absent from spec are
+                    # skipped), so a contexts-only or checks-only CR never drifts against the
+                    # derived other form.
                     #
                     # ORDER MATTERS. The drift comparison is order-sensitive on arrays, and the get
                     # responseTransform sorts both lists — `contexts` by name, `checks` by
@@ -112,16 +119,20 @@ paths:
                     # same {users, teams, apps} shape as top-level `restrictions` — login/slug
                     # STRINGS on the PUT, user/team/app OBJECTS on the GET — so the get
                     # responseTransform normalizes them to string lists exactly as it does
-                    # `restrictions` (map(.login)/map(.slug), sorted). Both are optional: omit to
-                    # leave unset (which GitHub treats as "off" since the whole review object is
-                    # replaced), or pass the object to set them. ORG-OWNED REPOSITORIES ONLY for
-                    # the user/team entries, same as `restrictions`. Same ordering caveat: the
+                    # `restrictions` (map(.login)/map(.slug), sorted). ORG-OWNED REPOSITORIES ONLY
+                    # for the user/team entries, same as `restrictions`. Same ordering caveat: the
                     # responseTransform sorts each list, so write them sorted.
                     #
-                    # Modelling these is the point of this whole block: before, a review object
-                    # the CR set but could not express these on would WIPE any dismissal /
-                    # bypass actors configured out-of-band, because the PUT replaces the review
-                    # object wholesale. Now the CR can carry them, so they survive a reconcile.
+                    # OMISSION DOES NOT CLEAR THEM. Unlike the four top-level controls, these two
+                    # nested actor lists are NOT part of the wholesale replace: VERIFIED LIVE on
+                    # 2026-11-03, a PUT whose required_pull_request_reviews omits them LEAVES the
+                    # previously-set actors in place (GitHub retains them). To CLEAR them, the CR
+                    # must send the object with explicit empty `users`/`teams`/`apps` — omitting is
+                    # "leave as is", not "off". A CR that never sets them never compares them (the
+                    # drift walk skips keys the spec omits), so this is safe for existing CRs.
+                    #
+                    # Modelling these lets the CR DECLARATIVELY MANAGE them — set, update, or clear
+                    # (explicit empties) — which the CR previously could not express at all.
                     dismissal_restrictions:
                       type: object
                       properties:

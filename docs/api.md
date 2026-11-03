@@ -349,9 +349,7 @@ and it is handled entirely in the RestDefinition, by two jq transforms:
   is spelled. A CRD field typed `object` cannot hold null (oasgen does not carry OAS
   `nullable` through), so the CR expresses "off" by omission and a `requestTransform`
   turns omission into the explicit `null` the API demands. It tests `has()` rather than
-  using `//`, so a deliberate `enforce_admins: false` is not rewritten to null. The same
-  transform also drops `required_status_checks.contexts` from the body whenever the CR set
-  the `checks` form, so the two never fight (GitHub allows only one, and `checks` wins).
+  using `//`, so a deliberate `enforce_admins: false` is not rewritten to null.
 - **Response** (`get`): a whole-document `responseTransform` rewrites GitHub's answer back
   into the CR domain once, at the reconcile chokepoint, before status population and drift
   comparison — `{"enabled": bool}` wrappers flattened to bare booleans (nine controls),
@@ -362,12 +360,21 @@ and it is handled entirely in the RestDefinition, by two jq transforms:
   means.
 
 `required_status_checks` takes **either** `contexts` (plain check names) **or** `checks`
-(`[{context, app_id}]`, pinning the reporting GitHub App); set one, not both. The review
-object can carry `dismissal_restrictions` and `bypass_pull_request_allowances`
-(`{users, teams, apps}` login/slug lists, org-owned repos only) — modelling these is what
-stops a reconcile from wiping dismissal/bypass actors set out-of-band, since the PUT
-replaces the whole review object. All of these are additive: a CR that sets none of them
-behaves exactly as before.
+(`[{context, app_id}]`, pinning the reporting GitHub App) — **set exactly one.** GitHub keeps
+the two derived from each other (`checks` wins when both are sent), so a CR that declares both
+with different names drift-loops: GitHub derives `contexts` from your `checks`, and the derived
+value never matches the `contexts` you also declared. This cannot be rejected at admission —
+oasgen carries neither `oneOf`/`not` nor `x-kubernetes-validations` from the asset into the
+generated CRD — so "set exactly one" is a contract the author must honour, not one the API
+server enforces.
+
+The review object can carry `dismissal_restrictions` and `bypass_pull_request_allowances`
+(`{users, teams, apps}` login/slug lists, org-owned repos only). Unlike the four top-level
+controls, **omitting these from the review object does not clear them** — verified live on
+2026-11-03, GitHub retains previously-set actors when the PUT's review object omits them. To
+clear them a CR sends the object with explicit empty `users`/`teams`/`apps`; modelling them is
+what lets a CR express and manage them at all. All of these are additive: a CR that sets none of
+them behaves exactly as before.
 
 Every list in that transform is **sorted**, because the comparison is order-sensitive and
 GitHub does not return these in the order they were sent. Write the lists in the CR sorted

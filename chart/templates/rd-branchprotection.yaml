@@ -50,14 +50,7 @@ spec:
         requestTransform:
           inline: |
             . + {
-              required_status_checks: (
-                if has("required_status_checks") then
-                  # GitHub documents that only ONE of contexts/checks may be populated and that
-                  # `checks` wins. When the CR set `checks`, drop `contexts` so the two never
-                  # fight on the wire. `type == "object"` guards `has` against a non-object value.
-                  (.required_status_checks | if (type == "object") and has("checks") then del(.contexts) else . end)
-                else null end
-              ),
+              required_status_checks: (if has("required_status_checks") then .required_status_checks else null end),
               enforce_admins: (if has("enforce_admins") then .enforce_admins else null end),
               required_pull_request_reviews: (if has("required_pull_request_reviews") then .required_pull_request_reviews else null end),
               restrictions: (if has("restrictions") then .restrictions else null end)
@@ -70,14 +63,7 @@ spec:
         requestTransform:
           inline: |
             . + {
-              required_status_checks: (
-                if has("required_status_checks") then
-                  # GitHub documents that only ONE of contexts/checks may be populated and that
-                  # `checks` wins. When the CR set `checks`, drop `contexts` so the two never
-                  # fight on the wire. `type == "object"` guards `has` against a non-object value.
-                  (.required_status_checks | if (type == "object") and has("checks") then del(.contexts) else . end)
-                else null end
-              ),
+              required_status_checks: (if has("required_status_checks") then .required_status_checks else null end),
               enforce_admins: (if has("enforce_admins") then .enforce_admins else null end),
               required_pull_request_reviews: (if has("required_pull_request_reviews") then .required_pull_request_reviews else null end),
               restrictions: (if has("restrictions") then .restrictions else null end)
