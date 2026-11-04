@@ -409,20 +409,34 @@ spec:
   and GitHub replaces it wholesale. Set it in `spec.config.secret` and do not rotate it
   elsewhere.
 - **These kinds own their object/array fields wholesale.** For `RepoRuleset`, `OrgRuleset`,
-  `BranchProtection`, `RepoWebhook`, `OrgWebhook` and `Environment`, an update re-sends the
-  *whole* value of each managed object/array, so anything added out-of-band that the CR
-  cannot express (a ruleset rule of an unmodelled type, a UI-set branch-protection
-  sub-control) is deleted on the next reconcile. Do not mix CR-managed and hand-managed
-  state on the same ruleset / protection / webhook / environment — see
+  `BranchProtection`, `RepoWebhook` and `OrgWebhook`, an update re-sends the *whole* value of
+  each managed object/array, so anything added out-of-band that the CR cannot express (a
+  ruleset rule of an unmodelled type, a UI-set branch-protection sub-control) is deleted on the
+  next reconcile. Do not mix CR-managed and hand-managed state on the same ruleset / protection
+  / webhook — see
   [configuration → Updates send whole values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
+  (`Environment` is different: its protection-rule PUT is a **merge**, so a key the CR omits is
+  left untouched — see its entry below.)
 - **`DeployKey` and `Autolink` are immutable.** GitHub has no update endpoint for either;
   to rotate a key or change an autolink prefix, delete the CR and create a new one.
 - **`Environment`'s two `deployment_branch_policy` booleans must disagree** —
   GitHub `422`s if both are true or both false — and `custom_branch_policies: true` is
   what makes a `DeploymentBranchPolicy` possible at all. `reviewers` takes numeric user
-  and team ids, not logins, and is write-only: GitHub returns it nested under
-  `protection_rules`, which this OAS does not model, so a reviewer removed in the UI is
-  not reconciled back.
+  and team ids, not logins. GitHub returns `reviewers`, `wait_timer` and
+  `prevent_self_review` only nested under the `anyOf`-typed `protection_rules` array, so the
+  get verb carries a responseTransform that flattens them back to the top-level PUT shape:
+  they are **observed and reconciled**, and a reviewer removed in the UI is restored. Write
+  `reviewers` sorted by `(type, id)` (the transform sorts them and the comparison is
+  positional). **Omission keeps, explicit clears** (verified live): the protection-rule PUT is
+  a merge, so a CR that omits `reviewers` / `wait_timer` / `prevent_self_review` leaves the
+  out-of-band value alone and does not reconcile it; set a field to take ownership, and send
+  `reviewers: []` / `wait_timer: 0` to actively clear. **Set `prevent_self_review: true` only
+  together with a non-empty `reviewers` list** — GitHub carries it inside the required-reviewers
+  rule, so with no reviewers it stores nothing and a CR that set it true re-applies forever
+  (never converges); admission cannot reject that until
+  [oasgen-provider#396](https://github.com/krateo-platformops/oasgen-provider/issues/396). The
+  `User` reviewer path is verified live; the `Team` path is modelled identically but was not
+  live-tested (the test org had no teams).
 
 ### CI/CD — variables, runners, deployment gates
 

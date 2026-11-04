@@ -11,7 +11,43 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
-## 2026-11-04 — release 0.7.2 (appVersion 0.1.8): all 23 ruleset rule types, shared release workflow
+## 2026-11-04 — feat(environment): observe wait_timer / prevent_self_review / reviewers via a responseTransform
+
+`Environment` could SET `wait_timer`, `prevent_self_review` and `reviewers` through the create-or-update
+PUT, but GitHub returns them only nested in the `anyOf`-typed `protection_rules` array, never as
+top-level keys — and oasgen has no anyOf, so the asset omitted it and the three fields were write-only:
+a UI edit was never observed or reverted. This closes that gap the same way `BranchProtection` closes
+its GET/PUT shape asymmetry: a whole-document `responseTransform` on the get verb flattens
+`protection_rules` back into the top-level PUT shape (`wait_timer` int, `prevent_self_review` bool,
+`reviewers` as `[{type, id}]` sorted by `(type, id)`), passing `id` / `node_id` / `name` / `url` /
+`html_url` / `created_at` / `updated_at` / `deployment_branch_policy` through unchanged so the identifier
+and `additionalStatusFields` survive. The three are declared as plain top-level properties in the GET
+response schema (no anyOf), so the generated CRD and the drift comparison see them; `deployment_branch_policy`
+is unchanged.
+
+Absent-rule defaults make a CR converge. **Verified live 2026-11-03** (public throwaway repo, since
+deleted): the transform's output equals GitHub's actual stored state in every case. GitHub's
+protection-rule PUT is a **merge** — omitting a key keeps the current value — and an explicit
+`wait_timer: 0` removes the wait_timer rule while `reviewers: []` removes the required-reviewers rule.
+So the transform normalizes an absent wait_timer rule to `0` and an absent required-reviewers rule to
+`reviewers: []` + `prevent_self_review: false`, exactly the state an explicit `0` / `[]` / `false`
+produces — those CRs converge; and a CR that OMITS a key never sends it (no requestTransform) and never
+compares it, so the out-of-band value is left untouched. Environment therefore does **not** silently
+overwrite, and it leaves the "write-only, silently overwritten" class in the whole-value docs.
+
+One non-convergent case by GitHub's design (not a transform defect), confirmed live: `prevent_self_review`
+is carried inside the required-reviewers rule, so `prevent_self_review: true` with an empty/absent
+`reviewers` list creates no rule — GitHub stores nothing, the transform returns `false`, and the CR
+re-applies forever (idempotent, never converges). It cannot be rejected at admission until oasgen passes
+cross-field validation through ([oasgen-provider#396](https://github.com/krateo-platformops/oasgen-provider/issues/396),
+the same blocker as the BranchProtection `checks` form); the asset and usage docs tell authors to set
+`prevent_self_review` only with a non-empty `reviewers` list. The `User` reviewer path is verified live;
+the `Team` path is modelled identically but was not live-tested (the test org had no teams).
+
+No oasgen-immutable RD field changed (the 7 are byte-identical); the three were already in the PUT body,
+so the generated spec is unchanged. Offline-validated: helm lint, 32/32 render, drift-invariants,
+preflight-refs, oasgen CRD render (0 errors, no anyOf choke), and a gojq unit suite (no-rules / wait-only
+/ reviewers User+Team unsorted / both / branch_policy / absent) with convergence and sort-matters checks.
 
 Rolls up the three PRs merged since **0.7.1** (#31–#33). `appVersion` moves `0.1.7` → `0.1.8` because
 the trimmed OpenAPI **assets** changed in #32 (the two ruleset assets). The chart `version` is still the

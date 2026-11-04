@@ -464,15 +464,18 @@ above). The whole-value hazard and the sub-controls still left unmodelled are in
   read-only, and with no update verb any difference would park the key permanently
   Unavailable while working perfectly. Its `additionalStatusFields` are server-side facts
   only, so the compared set contains no spec field at all.
-- **`Environment` has an observability gap.** `wait_timer`, `prevent_self_review` and
-  `reviewers` are in the update body but absent from the top-level GET response (GitHub
-  nests them under the `anyOf`-typed `protection_rules` array). The comparator ignores a
-  spec key the response does not carry, so they cannot loop — they simply are not
-  observed, and editing those three in the GitHub UI will not be reverted.
-  `deployment_branch_policy` **is** returned top-level and is genuinely reconciled. Not
-  being *compared* is not the same as being safe: because they are re-sent from spec, a PUT
-  fired by `deployment_branch_policy` drift still overwrites an out-of-band value — the
-  silent case in [configuration → Updates send whole values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
+- **`Environment` observes its protection rules through a responseTransform.** `wait_timer`,
+  `prevent_self_review` and `reviewers` are in the update body but GitHub returns them only
+  nested under the `anyOf`-typed `protection_rules` array, never top-level — the same GET/PUT
+  asymmetry `BranchProtection` has. The get verb carries a whole-document `responseTransform`
+  that flattens `protection_rules` back into those three top-level fields (in the PUT shape;
+  `reviewers` as `[{type, id}]` sorted by `(type, id)`), so they are genuinely observed and a
+  UI edit to any of them IS reverted. Absent rules normalise to the PUT defaults
+  (`wait_timer: 0`, `reviewers: []`, `prevent_self_review: false`) so a CR that writes those
+  explicit values converges rather than drift-looping; write `reviewers` sorted. One edge:
+  `prevent_self_review` is carried by GitHub inside the required-reviewers rule, so it is only
+  observable alongside `reviewers` — set it together with them. `deployment_branch_policy` is
+  returned top-level and is reconciled directly.
 - **`RepoRuleset` / `OrgRuleset` array order matters.** `rules` and `bypass_actors` are
   compared element-by-element, in order — list them in a stable order. Extra keys GitHub
   fills into a rule's `parameters` (defaults such as `do_not_enforce_on_create`) are
