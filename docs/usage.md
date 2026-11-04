@@ -360,14 +360,35 @@ spec:
   type — and, when the type has required keys, *all* of them: flattening the union drops
   GitHub's per-type `required` list, so the CRD cannot enforce it and a partial
   `pull_request` object is a `422`, not a silent ignore. Rules with no parameters are
-  written as a bare `- type:` entry. The modelled set (15 types) was round-trip-verified
-  live on 2026-11-03; the five pattern rules are **not** Enterprise-gated and work on a
-  Team-plan org.
+  written as a bare `- type:` entry (e.g. `creation`, `non_fast_forward`,
+  `license_compliance_scanning`). **All 23 of GitHub's rule types are modelled.** The
+  branch-protection set, `merge_queue` and the five pattern rules were round-trip-verified
+  live on 2026-11-03, and `code_scanning`, `copilot_code_review` and the four push rules on
+  2026-11-04 — all on a **Team-plan** org, order preserved and casing verbatim (the pattern
+  rules are **not** Enterprise-gated). Two types are modelled from GitHub's REST schema but
+  were **rejected with a `422` on a Team-plan org's repository rulesets** and so could not
+  round-trip there (see below): `workflows` and `license_compliance_scanning`.
 - **`merge_queue` needs a concrete ref.** A ruleset carrying a `merge_queue` rule must set
   `conditions.ref_name` to a non-wildcard ref — `refs/heads/<branch>` or `~DEFAULT_BRANCH`,
   not `~ALL` — or GitHub rejects it with `422 Wildcard ref names are not supported when
   merge queue is enabled`. `tag_name_pattern` likewise belongs on a `target: tag` ruleset
   (GitHub rejects a tag rule in a branch-target ruleset).
+- **The four push rules need `target: push`.** `file_path_restriction`,
+  `max_file_path_length`, `file_extension_restriction` and `max_file_size` are only valid on
+  a ruleset whose `target` is `push`; GitHub `422`s them on a branch- or tag-target ruleset.
+  `file_path_restriction` and `max_file_size` also take an optional `ignored_file_paths`;
+  when you omit it, GitHub echoes it back as `[]` on GET — harmless, because the drift
+  comparison walks only the keys the CR declares, so an unset `ignored_file_paths` is not
+  compared.
+- **`workflows` and `code_scanning` take hand-supplied identifiers** — a workflow by
+  `repository_id` + `path`, a code-scanning tool by name (e.g. `CodeQL`).
+- **`workflows` and `license_compliance_scanning` were `422`-rejected on a Team-plan org.**
+  Both are modelled (they are in GitHub's REST schema and a `422` is a loud, visible failure —
+  the CR goes `Synced=False` with GitHub's message, not a silent drop), but on repository
+  rulesets in a Team-plan org `workflows` returned `422 Invalid rule 'workflows': Invalid
+  parameter workflows: Workflow error at index 0:` (even with a real workflow file and valid
+  `repository_id`/`path`/`ref`/`sha`) and `license_compliance_scanning` returned `422 Invalid
+  rule 'license_compliance_scanning':`. Not verified on Enterprise or at the org level.
 - **Neither ruleset kind has a `ruleset_id` field.** GitHub assigns it on create; the
   provider carries it in `status.id` and binds get/update/delete from there. `OrgRuleset`
   additionally needs `conditions.repository_name` to say which repositories it covers —

@@ -249,14 +249,28 @@ components:
     #                          min_entries_to_merge, min_entries_to_merge_wait_minutes (all seven;
     #                          GitHub requires the whole set together)
     #   *_pattern (the five)   operator, pattern (required pair); name, negate (optional)
+    #   workflows              workflows[] (each: repository_id, path required; ref, sha optional);
+    #                          do_not_enforce_on_create optional. Needs target: branch.
+    #   code_scanning          code_scanning_tools[] (each: tool, security_alerts_threshold,
+    #                          alerts_threshold — all required). Needs target: branch.
+    #   copilot_code_review    review_draft_pull_requests, review_on_push (both optional)
+    #   file_path_restriction      restricted_file_paths (required); ignored_file_paths (optional)
+    #   file_extension_restriction restricted_file_extensions (required)
+    #   max_file_path_length       max_file_path_length (required; GitHub range 1-32767)
+    #   max_file_size              max_file_size (required, MB; GitHub range 1-100);
+    #                              ignored_file_paths (optional)
+    # The four file_*/max_* are PUSH-target rules: valid only on a ruleset whose target is `push`;
+    # GitHub 422s them on a branch/tag ruleset.
     # The parameterless types — creation, deletion, non_fast_forward, required_linear_history,
-    # required_signatures — take no `parameters` key at all.
+    # required_signatures, license_compliance_scanning — take no `parameters` key at all.
     #
-    # MODELLED (the declarative set a platform team actually writes):
+    # MODELLED — all of GitHub's 23 rule types are now modelled:
     #   creation, deletion, update, non_fast_forward, required_linear_history,
     #   required_signatures, pull_request, required_status_checks, required_deployments,
     #   merge_queue, commit_message_pattern, commit_author_email_pattern,
-    #   committer_email_pattern, branch_name_pattern, tag_name_pattern.
+    #   committer_email_pattern, branch_name_pattern, tag_name_pattern,
+    #   workflows, code_scanning, copilot_code_review, license_compliance_scanning,
+    #   file_path_restriction, max_file_path_length, file_extension_restriction, max_file_size.
     #
     # On the five *_pattern rules, and the "name/pattern would collide" note this comment used to
     # carry: there is NO collision, and it was removed after checking the generator source. Those
@@ -270,18 +284,20 @@ components:
     # generating the CRD and validating sample CRs. So the five pattern rules and merge_queue are
     # modelled as plain additional optional keys in the same union.
     #
-    # LEFT OUT, and why:
-    #   workflows, code_scanning,       — reference other GitHub products by identifiers this
-    #   license_compliance_scanning,      provider cannot resolve (Actions workflow files keyed by
-    #   copilot_code_review               repository_id + path, code-scanning tool names, Copilot).
-    #                                     Hand-copying a repository_id into a CR is the wrong
-    #                                     shape for a KOG kind.
-    #   file_path_restriction,          — push-target rules (target: push), GitHub Enterprise
-    #   max_file_path_length,             Cloud only. Out of scope for a provider that must work
-    #   file_extension_restriction,       on any plan.
-    #   max_file_size
+    # NOTHING is left out at the rule-type level any more — the former "LEFT OUT" set (workflows,
+    # code_scanning, copilot_code_review, license_compliance_scanning, and the four push rules) is
+    # modelled above. Two usage caveats remain:
+    #   - workflows / code_scanning reference other GitHub products by identifier — a workflow by
+    #     repository_id + path, a code-scanning tool by name — which the author must hand-supply;
+    #     the provider cannot resolve them. They are EXPRESSIBLE, just not convenient.
+    #   - the four push rules require the ruleset's target: push (see the PUSH-target note above).
+    #   - LIVE (2026-11-04, Team-plan org, repo-level): code_scanning, copilot_code_review and the
+    #     four push rules round-tripped cleanly; workflows and license_compliance_scanning were
+    #     422-rejected (empty-reason messages — see docs/usage.md). Both stay modelled: a 422 is a
+    #     loud Synced=False, not a silent drop, and they are in GitHub's REST schema. Not checked on
+    #     Enterprise or at org level.
     #
-    #   pull_request.dismissal_restriction and pull_request.required_reviewers are dropped for
+    #   Within pull_request, dismissal_restriction and required_reviewers are still dropped for
     #   reason (2) above; required_reviewers is additionally still in beta upstream.
     Rules:
       type: array
@@ -308,6 +324,14 @@ components:
               - committer_email_pattern
               - branch_name_pattern
               - tag_name_pattern
+              - workflows
+              - code_scanning
+              - copilot_code_review
+              - license_compliance_scanning
+              - file_path_restriction
+              - max_file_path_length
+              - file_extension_restriction
+              - max_file_size
           parameters:
             type: object
             properties:
@@ -409,6 +433,81 @@ components:
                   - regex
               pattern:
                 type: string
+              # type: workflows — `workflows` (array) required; do_not_enforce_on_create (declared
+              # above) optional. Each entry references an Actions workflow file by numeric
+              # repository_id + path (ref/sha optional). Needs the ruleset's target: branch.
+              workflows:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - repository_id
+                    - path
+                  properties:
+                    repository_id:
+                      type: integer
+                    path:
+                      type: string
+                    ref:
+                      type: string
+                    sha:
+                      type: string
+              # type: code_scanning — `code_scanning_tools` (array) required; each entry names a
+              # tool (e.g. CodeQL) and both alert thresholds. Needs the ruleset's target: branch.
+              code_scanning_tools:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - tool
+                    - security_alerts_threshold
+                    - alerts_threshold
+                  properties:
+                    tool:
+                      type: string
+                    security_alerts_threshold:
+                      type: string
+                      enum:
+                        - none
+                        - critical
+                        - high_or_higher
+                        - medium_or_higher
+                        - all
+                    alerts_threshold:
+                      type: string
+                      enum:
+                        - none
+                        - errors
+                        - errors_and_warnings
+                        - all
+              # type: copilot_code_review — both keys optional.
+              review_draft_pull_requests:
+                type: boolean
+              review_on_push:
+                type: boolean
+              # types: push-target rules — valid ONLY on a ruleset whose target is `push`; GitHub
+              # 422s them on a branch/tag ruleset. GitHub range-checks the integers
+              # (max_file_path_length 1-32767; max_file_size 1-100 MB); left to the API.
+              #   file_path_restriction      restricted_file_paths (required); ignored_file_paths (optional)
+              #   file_extension_restriction restricted_file_extensions (required)
+              #   max_file_path_length       max_file_path_length (required)
+              #   max_file_size              max_file_size (required); ignored_file_paths (optional)
+              restricted_file_paths:
+                type: array
+                items:
+                  type: string
+              ignored_file_paths:
+                type: array
+                items:
+                  type: string
+              restricted_file_extensions:
+                type: array
+                items:
+                  type: string
+              max_file_path_length:
+                type: integer
+              max_file_size:
+                type: integer
     # Response schema. It carries the fields the status is built from and nothing else: drift
     # comparison reads the LIVE response body, never this schema, so `rules`, `conditions` and
     # `bypass_actors` need no response-side declaration and are not duplicated here.

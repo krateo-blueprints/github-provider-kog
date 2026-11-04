@@ -11,7 +11,50 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
-## 2026-11-04 — samples stop enabling verbose request logging
+## 2026-11-04 — feat: model the remaining 8 ruleset rule types (all 23 now modelled)
+
+Added the last eight `RepoRuleset`/`OrgRuleset` rule types to both assets, so the union now
+covers **all 23** of GitHub's rule types (was 15 after #27): `workflows`, `code_scanning`,
+`copilot_code_review`, `license_compliance_scanning`, and the four push-target rules
+`file_path_restriction`, `max_file_path_length`, `file_extension_restriction`, `max_file_size`.
+Parameters were taken from GitHub's current REST `repository-rule` schema (docs.github.com/rest/repos/rules),
+not from memory: `workflows` → `workflows[]` (each `repository_id`+`path` required, `ref`/`sha`
+optional) + optional `do_not_enforce_on_create`; `code_scanning` → `code_scanning_tools[]` (each
+`tool` + `security_alerts_threshold` ∈ {none,critical,high_or_higher,medium_or_higher,all} +
+`alerts_threshold` ∈ {none,errors,errors_and_warnings,all}); `copilot_code_review` →
+`review_on_push`, `review_draft_pull_requests` (both optional); `license_compliance_scanning` →
+parameterless; push rules → `restricted_file_paths`/`ignored_file_paths`,
+`restricted_file_extensions`, `max_file_path_length`, `max_file_size`. Added to the same flat
+`{type, parameters}` union as the existing 15 (oasgen drops `oneOf` at generation —
+`libopenapi_adapter.go` — so GitHub remains the authority that `422`s an illegal key for a type).
+Purely additive; the 15 existing types keep an identical shape. Schema-only change: no RD file was
+touched, so none of the seven oasgen-immutable #290 fields moved.
+
+With the gap closed, `RepoRuleset`/`OrgRuleset` `rules` leaves the whole-value **data-loss**
+capability-gap class (a UI-added rule is now simply reverted, declarative-by-design) and moves to
+that class in `docs/configuration.md`. Usage constraints documented: a `merge_queue` rule's ruleset
+needs a concrete ref; the four push rules require `target: push`; `workflows`/`code_scanning` take
+hand-supplied identifiers.
+
+Validation: `helm lint` + render (32 RestDefinitions + 32 ConfigMaps); `hack/assert-drift-invariants.py`
+and `hack/preflight-refs.py` pass; the generated `RepoRuleset`/`OrgRuleset` CRDs (rendered with
+`oasgen-render` 0.50.0) now expose a 23-value `type` enum and accept one valid CR per new type
+(including the nested `required` on `workflows[]`/`code_scanning_tools[]`), while rejecting bad-enum,
+wrong-type, missing-nested-required, unknown-type and missing-`type` samples.
+
+Live round-trip (2026-11-04, private throwaway repos on a **Team-plan** org, deleted afterwards):
+**six of the eight verified** — `code_scanning` (`CodeQL`/`high_or_higher`/`errors`) and
+`copilot_code_review` on a branch ruleset; all four push rules on a `push` ruleset — order preserved
+and casing verbatim (`file_extension_restriction` kept `*.ZIP` exactly). `file_path_restriction` and
+`max_file_size` carry an optional `ignored_file_paths` that GitHub echoes as `[]` when omitted;
+harmless, as the comparison walks only CR-declared keys. The other **two were `422`-rejected** on that
+org's repository rulesets and could not round-trip there: `workflows` → `Invalid rule 'workflows':
+Invalid parameter workflows: Workflow error at index 0:` (empty reason, seen even with a real
+`.github/workflows/ci.yml` supplying a valid `repository_id`/`path`/`ref`/`sha`) and
+`license_compliance_scanning` → `Invalid rule 'license_compliance_scanning':` (empty reason). Both
+stay modelled: they are in GitHub's REST schema and a `422` is a loud failure (`Synced=False` with the
+message), not a silent drop. Not verified on Enterprise or at org level. (The branch-protection set,
+`merge_queue` and the pattern rules were live-verified earlier, on 2026-11-03.)
 
 Dropped the `krateo.io/connector-verbose: "true"` annotation from all 32 samples under
 `chart/samples/` (docs only; no chart value or rendered RestDefinition/ConfigMap changes).
