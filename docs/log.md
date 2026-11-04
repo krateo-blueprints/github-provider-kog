@@ -11,6 +11,37 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-04 — release 0.7.2 (appVersion 0.1.8): all 23 ruleset rule types, shared release workflow
+
+Rolls up the three PRs merged since **0.7.1** (#31–#33). `appVersion` moves `0.1.7` → `0.1.8` because
+the trimmed OpenAPI **assets** changed in #32 (the two ruleset assets). The chart `version` is still the
+release tag. No new kinds; the count stays **32**.
+
+- **#32: the remaining 8 ruleset rule types** (`RepoRuleset`/`OrgRuleset`). Modelled types go **15 → 23**,
+  so a rule added in the GitHub UI is no longer deleted for being inexpressible. Six were verified live on
+  a Team-plan org. `workflows` and `license_compliance_scanning` are modelled but `422`-rejected there,
+  which shows up as `Synced=False` with GitHub's message. See the dated entry below.
+- **#31: samples stop enabling verbose request logging.** It was docs-only; the rendered chart does not change.
+- **#33: releases go through the org-wide `release-oci` workflow.** From this release on, each published
+  chart carries OCI provenance annotations (`org.opencontainers.image.revision` = the release commit). A
+  published version can no longer be replaced: re-publishing it with different contents is refused, and
+  identical contents are skipped. Release tags must be on `main`. A dry run against the already-published
+  0.7.1 was refused and pushed nothing, and its digest is unchanged.
+
+Upgrade notes for this roll:
+
+- **Plain `helm upgrade` from 0.7.1, no migration.** No file under `chart/templates/` changed since the
+  `0.7.1` tag, so all 32 `RestDefinition`s are byte-identical. None of the oasgen-immutable fields
+  (`kind`, `identifiers`, `configurationFields`, `excludedSpecFields`, `resourceGroup`,
+  `additionalStatusFields`, `includedSpecFields`) moved, and the pre-roll gate in
+  [upgrading](./upgrading.md) is a no-op.
+- **Two CRDs regenerate.** Only the `RepoRuleset`/`OrgRuleset` OpenAPI documents changed, so oasgen
+  regenerates those two CRDs with a 23-value rule `type` enum. The change is additive: every CR valid on 0.7.1 stays valid.
+- **Ruleset CRs now own every rule type.** A rule that exists on GitHub but is not listed in the CR is now
+  reverted on the next update, like any other declarative field. Before #32, a rule of an unmodelled type
+  was deleted because the CR could not express it. In both cases the CR's `rules` list is the whole truth,
+  so list every rule you want kept.
+
 ## 2026-11-04 — feat: model the remaining 8 ruleset rule types (all 23 now modelled)
 
 Added the last eight `RepoRuleset`/`OrgRuleset` rule types to both assets, so the union now
