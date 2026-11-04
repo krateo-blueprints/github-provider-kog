@@ -40,11 +40,21 @@ Validation: `helm lint` + render (32 RestDefinitions + 32 ConfigMaps); `hack/ass
 and `hack/preflight-refs.py` pass; the generated `RepoRuleset`/`OrgRuleset` CRDs (rendered with
 `oasgen-render` 0.50.0) now expose a 23-value `type` enum and accept one valid CR per new type
 (including the nested `required` on `workflows[]`/`code_scanning_tools[]`), while rejecting bad-enum,
-wrong-type, missing-nested-required, unknown-type and missing-`type` samples. **The live round-trip
-for the eight new types was NOT captured** — creating a throwaway repo under `krateo-blueprints` was
-blocked by the environment's permission policy (`gh repo create`, public and private both denied), so
-order/casing for these eight is schema-asserted, not yet live-verified (the branch-protection set,
-`merge_queue` and the pattern rules were live-verified on 2026-11-03).
+wrong-type, missing-nested-required, unknown-type and missing-`type` samples.
+
+Live round-trip (2026-11-04, private throwaway repos on a **Team-plan** org, deleted afterwards):
+**six of the eight verified** — `code_scanning` (`CodeQL`/`high_or_higher`/`errors`) and
+`copilot_code_review` on a branch ruleset; all four push rules on a `push` ruleset — order preserved
+and casing verbatim (`file_extension_restriction` kept `*.ZIP` exactly). `file_path_restriction` and
+`max_file_size` carry an optional `ignored_file_paths` that GitHub echoes as `[]` when omitted;
+harmless, as the comparison walks only CR-declared keys. The other **two were `422`-rejected** on that
+org's repository rulesets and could not round-trip there: `workflows` → `Invalid rule 'workflows':
+Invalid parameter workflows: Workflow error at index 0:` (empty reason, seen even with a real
+`.github/workflows/ci.yml` supplying a valid `repository_id`/`path`/`ref`/`sha`) and
+`license_compliance_scanning` → `Invalid rule 'license_compliance_scanning':` (empty reason). Both
+stay modelled: they are in GitHub's REST schema and a `422` is a loud failure (`Synced=False` with the
+message), not a silent drop. Not verified on Enterprise or at org level. (The branch-protection set,
+`merge_queue` and the pattern rules were live-verified earlier, on 2026-11-03.)
 
 Dropped the `krateo.io/connector-verbose: "true"` annotation from all 32 samples under
 `chart/samples/` (docs only; no chart value or rendered RestDefinition/ConfigMap changes).

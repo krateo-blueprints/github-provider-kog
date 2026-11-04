@@ -500,11 +500,23 @@ above). The whole-value hazard and the sub-controls still left unmodelled are in
   push rules (`file_path_restriction`, `max_file_path_length`, `file_extension_restriction`,
   `max_file_size`) require the ruleset's `target: push`; `workflows` and `code_scanning`
   reference another product by identifier (a workflow by `repository_id` + `path`, a tool by
-  name) that the author must supply by hand. The eight newest types are modelled from GitHub's
-  current REST schema; their live round-trip was **not** captured in this session (creating a
-  throwaway repo was blocked by the environment's permission policy — see the PR for detail),
-  so order/casing for them is schema-asserted, not yet live-verified. The CR owns `rules`
-  wholesale; see [configuration → Updates send whole
+  name) that the author must supply by hand.
+  Six of the eight were **verified live 2026-11-04** on a **Team-plan** org (private throwaway
+  repos, since deleted): `code_scanning` (`CodeQL`, `high_or_higher`, `errors`) and
+  `copilot_code_review` on a branch ruleset, and all four push rules on a `push` ruleset — each
+  round-tripped with order preserved and casing verbatim (e.g. `file_extension_restriction`
+  kept `*.ZIP` exactly). `file_path_restriction` and `max_file_size` carry an optional
+  `ignored_file_paths`, which GitHub echoes as `[]` when the CR omits it; harmless, since the
+  comparison walks only the keys the CR declares.
+  The other two were **rejected by GitHub on repository rulesets in a Team-plan org** (so they
+  are modelled but could not round-trip there): `workflows` → `422 Invalid rule 'workflows':
+  Invalid parameter workflows: Workflow error at index 0:` (empty reason; seen both without and
+  with a real `.github/workflows/ci.yml` supplying a valid `repository_id`/`path`/`ref`/`sha`),
+  and `license_compliance_scanning` → `422 Invalid rule 'license_compliance_scanning':` (empty
+  reason). Not verified on Enterprise or at org level. They stay modelled because they are in
+  GitHub's REST schema and the CR-side failure is **loud** — a `422` surfaces as `Synced=False`
+  with that message — not a silent drop. The CR owns `rules` wholesale; see
+  [configuration → Updates send whole
   values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
 - **`DeploymentBranchPolicy` cannot change `type`.** The create body is `{name, type}`;
   the update body is `{name}` alone — GitHub cannot move a policy between `branch` and

@@ -275,6 +275,11 @@ components:
     #     repository_id + path, a code-scanning tool by name — which the author must hand-supply;
     #     the provider cannot resolve them. They are EXPRESSIBLE, just not convenient.
     #   - the four push rules require the ruleset's target: push (see the PUSH-target note above).
+    #   - LIVE (2026-11-04, Team-plan org, repo-level): code_scanning, copilot_code_review and the
+    #     four push rules round-tripped cleanly; workflows and license_compliance_scanning were
+    #     422-rejected (empty-reason messages — see docs/usage.md). Both stay modelled: a 422 is a
+    #     loud Synced=False, not a silent drop, and they are in GitHub's REST schema. Not checked on
+    #     Enterprise or at org level.
     #
     #   Within pull_request, dismissal_restriction and required_reviewers are still dropped for
     #   reason (2) above; required_reviewers is additionally still in beta upstream.
