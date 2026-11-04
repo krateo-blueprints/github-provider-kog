@@ -10,8 +10,6 @@ kind: RepoWebhook
 metadata:
   name: test-demo-destination-hook
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

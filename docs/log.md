@@ -11,6 +11,26 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-04 — samples stop enabling verbose request logging
+
+Dropped the `krateo.io/connector-verbose: "true"` annotation from all 32 samples under
+`chart/samples/` (docs only; no chart value or rendered RestDefinition/ConfigMap changes).
+
+With the annotation on, rest-dynamic-controller dumps every request *including the body* and
+every response to the pod log (`httputil.DumpRequestOut(req, true)` at
+`go/rest-dynamic-controller/internal/tools/client/restclient.go:1185`, oasgen-provider tag
+0.50.0). Redaction covers only `secretRef`-resolved values (`RedactValues`, :1179-1189, :1276)
+and credential *header* names (`credentialHeaderRe`, :1289-1348); body redaction is deliberately
+absent (:114). This chart uses no `secretRef`, so a copied-as-is sample had every spec body value
+logged in cleartext — most dangerously a `RepoWebhook`/`OrgWebhook` `spec.config.secret` (the
+HMAC key, sent on create/update), but also `RepoContent` file content and anything else in the
+spec. Pod logs are typically readable more widely than the CR. People copy samples into
+production, so shipping the annotation on by default leaked the webhook secret to the RDC pod log.
+
+Verbose is now documented in [usage](./usage.md#verify) and [examples](./examples.md) as an
+opt-in debug aid only: enable it briefly, on a single non-sensitive CR, and never on a webhook
+CR that carries a secret. No functional change to any kind.
+
 ## 2026-11-03 — release 0.7.1 (appVersion 0.1.7): ruleset + branch-protection modelling, #386 fix
 
 Rolls up the five PRs merged since **0.7.0** (#25–#29). `appVersion` moves `0.1.6` → `0.1.7` because

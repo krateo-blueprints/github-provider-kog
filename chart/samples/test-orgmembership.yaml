@@ -11,8 +11,6 @@ kind: OrgMembership
 metadata:
   name: test-demo-orgmembership
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

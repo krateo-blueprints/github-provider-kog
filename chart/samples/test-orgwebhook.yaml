@@ -8,8 +8,6 @@ kind: OrgWebhook
 metadata:
   name: test-krateo-blueprints-hook
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

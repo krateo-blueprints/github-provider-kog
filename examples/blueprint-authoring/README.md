@@ -67,7 +67,9 @@ $ # the PR number and URL land in status
 $ kubectl get pullrequest test-demo-pr -n krateo-system -o jsonpath='{.status.html_url}{"\n"}'
 ```
 
-Each sample sets `krateo.io/connector-verbose: "true"`, so
-`kubectl logs deploy/<release>-plugin -n krateo-system` shows the observe/create URLs
-the controller drives through the plugin. When you are done, delete the CRs to close the
-PR and remove the branch.
+The samples no longer enable verbose request logging by default. To see the observe/create
+URLs the controller drives through the plugin via
+`kubectl logs deploy/<release>-plugin -n krateo-system`, first enable the opt-in debug
+annotation described in [usage](../../docs/usage.md#verify) on a single CR — heed the warning
+there, and never add it to a CR that carries a secret. When you are done, delete the CRs to
+close the PR and remove the branch.

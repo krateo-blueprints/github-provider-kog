@@ -8,8 +8,6 @@ kind: CustomProperty
 metadata:
   name: test-demo-tier
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

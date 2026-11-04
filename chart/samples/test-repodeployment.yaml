@@ -21,8 +21,6 @@ kind: RepoDeployment
 metadata:
   name: test-demo-deployment
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

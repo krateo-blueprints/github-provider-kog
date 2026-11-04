@@ -9,8 +9,6 @@ kind: Workflow
 metadata:
   name: test-demo-destination-release
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

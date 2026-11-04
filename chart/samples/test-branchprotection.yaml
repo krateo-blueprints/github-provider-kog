@@ -15,8 +15,6 @@ kind: BranchProtection
 metadata:
   name: test-demo-destination-main
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config
