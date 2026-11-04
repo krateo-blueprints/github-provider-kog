@@ -9,8 +9,6 @@ kind: TeamMembership
 metadata:
   name: test-platform-engineering-octocat
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

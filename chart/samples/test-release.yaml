@@ -10,8 +10,6 @@ kind: Release
 metadata:
   name: test-demo-release
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

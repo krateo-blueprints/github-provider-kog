@@ -8,8 +8,6 @@ kind: Autolink
 metadata:
   name: test-demo-destination-jira
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

@@ -23,8 +23,6 @@ kind: CodeSecurityConfig
 metadata:
   name: test-demo-security-baseline
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

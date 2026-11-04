@@ -10,8 +10,6 @@ kind: ActionsVariableRepo
 metadata:
   name: test-demo-registry-var
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

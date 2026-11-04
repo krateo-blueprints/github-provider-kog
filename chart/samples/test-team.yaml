@@ -11,8 +11,6 @@ kind: Team
 metadata:
   name: test-platform-engineering
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

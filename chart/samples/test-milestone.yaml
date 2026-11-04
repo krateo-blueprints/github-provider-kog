@@ -19,8 +19,6 @@ kind: Milestone
 metadata:
   name: test-demo-milestone
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

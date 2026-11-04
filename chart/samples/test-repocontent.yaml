@@ -16,8 +16,6 @@ kind: RepoContent
 metadata:
   name: test-chart-yaml
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

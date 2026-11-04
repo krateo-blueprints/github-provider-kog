@@ -11,8 +11,6 @@ kind: RunnerGroup
 metadata:
   name: test-demo-runners
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

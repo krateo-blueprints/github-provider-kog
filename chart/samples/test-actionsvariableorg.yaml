@@ -11,8 +11,6 @@ kind: ActionsVariableOrg
 metadata:
   name: test-org-registry-var
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

@@ -22,8 +22,6 @@ kind: UserRepository
 metadata:
   name: test-user-repo
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-user-config         # a Configuration whose token belongs to the intended user

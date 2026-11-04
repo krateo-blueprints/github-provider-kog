@@ -11,8 +11,6 @@ kind: AutomatedSecurityFixes
 metadata:
   name: test-demo-destination-dependabot
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

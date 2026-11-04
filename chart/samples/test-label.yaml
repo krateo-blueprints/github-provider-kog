@@ -12,8 +12,6 @@ kind: Label
 metadata:
   name: test-demo-label
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config

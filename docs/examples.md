@@ -52,11 +52,20 @@ bringing it back natively took is recorded in [design-gitref](./design-gitref.md
 
 The chart ships one sample per kind — `chart/samples/test-<kind>.yaml`, lower-cased —
 covering the other 31 kinds as well. Each carries its gotchas in a
-header comment and sets `krateo.io/connector-verbose: "true"`, and every one of them
+header comment, and every one of them
 names the `krateo-blueprints` org and a `demo-destination` repository. Edit those first
 and work in a **scratch org**: several kinds delete the real thing when their CR is
 deleted, and no kind in this chart has ever reconciled against GitHub — the first apply
 is the real test.
+
+The samples no longer enable verbose request logging. The
+`krateo.io/connector-verbose: "true"` annotation is an opt-in **debug aid**: with it on,
+rest-dynamic-controller writes every request *including the body* to the pod log, and this
+chart redacts nothing there (only `secretRef`-resolved values and credential header names are
+redacted — see [usage](./usage.md#verify) for the full warning and the oasgen-provider
+file:lines). So a `RepoWebhook`/`OrgWebhook` `spec.config.secret`, `RepoContent` file content
+and any other spec value would be logged in cleartext. Add it only temporarily, to a single
+non-sensitive CR, and never to a webhook CR that carries a secret.
 
 One `<Kind>Configuration` set serves all of them. `chart/samples/configurations.yaml`
 ships one per kind, each named `github-blueprints-config` and pointing at the same

@@ -16,8 +16,6 @@ kind: OrgRuleset
 metadata:
   name: test-demo-org-protect-main
   namespace: krateo-system
-  annotations:
-    krateo.io/connector-verbose: "true"
 spec:
   configurationRef:
     name: github-blueprints-config
