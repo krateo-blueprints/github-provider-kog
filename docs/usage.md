@@ -420,9 +420,13 @@ spec:
 - **`Environment`'s two `deployment_branch_policy` booleans must disagree** —
   GitHub `422`s if both are true or both false — and `custom_branch_policies: true` is
   what makes a `DeploymentBranchPolicy` possible at all. `reviewers` takes numeric user
-  and team ids, not logins, and is write-only: GitHub returns it nested under
-  `protection_rules`, which this OAS does not model, so a reviewer removed in the UI is
-  not reconciled back.
+  and team ids, not logins. GitHub returns `reviewers`, `wait_timer` and
+  `prevent_self_review` only nested under the `anyOf`-typed `protection_rules` array, so the
+  get verb carries a responseTransform that flattens them back to the top-level PUT shape:
+  they are **observed and reconciled**, and a reviewer removed in the UI is restored. Write
+  `reviewers` sorted by `(type, id)` (the transform sorts them and the comparison is
+  positional). Set `prevent_self_review` only together with `reviewers` — GitHub carries it
+  inside the required-reviewers rule, so it is observable only when reviewers exist.
 
 ### CI/CD — variables, runners, deployment gates
 

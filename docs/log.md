@@ -11,7 +11,33 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
-## 2026-11-04 — release 0.7.2 (appVersion 0.1.8): all 23 ruleset rule types, shared release workflow
+## 2026-11-04 — feat(environment): observe wait_timer / prevent_self_review / reviewers via a responseTransform
+
+`Environment` could SET `wait_timer`, `prevent_self_review` and `reviewers` through the create-or-update
+PUT, but GitHub returns them only nested in the `anyOf`-typed `protection_rules` array, never as
+top-level keys — and oasgen has no anyOf, so the asset omitted it and the three fields were write-only:
+a UI edit was never observed or reverted. This closes that gap the same way `BranchProtection` closes
+its GET/PUT shape asymmetry: a whole-document `responseTransform` on the get verb flattens
+`protection_rules` back into the top-level PUT shape (`wait_timer` int, `prevent_self_review` bool,
+`reviewers` as `[{type, id}]` sorted by `(type, id)`), passing `id` / `node_id` / `name` / `url` /
+`html_url` / `created_at` / `updated_at` / `deployment_branch_policy` through unchanged so the identifier
+and `additionalStatusFields` survive. The three are declared as plain top-level properties in the GET
+response schema (no anyOf), so the generated CRD and the drift comparison see them; `deployment_branch_policy`
+is unchanged.
+
+Absent-rule defaults make a CR converge instead of drift-looping: GitHub returns no rule for a control
+that is off, and its PUT reads an omitted `wait_timer` as 0, omitted `reviewers` as `[]`, omitted
+`prevent_self_review` as false — so the transform normalizes an absent wait_timer rule to `0` and an
+absent required-reviewers rule to `reviewers: []` + `prevent_self_review: false`, matching a CR that
+wrote those explicit values (and a CR that omits a key is never compared on it). One edge, to verify
+live: `prevent_self_review` is carried inside the required-reviewers rule, so it is observable only
+alongside `reviewers`; a CR setting `prevent_self_review: true` with no reviewers may not converge, and
+the asset tells authors to set it only together with reviewers. No oasgen-immutable RD field changed
+(the 7 are byte-identical); the three were already in the PUT body, so the generated spec is unchanged.
+Offline-validated (helm lint, 32/32 render, drift-invariants, preflight-refs, oasgen 0.43→main CRD
+render with 0 errors, and a gojq unit suite covering no-rules / wait-only / reviewers / both /
+branch_policy / absent, with convergence and sort-matters checks). Live round-trip pending on a
+throwaway repo.
 
 Rolls up the three PRs merged since **0.7.1** (#31–#33). `appVersion` moves `0.1.7` → `0.1.8` because
 the trimmed OpenAPI **assets** changed in #32 (the two ruleset assets). The chart `version` is still the

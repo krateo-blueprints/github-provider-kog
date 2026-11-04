@@ -33,17 +33,13 @@ spec:
     # accident of GitHub not happening to return keys with those names. `environment_name` in
     # particular is one rename away from colliding with the response's `name`.
     #
-    # Note the deliberate observability gap it does NOT hide: wait_timer, prevent_self_review
-    # and reviewers are in the updatable set but absent from the top-level GET response (GitHub
-    # nests them under the anyOf-typed `protection_rules` array — see assets/environment.yaml).
-    # The comparator ignores a spec key the response does not carry, so they cannot loop; they
-    # simply are not observed. Someone editing those three settings in the GitHub UI will not be
-    # reverted. deployment_branch_policy IS returned top-level, so it is genuinely reconciled.
-    #
-    # Ownership note: "not compared" is not "safe". Because the whole PUT body is re-sent from
-    # spec, a PUT fired by deployment_branch_policy drift still OVERWRITES out-of-band wait_timer /
-    # prevent_self_review / reviewers from spec — invisibly, since they are write-only. See
-    # docs/configuration.md "Updates send whole values — what a CR owns".
+    # wait_timer, prevent_self_review and reviewers are in the updatable set AND now observed:
+    # GitHub returns them only nested in the anyOf-typed `protection_rules` array (never as
+    # top-level keys), and the get verb's responseTransform below flattens that array back into
+    # the top-level PUT shape before status population and the drift comparison. So an out-of-band
+    # UI edit to any of the three is now seen and reverted, exactly like deployment_branch_policy
+    # (which GitHub already returns top-level). This is the same GET/PUT shape asymmetry
+    # BranchProtection closes with a responseTransform. See assets/environment.yaml for the shape.
     configurationFields: []
     verbsDescription:
       # PUT is create-or-update upstream, so create and update are the same endpoint. Observe
@@ -54,6 +50,44 @@ spec:
       - action: get
         method: GET
         path: /repos/{owner}/{repo}/environments/{environment_name}
+        # GitHub returns wait_timer / prevent_self_review / reviewers ONLY nested inside the
+        # anyOf-typed `protection_rules` array, never as top-level keys, while the PUT sets them at
+        # top level — the same GET/PUT shape asymmetry BranchProtection has. oasgen cannot model an
+        # anyOf array, so this whole-document responseTransform flattens protection_rules back into
+        # the PUT shape at the reconcile chokepoint (the observe GET feeds BOTH status population and
+        # the drift comparison). Everything else — id, node_id, name, url, html_url, created_at,
+        # updated_at, deployment_branch_policy — is passed through unchanged so the identifier and
+        # the additionalStatusFields survive. protection_rules itself is dropped from the output.
+        #
+        #   protection_rules[type=wait_timer].wait_timer                      -> wait_timer (int)
+        #   protection_rules[type=required_reviewers].prevent_self_review     -> prevent_self_review (bool)
+        #   protection_rules[type=required_reviewers].reviewers[]
+        #     {type, reviewer:{id}}                                           -> reviewers: [{type, id}]
+        #   (a branch_policy rule carries nothing the CR sets and is ignored)
+        #
+        # ABSENT-rule defaults make a CR CONVERGE rather than drift-loop. GitHub does not return a
+        # rule for a control that is off, and its PUT reads an omitted wait_timer as 0, omitted
+        # reviewers as [], omitted prevent_self_review as false. So an absent wait_timer rule
+        # normalizes to 0 and an absent required_reviewers rule to reviewers:[] + prevent_self_review:
+        # false — exactly what a CR that wrote those explicit values holds (and a CR that omits a key
+        # is never compared on it). `//` here defaults RAW extractions only, never a normalized value.
+        # reviewers is sorted by (type,id) because array comparison is positional — the asset tells
+        # authors to write it sorted.
+        responseTransform:
+          inline: |
+            {
+              id: .id,
+              node_id: .node_id,
+              name: .name,
+              url: .url,
+              html_url: .html_url,
+              created_at: .created_at,
+              updated_at: .updated_at,
+              deployment_branch_policy: .deployment_branch_policy,
+              wait_timer: (([ (.protection_rules // [])[] | select(.type == "wait_timer") | .wait_timer ])[0] // 0),
+              prevent_self_review: (([ (.protection_rules // [])[] | select(.type == "required_reviewers") | .prevent_self_review ])[0] // false),
+              reviewers: ([ (.protection_rules // [])[] | select(.type == "required_reviewers") | (.reviewers // [])[] | {type: .type, id: .reviewer.id} ] | sort_by(.type, .id))
+            }
       - action: update
         method: PUT
         path: /repos/{owner}/{repo}/environments/{environment_name}
