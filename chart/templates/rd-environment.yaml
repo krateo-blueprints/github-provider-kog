@@ -65,14 +65,24 @@ spec:
         #     {type, reviewer:{id}}                                           -> reviewers: [{type, id}]
         #   (a branch_policy rule carries nothing the CR sets and is ignored)
         #
-        # ABSENT-rule defaults make a CR CONVERGE rather than drift-loop. GitHub does not return a
-        # rule for a control that is off, and its PUT reads an omitted wait_timer as 0, omitted
-        # reviewers as [], omitted prevent_self_review as false. So an absent wait_timer rule
-        # normalizes to 0 and an absent required_reviewers rule to reviewers:[] + prevent_self_review:
-        # false — exactly what a CR that wrote those explicit values holds (and a CR that omits a key
-        # is never compared on it). `//` here defaults RAW extractions only, never a normalized value.
-        # reviewers is sorted by (type,id) because array comparison is positional — the asset tells
-        # authors to write it sorted.
+        # ABSENT-rule defaults make a CR CONVERGE. VERIFIED LIVE 2026-11-03: GitHub's PUT is a MERGE
+        # for protection rules — OMITTING a key keeps the current value — and an EXPLICIT wait_timer:0
+        # REMOVES the wait_timer rule while reviewers:[] REMOVES the required_reviewers rule. So the
+        # transform normalizes an absent wait_timer rule to 0 and an absent required_reviewers rule to
+        # reviewers:[] + prevent_self_review:false, which is exactly the state an explicit 0 / [] / false
+        # produces -> those CRs converge. A CR that OMITS a key never sends it (RDC assembles the body
+        # from spec keys; there is no requestTransform here) and never compares it, so the UI value is
+        # left untouched -- Environment does NOT silently overwrite. `//` defaults RAW extractions only,
+        # never a normalized value. reviewers is sorted by (type,id) because array comparison is
+        # positional -- the asset tells authors to write it sorted.
+        #
+        # ONE non-convergent case, by GitHub's design (not a transform defect): prevent_self_review is
+        # carried INSIDE the required_reviewers rule, so prevent_self_review:true with an empty/absent
+        # reviewers list creates NO rule -- GitHub stores nothing, the transform returns false, and such
+        # a CR re-PUTs forever (idempotent, never converges). It cannot be rejected at admission until
+        # oasgen passes cross-field validation through (oasgen-provider#396, the same blocker as the
+        # BranchProtection checks form). The asset tells authors to set prevent_self_review only with a
+        # non-empty reviewers list.
         responseTransform:
           inline: |
             {

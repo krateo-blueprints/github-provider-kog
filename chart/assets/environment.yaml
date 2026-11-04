@@ -42,11 +42,18 @@ paths:
                 # WRITE THIS LIST SORTED by (type, id) — "Team" sorts before "User", then ascending
                 # id. The get responseTransform observes reviewers back from protection_rules and
                 # sorts them the same way, and array comparison is positional, so an unsorted spec
-                # reports drift on every reconcile and re-PUTs the same list. An empty/omitted list
-                # means no required reviewers; GitHub returns no required_reviewers rule and the
-                # transform normalizes that to [] + prevent_self_review:false, so `reviewers: []`
-                # converges. prevent_self_review is only meaningful (and observable) ALONGSIDE
-                # reviewers — GitHub carries it inside the required_reviewers rule.
+                # reports drift on every reconcile and re-PUTs the same list.
+                #
+                # OMISSION KEEPS, EXPLICIT CLEARS (verified live): omit `reviewers` and GitHub leaves
+                # whatever is configured out-of-band untouched (and the CR does not compare it); send
+                # `reviewers: []` to actively clear it (GitHub removes the required_reviewers rule, the
+                # transform returns [] + prevent_self_review:false, and the CR converges).
+                #
+                # Set `prevent_self_review: true` ONLY together with a non-empty `reviewers` list.
+                # GitHub carries prevent_self_review inside the required_reviewers rule, so with an
+                # empty or absent reviewers list it stores nothing, the transform returns false, and a
+                # CR that set it true re-applies on every reconcile and never converges. Admission
+                # cannot reject that combination until oasgen-provider#396 (CEL passthrough).
                 reviewers:
                   type: array
                   items:
