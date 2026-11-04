@@ -360,14 +360,23 @@ spec:
   type — and, when the type has required keys, *all* of them: flattening the union drops
   GitHub's per-type `required` list, so the CRD cannot enforce it and a partial
   `pull_request` object is a `422`, not a silent ignore. Rules with no parameters are
-  written as a bare `- type:` entry. The modelled set (15 types) was round-trip-verified
-  live on 2026-11-03; the five pattern rules are **not** Enterprise-gated and work on a
-  Team-plan org.
+  written as a bare `- type:` entry (e.g. `creation`, `non_fast_forward`,
+  `license_compliance_scanning`). **All 23 of GitHub's rule types are modelled.** The
+  branch-protection set, `merge_queue` and the five pattern rules were round-trip-verified
+  live on 2026-11-03 (pattern rules are **not** Enterprise-gated — they work on a Team-plan
+  org); the eight newest types (`workflows`, `code_scanning`, `copilot_code_review`,
+  `license_compliance_scanning`, and the four push rules) are modelled from GitHub's current
+  REST schema but their live round-trip was not captured in this session.
 - **`merge_queue` needs a concrete ref.** A ruleset carrying a `merge_queue` rule must set
   `conditions.ref_name` to a non-wildcard ref — `refs/heads/<branch>` or `~DEFAULT_BRANCH`,
   not `~ALL` — or GitHub rejects it with `422 Wildcard ref names are not supported when
   merge queue is enabled`. `tag_name_pattern` likewise belongs on a `target: tag` ruleset
   (GitHub rejects a tag rule in a branch-target ruleset).
+- **The four push rules need `target: push`.** `file_path_restriction`,
+  `max_file_path_length`, `file_extension_restriction` and `max_file_size` are only valid on
+  a ruleset whose `target` is `push`; GitHub `422`s them on a branch- or tag-target ruleset.
+  `workflows` and `code_scanning` take identifiers the author supplies by hand — a workflow
+  by `repository_id` + `path`, a code-scanning tool by name (e.g. `CodeQL`).
 - **Neither ruleset kind has a `ruleset_id` field.** GitHub assigns it on create; the
   provider carries it in `status.id` and binds get/update/delete from there. `OrgRuleset`
   additionally needs `conditions.repository_name` to say which repositories it covers —

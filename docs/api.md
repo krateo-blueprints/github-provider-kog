@@ -477,27 +477,34 @@ above). The whole-value hazard and the sub-controls still left unmodelled are in
   compared element-by-element, in order — list them in a stable order. Extra keys GitHub
   fills into a rule's `parameters` (defaults such as `do_not_enforce_on_create`) are
   ignored, since the comparison walks only keys the CR declares, so a partially-specified
-  rule does not read as drift. The modelled `rules` types are `creation`, `deletion`,
-  `update`, `non_fast_forward`, `required_linear_history`, `required_signatures`,
-  `pull_request`, `required_status_checks`, `required_deployments`, `merge_queue`, and the
-  five pattern rules (`commit_message_pattern`, `commit_author_email_pattern`,
-  `committer_email_pattern`, `branch_name_pattern`, `tag_name_pattern`). Verified live
-  2026-11-03 on a throwaway public repo (since deleted): the parameters a CR sets round-trip
-  identically on GET for all of these — the `rules` array came back in submit order, enum
-  casing was verbatim (`merge_method: SQUASH`, `grouping_strategy: HEADGREEN`, the operators)
-  and pattern strings were stored exactly as sent (regex escapes included), and a second
-  PUT+GET was byte-identical. The defaults GitHub fills for omitted optional keys (e.g. a
-  pattern rule's `negate: false`, `name`) are response-only keys the CR never set, which the
-  comparator skips, so none loops. The five pattern rules are **not** Enterprise-gated — they
-  worked on a Team-plan org. **`merge_queue` constraint:** GitHub `422`s
-  (`Wildcard ref names are not supported when merge queue is enabled`) if the ruleset's
-  `conditions.ref_name` is a wildcard such as `~ALL`; a ruleset carrying a `merge_queue` rule
-  must target a concrete ref (e.g. `refs/heads/main`, or `~DEFAULT_BRANCH`). Still unmodelled
-  (configure in the UI): the product-reference rules (`workflows`, `code_scanning`,
-  `license_compliance_scanning`, `copilot_code_review`) and the Enterprise-only push rules.
-  Order sensitivity also means an out-of-band rule of one of those still-unmodelled types
-  lengthens the array, reads as drift and is deleted by the replacing PUT — the CR owns
-  `rules` wholesale; see [configuration → Updates send whole
+  rule does not read as drift. **All 23 of GitHub's rule types are now modelled** — the nine
+  branch-protection replacements (`creation`, `deletion`, `update`, `non_fast_forward`,
+  `required_linear_history`, `required_signatures`, `pull_request`, `required_status_checks`,
+  `required_deployments`), `merge_queue`, the five pattern rules (`commit_message_pattern`,
+  `commit_author_email_pattern`, `committer_email_pattern`, `branch_name_pattern`,
+  `tag_name_pattern`), and the remaining eight (`workflows`, `code_scanning`,
+  `copilot_code_review`, `license_compliance_scanning`, `file_path_restriction`,
+  `max_file_path_length`, `file_extension_restriction`, `max_file_size`). Nothing is left to
+  be configured only in the UI, so an out-of-band rule is now reverted to the CR's declared
+  set rather than deleted-and-unrecoverable — ordinary declarative management.
+  The branch-protection set, `merge_queue` and the pattern rules were **verified live**
+  2026-11-03 on a throwaway repo (since deleted): the `rules` array came back in submit
+  order, enum casing was verbatim (`merge_method: SQUASH`, `grouping_strategy: HEADGREEN`, the
+  operators) and pattern strings were stored exactly as sent (regex escapes included), and a
+  second PUT+GET was byte-identical; the defaults GitHub fills for omitted optional keys (e.g.
+  a pattern rule's `negate: false`, `name`) are response-only keys the comparator skips, so
+  none loops. The five pattern rules are **not** Enterprise-gated (they worked on a Team-plan
+  org). Usage notes for the eight newest types: a **`merge_queue`** rule's ruleset must target
+  a concrete ref (GitHub `422`s `Wildcard ref names are not supported when merge queue is
+  enabled` on a wildcard such as `~ALL`; use `refs/heads/main` or `~DEFAULT_BRANCH`); the four
+  push rules (`file_path_restriction`, `max_file_path_length`, `file_extension_restriction`,
+  `max_file_size`) require the ruleset's `target: push`; `workflows` and `code_scanning`
+  reference another product by identifier (a workflow by `repository_id` + `path`, a tool by
+  name) that the author must supply by hand. The eight newest types are modelled from GitHub's
+  current REST schema; their live round-trip was **not** captured in this session (creating a
+  throwaway repo was blocked by the environment's permission policy — see the PR for detail),
+  so order/casing for them is schema-asserted, not yet live-verified. The CR owns `rules`
+  wholesale; see [configuration → Updates send whole
   values](./configuration.md#updates-send-whole-values--what-a-cr-owns).
 - **`DeploymentBranchPolicy` cannot change `type`.** The create body is `{name, type}`;
   the update body is `{name}` alone — GitHub cannot move a policy between `branch` and
