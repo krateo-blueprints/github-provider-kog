@@ -11,6 +11,25 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-05 — test(environment): 0.7.3 verified through a controller; sample corrected
+
+The 0.7.3 entry below says no `Environment` CR had run through a controller. One has now: krateo-057, chart
+0.7.3, RDC 0.48.0, one writer, on a throwaway public repo that was deleted after.
+
+- **A CR setting `wait_timer`, `prevent_self_review` and `reviewers` converges:** `Ready=True` with no further
+  updates over 400s.
+- **Drift is reverted:** an out-of-band change to `wait_timer` and `reviewers` was undone in 130s, and the CR
+  then stayed quiet for another 400s.
+- **Weaker evidence, two copies of the test ran together:** a field the CR omits survived an update, and each
+  field reverted on its own. Neither test copy wrote a target value, so only the controller could have
+  restored them, but those arms were not repeated with one writer.
+- **`chart/samples/test-environment.yaml` was wrong for 0.7.3.** Its comment called `reviewers` write-only,
+  and it set `prevent_self_review: true` without reviewers, which re-applies forever. Fixed. No asset changed,
+  so no CRD regenerates; the sample reaches users with the next chart release.
+- **Still not through a controller on 0.7.3:** `Collaborator`, `RepoContent`, `UserRepository`.
+
+`docs/upgrading.md` also gains the cleanup for the `DeploymentConfiguration` CRD the 0.6.0 rename left behind.
+
 ## 2026-11-05 — release 0.7.3 (appVersion 0.1.9): Environment drift, spec-parameter docs
 
 Rolls up the three PRs merged since **0.7.2** (#35–#37). `appVersion` moves `0.1.8` → `0.1.9` because the
