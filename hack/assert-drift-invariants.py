@@ -119,6 +119,48 @@ COMPARESCOPE_INVARIANTS = [
 ]
 
 
+# (template, kind, field, why it is load-bearing)
+#
+# oasgen takes the spec BODY from create but merges PARAMETERS from every verb, so a findby query
+# parameter is a spec field unless a mapping supplies it or excludedSpecFields names
+# it. These entries are what keep them off the CRD (measured by rendering without them on oasgen
+# 0.43.0 and 0.51.0). excludedSpecFields is immutable (#290), but that protects a live CRD, not a
+# fresh install: removing an entry here would ship the field to every new cluster.
+#
+# Checked by text, not YAML: these are Helm templates, so `{{ ... }}` is not parseable.
+LOAD_BEARING_EXCLUSIONS = [
+    ("chart/templates/rd-collaborator.yaml", "Collaborator", "affiliation",
+     "pinned to direct by the verb's static query, which wins over spec: a spec field would be silently ignored"),
+    ("chart/templates/rd-collaborator.yaml", "Collaborator", "per_page",
+     "the paginator owns page size: not a field a CR can use"),
+    ("chart/templates/rd-userrepository.yaml", "UserRepository", "affiliation",
+     "pinned to owner by the verb's static query, which wins over spec: a spec field would be silently ignored"),
+    ("chart/templates/rd-userrepository.yaml", "UserRepository", "sort",
+     "pinned by the verb's static query, which wins over spec: a spec field would be silently ignored"),
+    ("chart/templates/rd-userrepository.yaml", "UserRepository", "direction",
+     "pinned by the verb's static query, which wins over spec: a spec field would be silently ignored"),
+    ("chart/templates/rd-userrepository.yaml", "UserRepository", "per_page",
+     "the paginator owns page size: not a field a CR can use"),
+    ("chart/templates/rd-userrepository.yaml", "UserRepository", "page",
+     "the paginator owns the page cursor: not a field a CR can use"),
+]
+
+
+def excluded_spec_fields(path):
+    """The `- name` items of the excludedSpecFields block, by text."""
+    entries, inside = [], False
+    with open(path) as fh:
+        for raw in fh:
+            ln = raw.split("#", 1)[0].rstrip()
+            if ln.strip() == "excludedSpecFields:":
+                inside = True
+            elif inside and ln.strip():
+                if not ln.strip().startswith("- "):
+                    break
+                entries.append(ln.strip()[2:].strip())
+    return entries
+
+
 def body_properties(asset, doc, path, method):
     """The declared application/json request-body properties of one operation."""
     try:
@@ -162,6 +204,13 @@ def main(root="."):
                 "found %d `inCustomResource: status.name` mapping(s).\n    %s\n"
                 "    This is the #386 fix; a GET/PATCH keyed on spec.name loops on a normalised name."
                 % (template, kind, expected, keyed, why))
+
+    for template, kind, field, why in LOAD_BEARING_EXCLUSIONS:
+        if field not in excluded_spec_fields("%s/%s" % (root, template)):
+            failures.append(
+                "%s: %s no longer lists `%s` in excludedSpecFields, so it becomes a spec field "
+                "(oasgen merges parameters from every verb).\n    %s"
+                % (template, kind, field, why))
 
     for template, kind, required, why in COMPARESCOPE_INVARIANTS:
         with open("%s/%s" % (root, template)) as fh:

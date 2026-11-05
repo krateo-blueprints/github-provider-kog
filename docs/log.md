@@ -11,6 +11,43 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-05 — fix(docs): seven findby `excludedSpecFields` entries are load-bearing, not redundant
+
+The chart stated that oasgen builds the spec from the create operation alone, so a parameter of any
+other verb could never be a spec field, and called the `findby` exclusions redundant no-ops (the
+2026-11-02 entry). Half of that is wrong. `getBaseSchemaForSpec` takes the **body** from create, but
+`addParametersToSpec` loops over every verb, so **parameters merge from all of them**. Authorization
+headers aside, a parameter stays off the spec only if a mapping supplies it (on any verb) or
+`excludedSpecFields` names it.
+
+Measured by removing 9 exclusions from a scratch request and rendering with oasgen-render 0.43.0 and
+0.51.0, with an unmodified render of each as the control. Both versions agree:
+
+| kind | exclusion removed | result |
+|---|---|---|
+| `Collaborator` | `affiliation`, `per_page` | **added to the spec** |
+| `UserRepository` | `affiliation`, `sort`, `direction`, `per_page`, `page` | **added to the spec** |
+| `RepoContent` | `ref` | stays absent (mapped) |
+| `UserRepository` | `owner` | stays absent (mapped) |
+
+So those seven entries are what keep the fields off the CRD. What they protect is the CRD surface, not
+the request. A verb's static `queries` are set before spec is read and win over it, so
+`spec.affiliation: all` would still send `affiliation=direct` (measured with a `BuildCallConfig` test
+at 0.51.0; the order is the same at 0.43.0 and 0.48.0). Dropping an entry would give users a field that
+silently does nothing, and could not reintroduce the false-exists bug the old comments credited it
+with preventing: the static query prevents that. The 15 server-assigned
+ids and `RepoContent`'s `ref` and `UserRepository`'s `owner` are redundant as stated, but because they
+are mapped, not because they are absent from create. oasgen-provider's own test showed the premise was
+wrong: an unmapped required path parameter on `get` only is present and required in the generated
+spec.
+
+**Behaviour does not change.** Of 314 parameters across the 32 kinds, no spec field exists only through
+a non-create verb's parameter, so the wrong belief left nothing accidentally user-settable. The risk
+was to the next kind written from these docs. `docs/configuration.md` now says to exclude or map every
+parameter a user must not set, and `hack/assert-drift-invariants.py` fails if any of the seven entries
+goes. Comments in the Collaborator, RepoContent and UserRepository assets changed, which moves their
+`oasHash`, so those three CRDs regenerate when this ships; a render before and after is identical.
+
 ## 2026-11-04 — feat(environment): observe wait_timer / prevent_self_review / reviewers via a responseTransform
 
 `Environment` could SET `wait_timer`, `prevent_self_review` and `reviewers` through the create-or-update
@@ -336,6 +373,10 @@ RestDefinitions + 32 ConfigMaps, the embedded asset YAML re-parsed); `helm lint`
 `hack/assert-drift-invariants.py` and `hack/preflight-refs.py` all pass.
 
 ## 2026-11-02 — docs: correct the "every parameter becomes a spec field" claim
+
+> **Superseded.** This entry over-corrected: see the 2026-11-05 entry. Parameters do merge from every
+> verb, and the five `UserRepository` and two `Collaborator` findby exclusions it calls redundant are
+> load-bearing. Kept as written because the log is history.
 
 Several comments and docs stated that **every OAS parameter of every verb** becomes a CR spec
 field, and framed each `excludedSpecFields` entry as what keeps a parameter out of the CRD. That is

@@ -196,8 +196,8 @@ documented least loudly.
 
 ### 3.1 `spec.branch` → `?ref` — a request-direction `fieldMapping`, no jq
 
-Declare GitHub's real parameter name in the OAS (a get-only query parameter, so it is never a
-spec field) and relocate the CR's `branch` onto it. `applyFieldMapping`'s `InQuery` branch writes
+Declare GitHub's real parameter name in the OAS (a mapped parameter, so oasgen omits it from the
+spec) and relocate the CR's `branch` onto it. `applyFieldMapping`'s `InQuery` branch writes
 `reqConfiguration.Query["ref"]` directly (`builder/builder.go:359-365`), and a plain
 relocation carries **no** `valueMapping`, so it is nowhere near the dead request-direction jq
 path (`builder/builder.go:348-356`, `default: continue`).
@@ -211,8 +211,8 @@ path (`builder/builder.go:348-356`, `default: continue`).
         - $ref: '#/components/parameters/owner'
         - $ref: '#/components/parameters/repo'
         - $ref: '#/components/parameters/path'
-        # GitHub's own name. A get query parameter, not a create parameter, so it is never a spec
-        # field anyway — excludedSpecFields: [ref] is a redundant no-op kept for immutability. The CR
+        # GitHub's own name. A mapped parameter, which oasgen omits from the spec, so
+        # excludedSpecFields: [ref] is a redundant no-op kept for immutability. The CR
         # expresses the branch once, as spec.branch, and the get verb's fieldMapping relocates it here.
         - name: ref
           in: query
@@ -406,9 +406,9 @@ spec:
       - html_url
     # `ref` is GitHub's query-parameter name for the branch on the get verb. The CR expresses
     # the branch ONCE, as spec.branch (which the PUT/DELETE bodies genuinely take), and the get
-    # verb's fieldMapping relocates it. As a get query parameter, not a create parameter, `ref` is
-    # never a spec field anyway, so this excludedSpecFields entry is a redundant no-op kept for
-    # immutability; it records the intent that authors never face a ref/branch pair to keep in sync.
+    # verb's fieldMapping relocates it. oasgen omits a mapped parameter from the spec, so this
+    # excludedSpecFields entry is a redundant no-op kept for immutability; it records the intent
+    # that authors never face a ref/branch pair to keep in sync.
     # IMMUTABLE once the CRD is generated.
     excludedSpecFields:
       - ref

@@ -94,12 +94,11 @@ paths:
         - $ref: '#/components/parameters/owner'
         - $ref: '#/components/parameters/repo'
         # affiliation and per_page are pinned by the verb's static `queries` in rd-collaborator.yaml.
-        # As query parameters of this findby (list) verb — not create parameters — they are never
-        # spec fields in the first place (oasgen builds the spec from the create operation alone), so
-        # they are not user-settable and their excludedSpecFields entries are redundant no-ops kept
-        # for immutability. That is what prevents a user setting affiliation=all and reintroducing the
-        # false-exists bug described above. They are declared here because this document must describe
-        # the call that is actually made.
+        # oasgen merges parameters from every verb into the spec, so what keeps these two off the
+        # CRD is their excludedSpecFields entries, which are load-bearing. The static query wins
+        # over spec, so it is what keeps affiliation=direct on the wire and the false-exists bug
+        # described above away. They are declared here because this document must describe the
+        # call that is actually made.
         - $ref: '#/components/parameters/affiliation'
         - $ref: '#/components/parameters/per_page'
       responses:

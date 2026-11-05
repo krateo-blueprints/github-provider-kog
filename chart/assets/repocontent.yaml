@@ -67,10 +67,10 @@ paths:
         - $ref: '#/components/parameters/owner'
         - $ref: '#/components/parameters/repo'
         - $ref: '#/components/parameters/path'
-        # GitHub's own query-parameter name for the branch on this verb. As a get query parameter
-        # (not a create parameter) it is never a spec field anyway — oasgen builds the spec from the
-        # create operation alone — so `excludedSpecFields: [ref]` is a redundant no-op kept only for
-        # immutability. What makes the branch work is the get verb's `fieldMapping`
+        # GitHub's own query-parameter name for the branch on this verb. oasgen merges parameters
+        # from every verb into the spec, but omits one that a mapping supplies, so this is not a spec
+        # field and `excludedSpecFields: [ref]` is a redundant no-op kept only for immutability.
+        # What makes the branch work is the get verb's `fieldMapping`
         # (inQuery: ref <- spec.branch). The CR expresses the branch ONCE, as spec.branch (which
         # the PUT/DELETE bodies genuinely take). Without the relocation observe reads the DEFAULT
         # branch, 404s on a `builder/*` file, and the CR sticks "Creating". The plugin used to do

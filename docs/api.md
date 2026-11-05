@@ -162,8 +162,9 @@ Verbs: create on `/orgs/{org}/repos`, get/update on `/repos/{org}/{name}`. There
 delete verb.
 
 `spec` is the **create** request body plus the path/query params — *not* the union of
-both bodies. oasgen-provider builds it from the create action alone
-(`getBaseSchemaForSpec` hardcodes it) and then adds parameters. Two consequences worth
+both bodies. oasgen-provider takes the body from the create action alone
+(`getBaseSchemaForSpec` hardcodes it) and then adds the parameters of every verb. Two
+consequences worth
 stating, because both have been got wrong here before: `default_branch` and `archived`
 live in the PATCH body only, so they are **not** spec fields and cannot be set on the CR
 at all; and removing a field from the PATCH body does not remove it from the CRD, which

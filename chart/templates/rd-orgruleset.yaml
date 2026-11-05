@@ -21,12 +21,12 @@ spec:
       - enforcement
       - created_at
       - updated_at
-    # ruleset_id is a path parameter on get/update/delete only, never a create parameter — and
-    # oasgen builds the spec from the create operation alone (getBaseSchemaForSpec) — so it is not a
-    # spec field to begin with. The excludedSpecFields entry below is a redundant no-op (oasgen warns
-    # it is not in the schema), kept because excludedSpecFields is oasgen-immutable (#290) and it
-    # records the intent that the id is never author-supplied; get/update/delete source the path
-    # parameter from status.id via the requestFieldMapping below.
+    # ruleset_id is a path parameter on get/update/delete only. oasgen merges parameters from every
+    # verb into the spec, but omits one that a mapping supplies, and the requestFieldMapping below
+    # supplies this one, so it is not a spec field. The excludedSpecFields entry below is a
+    # redundant no-op (oasgen warns it is not in the schema), kept because excludedSpecFields is
+    # oasgen-immutable (#290) and it records the intent that the id is never author-supplied;
+    # get/update/delete source the path parameter from status.id via the requestFieldMapping below.
     excludedSpecFields:
       - ruleset_id
     compareScope: updatable

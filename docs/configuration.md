@@ -43,11 +43,10 @@ follows is the mapping mechanics.
 Three patterns recur across the set and are worth reading once:
 
 - **Server-assigned identifiers.** When GitHub assigns the item key on create, that key is a
-  path parameter on the item verbs only — never a create parameter — so oasgen (which builds the
-  spec from the create operation alone) never makes it a spec field, and each item verb sources it
-  from status via `requestFieldMapping`. The matching `excludedSpecFields` entry is a redundant
-  no-op, kept because `excludedSpecFields` is immutable (#290) and it records that the key is never
-  author-supplied. That is
+  path parameter on the item verbs only, and each item verb sources it from status via
+  `requestFieldMapping`. oasgen omits a mapped parameter from the spec entirely, so the matching
+  `excludedSpecFields` entry is a redundant no-op, kept because `excludedSpecFields` is immutable
+  (#290) and it records that the key is never author-supplied. That is
   `Release`'s `release_id` / `status.id` shape, shared by `Milestone`, `Issue`,
   `RepoWebhook`, `OrgWebhook`, `DeployKey`, `Autolink`, `RunnerGroup`,
   `DeploymentBranchPolicy`, `RepoRuleset`, `OrgRuleset`, `CodeSecurityConfig` and
@@ -57,11 +56,18 @@ Three patterns recur across the set and are worth reading once:
   `create` and `update` name the same method and path: `Collaborator`, `OrgMembership`,
   `TeamMembership`, `TeamRepo`, `Environment`, `CustomProperty` and `BranchProtection`
   all declare one method and one path for both.
-- **Only the create operation's parameters are spec fields.** oasgen builds the spec from the
-  create operation alone — its body plus its own path/query parameters — so a parameter that
-  appears only on the other verbs is never a spec field. A non-create path parameter is instead
-  filled by name from a same-named spec field (the one the create operation already produced), or
-  sourced from status via a mapping. That is why several assets rename parameters so the
+- **The spec is the create body plus the parameters of every verb.** oasgen takes the body from
+  the create operation alone, then merges in the parameters of every verb. Authorization headers
+  aside, a parameter stays off the spec only if a request-direction mapping supplies it (on any
+  verb) or `excludedSpecFields` names it. So a query parameter of a `findby` or `get` verb becomes a
+  spec field unless it is excluded or mapped, and that exclusion is load-bearing, not a formality:
+  `Collaborator`'s `affiliation`/`per_page` and `UserRepository`'s `affiliation`/`sort`/`direction`/
+  `per_page`/`page` stay off the CRD only because of theirs. A verb's static `queries` win over
+  spec, so a pinned parameter left unexcluded becomes a field that is silently ignored, while one
+  not pinned is sent as the user set it. **When adding a kind, exclude or map every parameter a user
+  must not set.** A non-create path parameter is filled by name from a
+  same-named spec field, or sourced from status via a mapping. That is why several assets rename
+  parameters so the
   create-derived fields can fill the item paths (see `Repository`'s `org`/`name` below, and
   `CustomProperty`'s `property_name`), and why a server-assigned id that no create field can supply
   is sourced from status instead.
