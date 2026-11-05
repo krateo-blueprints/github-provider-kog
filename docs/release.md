@@ -31,8 +31,11 @@ the restoration path are in the [log](./log.md) and in
 ## Steps
 
 ```console
-$ git tag X.Y.Z && git push origin X.Y.Z
+$ git tag -a X.Y.Z -m "X.Y.Z: <summary>" && git push origin X.Y.Z
 ```
+
+Use an **annotated** tag. On 2026-11-05 a lightweight `0.7.3` tag started no workflow in 14 minutes, while
+the same commit tagged with `-a` started `release-oci` within seconds. Every earlier release was annotated.
 
 Then verify the workflow went green and the chart exists:
 
