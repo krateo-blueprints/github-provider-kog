@@ -18,12 +18,12 @@ spec:
       - html_url
       - upload_url
       - created_at
-    # release_id is a path parameter on get/update/delete only, never a create parameter — and
-    # oasgen builds the spec from the create operation alone (getBaseSchemaForSpec) — so it is not a
-    # spec field to begin with. The excludedSpecFields entry below is a redundant no-op (oasgen warns
-    # it is not in the schema), kept because excludedSpecFields is oasgen-immutable (#290) and it
-    # records the intent that the id is never author-supplied; the requestFieldMapping entries below
-    # supply the path parameter from status.id instead.
+    # release_id is a path parameter on get/update/delete only. oasgen merges parameters from every
+    # verb into the spec, but omits one that a mapping supplies, and the requestFieldMapping below
+    # supplies this one, so it is not a spec field. The excludedSpecFields entry below is a
+    # redundant no-op (oasgen warns it is not in the schema), kept because excludedSpecFields is
+    # oasgen-immutable (#290) and it records the intent that the id is never author-supplied; the
+    # requestFieldMapping entries below supply the path parameter from status.id instead.
     excludedSpecFields:
       - release_id
     # `updatable` compares exactly the fields the PATCH body can express — tag_name,

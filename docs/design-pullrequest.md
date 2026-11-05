@@ -258,15 +258,15 @@ spec:
       - number
       - html_url
       - state
-    # pull_number is a path parameter on get/update only, never a create parameter — and oasgen
-    # builds the spec from the create operation alone — so it is not a spec field to begin with;
-    # the excludedSpecFields entry below is a redundant no-op kept for immutability. get/update
+    # pull_number is a path parameter on get/update only. oasgen merges parameters from every verb
+    # into the spec, but omits one that a mapping supplies, so it is not a spec field and the
+    # excludedSpecFields entry below is a redundant no-op kept for immutability. get/update
     # source the path parameter from status.number via the requestFieldMapping below.
     excludedSpecFields:
       - pull_number
     # Compare exactly what the PATCH body can express. The CRD spec is built from the CREATE
-    # body plus the create operation's own path/query parameters (getBaseSchemaForSpec hardcodes
-    # the create action), so of the PATCH's four properties only title/body/base are spec fields —
+    # body (getBaseSchemaForSpec hardcodes the create action) plus parameters merged from every
+    # verb, so of the PATCH's four properties only title/body/base are spec fields —
     # `state` is not, because it lives in the PATCH body only — and the
     # effective compared set is {title, body, base}: all three are properties of the GET
     # response and all three are fixable by the PATCH.

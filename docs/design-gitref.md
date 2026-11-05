@@ -590,9 +590,9 @@ Traps specific to this kind, in the order they bite:
    named `ref` it auto-populates from `spec.ref` (`builder.go:441-446`), `IsResourceKnown`
    returns true, and `findby` is never called. It must be a distinct name (`short_ref`) so the get
    path parameter does not auto-populate from a spec field — it is sourced from status instead.
-   `short_ref` is a get/update/delete path parameter, never a create parameter, so it is not a spec
-   field regardless; the `excludedSpecFields: [short_ref]` entry is a belt-and-suspenders no-op
-   recording that it is never author-supplied.
+   `short_ref` is a mapped get/update/delete path parameter, which oasgen omits from the spec; the
+   `excludedSpecFields: [short_ref]` entry is a belt-and-suspenders no-op recording that it is never
+   author-supplied.
 8. **`identifiers` and `additionalStatusFields` are immutable**
    (`types.go:493, 497`, `self == oldSelf`). Iterating on the status shape means deleting and
    recreating the RestDefinition, which takes the generated CRD and every `GitRef` CR with it.

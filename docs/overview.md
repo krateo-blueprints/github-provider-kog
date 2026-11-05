@@ -205,8 +205,8 @@ RestDefinition expresses more than a path table, and the quirks that would other
 need a proxy are handled at the mapping layer:
 
 - **Server-assigned identifiers.** An id the author cannot know is a path parameter on the item
-  verbs only, never a create parameter, so oasgen (which builds the spec from the create operation
-  alone) never makes it a spec field; `requestFieldMapping` sources it from status instead —
+  verbs only, and `requestFieldMapping` sources it from status. oasgen omits a mapped parameter
+  from the spec entirely —
   `hook_id`, `ruleset_id`, `release_id`, `runner_group_id`, `branch_policy_id`,
   `milestone_number`, `issue_number`, `team_slug`. The matching `excludedSpecFields` entry is a
   redundant no-op kept for immutability (#290).

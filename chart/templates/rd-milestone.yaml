@@ -24,13 +24,13 @@ spec:
       - due_on
       - open_issues
       - closed_issues
-    # milestone_number is a path parameter on get/update/delete only, never a create parameter —
-    # and oasgen builds the spec from the create operation alone (getBaseSchemaForSpec) — so it is
-    # not a spec field to begin with. The excludedSpecFields entry below is a redundant no-op (oasgen
-    # warns it is not in the schema), kept because excludedSpecFields is oasgen-immutable (#290) and
-    # it records the intent that the number is never author-supplied; get/update/delete source the
-    # path parameter from status.number via the requestFieldMapping below. Same shape as
-    # PullRequest's pull_number.
+    # milestone_number is a path parameter on get/update/delete only. oasgen merges parameters from
+    # every verb into the spec, but omits one that a mapping supplies, and the requestFieldMapping
+    # below supplies this one, so it is not a spec field. The excludedSpecFields entry below is a
+    # redundant no-op (oasgen warns it is not in the schema), kept because excludedSpecFields is
+    # oasgen-immutable (#290) and it records the intent that the number is never author-supplied;
+    # get/update/delete source the path parameter from status.number via the requestFieldMapping
+    # below. Same shape as PullRequest's pull_number.
     excludedSpecFields:
       - milestone_number
     # DELIBERATE, and load-bearing rather than cosmetic: this kind HAS a create-only field.
