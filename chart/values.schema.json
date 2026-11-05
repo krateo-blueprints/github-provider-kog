@@ -6,7 +6,7 @@
     "resourceGroup": {
       "type": "string",
       "default": "github.krateo.io",
-      "description": "The API group every generated CRD lands under (29 resource kinds + a <Kind>Configuration auth kind for each)."
+      "description": "The API group every generated CRD lands under: each resource kind plus a <Kind>Configuration auth kind for it."
     },
     "global": {
       "type": "object",
