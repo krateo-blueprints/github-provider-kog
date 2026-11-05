@@ -349,6 +349,10 @@ kubectl get restdefinition github-provider-kog-gitref github-provider-kog-repode
   -o jsonpath='{range .items[*]}{.metadata.name}: ann={.metadata.annotations.meta\.helm\.sh/release-name} mgdby={.metadata.labels.app\.kubernetes\.io/managed-by}{"\n"}{end}'
 ```
 
+From oasgen-provider 0.52.0 the `RestDefinition`'s `Ready` leaves `True` while its CRD is regenerating, so the
+`Ready` check above is a real gate. Below 0.52.0 it can read `True` during regeneration, so rely on the
+`kubectl get crd` line there.
+
 **5. Unpause the owning CR compositions — self-heal re-renders the CRs.** Only after step 4 confirms the
 CRD is served at `[head, base]` (otherwise the re-rendered CRs would hit a missing CRD). This is the 17
 `BuilderPublish` on 057; the github-provider-kog composition was already unpaused in step 4. First

@@ -11,6 +11,36 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-05 — release 0.7.3 (appVersion 0.1.9): Environment drift, spec-parameter docs
+
+Rolls up the three PRs merged since **0.7.2** (#35–#37). `appVersion` moves `0.1.8` → `0.1.9` because the
+trimmed OpenAPI **assets** changed in #35 and #36. The chart `version` is still the release tag. No new
+kinds; the count stays **32**.
+
+- **#35: `Environment` observes `wait_timer`, `prevent_self_review` and `reviewers`.** They were write-only,
+  so a UI edit was never seen or reverted. See the dated entry below, including the one non-convergent case.
+- **#36: seven `findby` exclusions are documented as load-bearing.** Comments and docs only.
+- **#37: the stale kind count is gone from the `resourceGroup` description.** It said 29, and it also appears
+  in the composition CRD's field description. That description is the only change to the composition CRD.
+
+This entry also restores the 0.7.2 release heading, which #35 overwrote.
+
+Upgrade notes for this roll:
+
+- **Plain `helm upgrade` from 0.7.2, no migration.** None of the oasgen-immutable fields moved on any of the
+  32 kinds, and `Environment` is the only `RestDefinition` whose spec changed (its get `responseTransform`).
+- **Four OpenAPI documents changed:** `Collaborator`, `Environment`, `RepoContent` and `UserRepository`. Their
+  `oasHash` moves, so oasgen regenerates those four CRDs. Rendered with oasgen-render 0.51.0 and 0.52.0, all
+  32 CRD specs, all 32 Configuration CRD specs and the findings match 0.7.2, so no schema change is expected.
+  That is a render result, not a reading of a stored CRD.
+- **`Environment` CRs now revert out-of-band changes to fields they set.** A CR that sets `wait_timer`,
+  `prevent_self_review` or `reviewers` is compared against GitHub on those fields, so a UI edit is overwritten
+  on the next update. A CR that omits a field still leaves it alone.
+- **`prevent_self_review: true` without `reviewers` re-applies forever,** by GitHub's design. Set it only with
+  a non-empty `reviewers` list.
+- **Not tested end to end:** the transform was verified live against GitHub, but no `Environment` CR has run
+  through a controller on this chart version.
+
 ## 2026-11-05 — fix(docs): seven findby `excludedSpecFields` entries are load-bearing, not redundant
 
 The chart stated that oasgen builds the spec from the create operation alone, so a parameter of any
@@ -85,6 +115,8 @@ No oasgen-immutable RD field changed (the 7 are byte-identical); the three were 
 so the generated spec is unchanged. Offline-validated: helm lint, 32/32 render, drift-invariants,
 preflight-refs, oasgen CRD render (0 errors, no anyOf choke), and a gojq unit suite (no-rules / wait-only
 / reviewers User+Team unsorted / both / branch_policy / absent) with convergence and sort-matters checks.
+
+## 2026-11-04 — release 0.7.2 (appVersion 0.1.8): all 23 ruleset rule types, shared release workflow
 
 Rolls up the three PRs merged since **0.7.1** (#31–#33). `appVersion` moves `0.1.7` → `0.1.8` because
 the trimmed OpenAPI **assets** changed in #32 (the two ruleset assets). The chart `version` is still the
