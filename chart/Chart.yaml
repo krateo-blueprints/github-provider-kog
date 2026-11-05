@@ -12,7 +12,7 @@ type: application
 version: CHART_VERSION
 # No provider image is shipped (the git-write kinds are OAS-only; oasgen spawns the
 # rest-dynamic-controller). appVersion tracks the OpenAPI/mapping revision.
-appVersion: "0.1.8"
+appVersion: "0.1.9"
 
 keywords:
   - krateo
