@@ -11,6 +11,20 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-06 — PullRequest findby read page 2 on a cluster
+
+The 2026-11-02 pagination fix was checked by render and dry-run only. This run tested it on
+krateo-057 with rest-dynamic-controller 0.48.0, against a throwaway repository with 105 pull
+requests, so `per_page=100` left #1 to #5 on page 2.
+
+- **Page 2:** a `PullRequest` CR with no `status.number`, whose PR exists only on page 2, adopted
+  #2 in under 20 seconds. A control CR on page 1 adopted #104.
+- **No write:** the repository stayed at 105 PRs, and neither PR's `updated_at` moved.
+- **Stable:** both CRs were still `Synced=True` after the next poll, about 3 minutes later.
+
+This also covers recovery by `head` and `base`, using a new CR rather than one that lost its
+status. It does not cover running out of `maxPages`, or a list changing during the walk.
+
 ## 2026-11-06 — feat: a second chart for the publishing Configurations
 
 No chart created the `RepositoryConfiguration` and `PullRequestConfiguration` that builder
