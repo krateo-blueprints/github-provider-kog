@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "RepoDeployment") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -84,3 +85,4 @@ spec:
         requestFieldMapping:
           - inPath: deployment_id
             inCustomResource: status.id
+{{- end }}

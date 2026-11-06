@@ -43,9 +43,9 @@ itself.
 
 Four facts hold across the whole set:
 
-- **All 32 are always installed.** The chart has no per-kind toggle, and each RestDefinition
-  runs one controller pod whether or not a CR of its kind exists
-  ([overview](./overview.md)).
+- **All 32 are installed by default.** Each RestDefinition runs one controller pod whether
+  or not a CR of its kind exists, so `kinds` lets an install choose which ones render
+  ([configuration](./configuration.md)).
 - **Every one of the 32 is native**, calling `api.github.com` directly. The chart renders
   32 ConfigMaps + 32 RestDefinitions and ships **no runtime component** — no Deployment,
   no Service, no image, no proxy ([overview](./overview.md)).

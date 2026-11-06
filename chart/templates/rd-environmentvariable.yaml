@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "EnvironmentVariable") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -45,3 +46,4 @@ spec:
       - action: delete
         method: DELETE
         path: /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}
+{{- end }}

@@ -11,6 +11,24 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-06 — feat: choose which kinds render
+
+Every kind runs a controller pod, so a child Krateo with a 100-pod quota could not fit the chart and still
+publish through the builders. `registerOnly` was not the answer: without the `github.krateo.io` group every
+default `BuilderPublish` fails at render. The new `kinds` value lists the kinds to render, and
+`kinds: [Repository, PullRequest]` takes the provider from 33 pods to 3.
+
+- **The default changes nothing.** `kinds` is empty, and the render is byte-identical to published 0.7.3.
+- **Empty means all** because a default of 32 names would be stored on the composition and would hide any kind
+  a later chart adds.
+- **Verified:** render of the default, an explicit empty list and the two-kind list, where both RestDefinitions
+  and ConfigMaps equal 0.7.3's; an unknown name fails the schema; core-provider's generator gives a CRD with
+  the 32-name enum and no warnings, and it passes the API server's own CRD validation.
+- **Not yet verified:** a composition on a cluster using the list, and removing a kind from a running install.
+  The removal note in `configuration` comes from reading oasgen-provider, not from a run.
+- `hack/assert-kinds.py` runs in CI: nothing else ties the guard in each template to its Kind or to the
+  schema enum.
+
 ## 2026-11-06 — docs: a RestDefinition is not free
 
 `values.yaml`, `overview`, `index` and `configuration` said a RestDefinition costs nothing until a CR of its

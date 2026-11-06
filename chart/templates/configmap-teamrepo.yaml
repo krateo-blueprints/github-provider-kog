@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "TeamRepo") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,3 +12,4 @@ data:
   # template action.
   teamrepo.yaml: |
 {{ .Files.Get "assets/teamrepo.yaml" | indent 4 }}
+{{- end }}

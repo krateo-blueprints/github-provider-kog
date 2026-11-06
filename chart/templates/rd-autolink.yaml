@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "Autolink") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -60,3 +61,4 @@ spec:
         requestFieldMapping:
           - inPath: autolink_id
             inCustomResource: status.id
+{{- end }}

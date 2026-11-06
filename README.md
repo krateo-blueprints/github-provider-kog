@@ -137,7 +137,7 @@ $ helm upgrade --install github-provider-kog ./chart --namespace krateo-system
 
 ## Configure
 
-The chart surface is one scalar, `resourceGroup` (default `github.krateo.io`) — the API
+The chart surface is two values: `kinds`, which picks the kinds to render (default all 32, each one a controller pod), and `resourceGroup` (default `github.krateo.io`) — the API
 group the generated CRDs land under. Everything else is fixed mapping in `chart/assets/`
 and `chart/templates/`.
 

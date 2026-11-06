@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "TeamMembership") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -43,3 +44,4 @@ spec:
       - action: delete
         method: DELETE
         path: /orgs/{org}/teams/{team_slug}/memberships/{username}
+{{- end }}

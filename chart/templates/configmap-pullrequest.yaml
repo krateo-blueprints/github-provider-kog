@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "PullRequest") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,3 +11,4 @@ data:
   # to resolve. A leftover `tpl` would be harmless, a leftover `servers:` would be fatal.
   pullrequest.yaml: |
 {{ .Files.Get "assets/pullrequest.yaml" | indent 4 }}
+{{- end }}

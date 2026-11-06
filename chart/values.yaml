@@ -7,11 +7,16 @@
 # image in this chart.
 #
 # When installed as a Krateo component, the CDC generates this chart's CRD from
-# values.schema.json — which declares ONLY this single top-level scalar (a scalar
-# default materializes cleanly in the component CR; nested-object toggles would not).
+# values.schema.json, so keep values flat: a scalar or a list default materializes
+# cleanly in the component CR; nested-object toggles would not.
 
 # The API group every generated CRD lands under: each resource kind plus a
-# <Kind>Configuration auth kind for it. All of them are always installed; the chart has
-# no per-kind toggle. Each RestDefinition runs one rest-dynamic-controller pod, whether or
-# not a CR of its kind exists, so an install runs 32 controller pods.
+# <Kind>Configuration auth kind for it.
 resourceGroup: github.krateo.io
+
+# Which kinds to render, by Kind name. Empty renders all 32. Each RestDefinition runs one
+# rest-dynamic-controller pod, whether or not a CR of its kind exists, so this is what sets the
+# provider's pod count. A child Krateo that only publishes through the builders needs:
+#   kinds: [Repository, PullRequest]
+# Before removing a kind from a running install, delete its CRs. See docs/configuration.md.
+kinds: []

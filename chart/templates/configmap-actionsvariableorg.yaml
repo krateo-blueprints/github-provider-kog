@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "ActionsVariableOrg") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,3 +11,4 @@ data:
   # so the asset is copied verbatim and contains no template action.
   actionsvariableorg.yaml: |
 {{ .Files.Get "assets/actionsvariableorg.yaml" | indent 4 }}
+{{- end }}

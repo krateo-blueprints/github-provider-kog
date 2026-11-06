@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "Repository") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -102,3 +103,4 @@ spec:
     # can delete in GitHub; a destroyed one is not recoverable from here. For a blueprint
     # DESTINATION repo, "removing the CR should never remove the code" is the right default. Restore
     # the verb only alongside the #125 guard, and only with a per-CR opt-in.
+{{- end }}

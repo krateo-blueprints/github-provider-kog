@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "RepoDeployment") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,3 +9,4 @@ data:
   # every verb goes straight to api.github.com, and the asset contains no template action.
   repodeployment.yaml: |
 {{ .Files.Get "assets/repodeployment.yaml" | indent 4 }}
+{{- end }}

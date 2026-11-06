@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "Workflow") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -72,3 +73,4 @@ spec:
       - action: delete
         method: PUT
         path: /repos/{owner}/{repo}/actions/workflows/{workflow_id}/disable
+{{- end }}

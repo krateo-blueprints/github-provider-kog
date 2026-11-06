@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "BranchProtection") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,3 +12,4 @@ data:
   # rd-branchprotection.yaml — so the asset is copied verbatim and contains no template action.
   branchprotection.yaml: |
 {{ .Files.Get "assets/branchprotection.yaml" | indent 4 }}
+{{- end }}

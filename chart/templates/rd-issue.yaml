@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "Issue") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -66,3 +67,4 @@ spec:
         requestFieldMapping:
           - inPath: issue_number
             inCustomResource: status.number
+{{- end }}

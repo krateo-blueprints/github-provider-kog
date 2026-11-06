@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "ActionsVariableRepo") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -51,3 +52,4 @@ spec:
       - action: delete
         method: DELETE
         path: /repos/{owner}/{repo}/actions/variables/{name}
+{{- end }}

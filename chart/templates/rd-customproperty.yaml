@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "CustomProperty") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -39,3 +40,4 @@ spec:
       - action: delete
         method: DELETE
         path: /orgs/{org}/properties/schema/{property_name}
+{{- end }}

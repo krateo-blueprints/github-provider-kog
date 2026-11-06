@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "RunnerGroup") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -79,3 +80,4 @@ spec:
         requestFieldMapping:
           - inPath: runner_group_id
             inCustomResource: status.id
+{{- end }}

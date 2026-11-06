@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "GitRef") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,3 +11,4 @@ data:
   # file to inject the plugin Service URL via `webServiceUrl`; that mechanism is gone.)
   gitref.yaml: |
 {{ .Files.Get "assets/gitref.yaml" | indent 4 }}
+{{- end }}

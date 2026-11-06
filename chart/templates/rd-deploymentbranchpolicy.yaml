@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "DeploymentBranchPolicy") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -57,3 +58,4 @@ spec:
         requestFieldMapping:
           - inPath: branch_policy_id
             inCustomResource: status.id
+{{- end }}

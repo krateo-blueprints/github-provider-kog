@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "OrgMembership") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,3 +10,4 @@ data:
   # Only the plugin-backed kinds need `tpl`.
   orgmembership.yaml: |
 {{ .Files.Get "assets/orgmembership.yaml" | indent 4 }}
+{{- end }}

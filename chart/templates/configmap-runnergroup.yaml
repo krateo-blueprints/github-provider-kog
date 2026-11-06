@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "RunnerGroup") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,3 +11,4 @@ data:
   # so the asset is copied verbatim and contains no template action.
   runnergroup.yaml: |
 {{ .Files.Get "assets/runnergroup.yaml" | indent 4 }}
+{{- end }}
