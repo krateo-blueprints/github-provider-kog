@@ -1,0 +1,15 @@
+{{- range $kind := list "RepositoryConfiguration" "PullRequestConfiguration" }}
+---
+apiVersion: {{ $.Values.resourceGroup }}/v1alpha1
+kind: {{ $kind }}
+metadata:
+  name: {{ $.Values.configurationName }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: {{ $.Values.secretName }}
+        namespace: {{ $.Release.Namespace }}
+        key: {{ $.Values.secretKey }}
+{{- end }}

@@ -11,6 +11,24 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-06 — feat: a second chart for the publishing Configurations
+
+No chart created the `RepositoryConfiguration` and `PullRequestConfiguration` that builder
+publishing needs. The ones on krateo-057 were applied by hand, so a fresh install or a child
+Krateo did not get them. They can't go in the main chart, because their CRDs don't exist until
+oasgen-provider has processed its RestDefinitions, and a kind with no CRD can't be rendered.
+`github-provider-kog-config` carries them as a separate component, which the installer holds
+back with `deps` and `requiresApiGroups`.
+
+- **Same repo, same tag.** The shared release workflow publishes every first-class chart, and
+  the two charts are coupled by the auth scheme in `chart/assets`.
+- **Verified:** the render equals both live objects on krateo-057 on apiVersion, name, namespace
+  and spec; core-provider's generator gives a CRD with no warnings, and it passes the API
+  server's CRD validation; `hack/assert-config-chart.py` fails on a kind `chart/` doesn't have
+  and on a non-bearer asset.
+- **Not yet verified:** the chart through a composition on any cluster, and taking over objects
+  that were applied by hand.
+
 ## 2026-11-06 — feat: choose which kinds render
 
 Every kind runs a controller pod, so a child Krateo with a 100-pod quota could not fit the chart and still

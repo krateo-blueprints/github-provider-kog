@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "resourceGroup": {
+      "type": "string",
+      "default": "github.krateo.io",
+      "description": "The API group of the Configuration kinds. Must match github-provider-kog's resourceGroup."
+    },
+    "configurationName": {
+      "type": "string",
+      "default": "github-blueprints-config",
+      "description": "The name both Configurations carry. builder-publish references this name by default."
+    },
+    "secretName": {
+      "type": "string",
+      "default": "git-provider-credentials",
+      "description": "The Secret holding the GitHub token, in the release namespace. This chart does not create it."
+    },
+    "secretKey": {
+      "type": "string",
+      "default": "token",
+      "description": "The key in that Secret that holds the token."
+    },
+    "global": {
+      "type": "object",
+      "title": "Global values",
+      "description": "Helm global values (injected by the chart-inspector / when used as a subchart)."
+    }
+  }
+}
