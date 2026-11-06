@@ -12,5 +12,6 @@
 
 # The API group every generated CRD lands under: each resource kind plus a
 # <Kind>Configuration auth kind for it. All of them are always installed; the chart has
-# no per-kind toggle, because a RestDefinition costs nothing until a CR exists.
+# no per-kind toggle. Each RestDefinition runs one rest-dynamic-controller pod, whether or
+# not a CR of its kind exists, so an install runs 32 controller pods.
 resourceGroup: github.krateo.io

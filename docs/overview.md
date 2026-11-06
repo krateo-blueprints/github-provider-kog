@@ -111,8 +111,13 @@ oasgen-provider deploys per kind, which are not this chart's.
 
 Every generated CRD lands under `resourceGroup` (default `github.krateo.io`), the
 chart's single value ([configuration](./configuration.md)). There is no per-kind toggle:
-all 32 RestDefinitions are always installed, because a RestDefinition costs nothing
-until a CR of its kind exists.
+all 32 RestDefinitions are always installed.
+
+**Size for 33 pods.** Each RestDefinition runs one `rest-dynamic-controller` pod, whether
+or not a CR of its kind exists, and the composition adds its own controller pod. On
+krateo-057, 32 controllers run while only `Repository` and `PullRequest` have resource
+CRs. A namespace pod quota counts all of them, and a controller the quota refuses leaves
+its kind with a CRD that nothing reconciles.
 
 ## How oasgen-provider turns this into live kinds
 

@@ -27,9 +27,10 @@ installed as a Krateo component the CDC derives the CompositionDefinition CRD fr
 schema, and a scalar default materializes cleanly in the component CR (nested-object
 toggles would not) ([api](./api.md)).
 
-There is **no per-kind toggle**. All 32 RestDefinitions are always installed; a
-RestDefinition costs nothing until a CR of its kind exists, and a per-kind switch would
-mean nested-object values the CDC cannot materialize.
+There is **no per-kind toggle**. All 32 RestDefinitions are always installed, and each one
+runs a controller pod whether or not a CR of its kind exists
+([overview](./overview.md)). A per-kind switch would mean nested-object values the CDC
+cannot materialize.
 
 ## The RestDefinition mappings
 
