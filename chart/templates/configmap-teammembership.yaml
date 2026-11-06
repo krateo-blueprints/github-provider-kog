@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "TeamMembership") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,3 +12,4 @@ data:
   # template action.
   teammembership.yaml: |
 {{ .Files.Get "assets/teammembership.yaml" | indent 4 }}
+{{- end }}

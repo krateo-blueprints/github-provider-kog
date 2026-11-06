@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "AutomatedSecurityFixes") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,3 +11,4 @@ data:
   # api.github.com — so the asset is copied verbatim and contains no template action.
   automatedsecurityfixes.yaml: |
 {{ .Files.Get "assets/automatedsecurityfixes.yaml" | indent 4 }}
+{{- end }}

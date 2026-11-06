@@ -110,14 +110,15 @@ built or pulled. The only workloads in play are the `rest-dynamic-controller`s
 oasgen-provider deploys per kind, which are not this chart's.
 
 Every generated CRD lands under `resourceGroup` (default `github.krateo.io`), the
-chart's single value ([configuration](./configuration.md)). There is no per-kind toggle:
-all 32 RestDefinitions are always installed.
+chart's `resourceGroup` value ([configuration](./configuration.md)). All 32 kinds render
+by default, and `kinds` narrows that to a chosen list.
 
-**Size for 33 pods.** Each RestDefinition runs one `rest-dynamic-controller` pod, whether
-or not a CR of its kind exists, and the composition adds its own controller pod. On
-krateo-057, 32 controllers run while only `Repository` and `PullRequest` have resource
-CRs. A namespace pod quota counts all of them, and a controller the quota refuses leaves
-its kind with a CRD that nothing reconciles.
+**Size for one pod per kind, plus one.** Each RestDefinition runs one
+`rest-dynamic-controller` pod, whether or not a CR of its kind exists, and the composition
+adds its own controller pod: 33 pods by default. On krateo-057, 32 controllers run while
+only `Repository` and `PullRequest` have resource CRs. A namespace pod quota counts all of
+them, and a controller the quota refuses leaves its kind with a CRD that nothing
+reconciles. With `kinds: [Repository, PullRequest]` the provider needs 3 pods.
 
 ## How oasgen-provider turns this into live kinds
 
@@ -356,7 +357,7 @@ the chart requires one token for everything ([usage](./usage.md)).
 
 Stated plainly, because the difference matters:
 
-- `helm lint` is clean and all 32 kinds render — 32 ConfigMaps + 32 RestDefinitions and
+- `helm lint` is clean and all 32 kinds render by default — 32 ConfigMaps + 32 RestDefinitions and
   nothing else, with zero plugin references anywhere in the rendered output.
 - Every RestDefinition path + method was cross-checked against the operations declared
   in its own OpenAPI asset — zero mismatches.

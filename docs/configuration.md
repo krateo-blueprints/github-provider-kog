@@ -1,7 +1,7 @@
 ---
 type: Configuration
 title: github-provider-kog — configuration
-description: The whole config surface — the single chart value resourceGroup, the 32 RestDefinition mappings grouped by area, the compareScope tally and the reasoning behind each non-default choice, the native normalizations GitHub's REST inconsistencies demand, the OpenAPI ConfigMaps, and the invariants that must hold for a chart that ships no runtime component.
+description: The whole config surface — the chart values resourceGroup and kinds, the 32 RestDefinition mappings grouped by area, the compareScope tally and the reasoning behind each non-default choice, the native normalizations GitHub's REST inconsistencies demand, the OpenAPI ConfigMaps, and the invariants that must hold for a chart that ships no runtime component.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, values, restdefinition, oasgen-provider]
 timestamp: 2026-09-09T00:00:00Z
@@ -9,7 +9,7 @@ timestamp: 2026-09-09T00:00:00Z
 
 # Configuration
 
-The chart surface is deliberately tiny — one scalar. Everything else is fixed mapping
+The chart surface is deliberately tiny — two values. Everything else is fixed mapping
 (`chart/assets/`, `chart/templates/`).
 
 ## Chart values
@@ -20,17 +20,36 @@ The chart surface is deliberately tiny — one scalar. Everything else is fixed 
 | key | default | effect |
 |---|---|---|
 | `resourceGroup` | `github.krateo.io` | the API group every generated CRD lands under — 32 resource kinds plus a `<Kind>Configuration` auth kind for each. Referenced by every RestDefinition's `spec.resourceGroup`. |
+| `kinds` | `[]` | which kinds to render, by Kind name. Empty renders all 32. |
 | `global` | `{}` (object) | Helm global values, injected by the chart-inspector / when used as a subchart. |
 
-The schema declares **only** a single top-level scalar on purpose: when the chart is
-installed as a Krateo component the CDC derives the CompositionDefinition CRD from this
-schema, and a scalar default materializes cleanly in the component CR (nested-object
-toggles would not) ([api](./api.md)).
+The values stay flat on purpose: when the chart is installed as a Krateo component the
+CDC derives the CompositionDefinition CRD from this schema, and a scalar or list default
+materializes cleanly in the component CR (nested-object toggles would not)
+([api](./api.md)).
 
-There is **no per-kind toggle**. All 32 RestDefinitions are always installed, and each one
-runs a controller pod whether or not a CR of its kind exists
-([overview](./overview.md)). A per-kind switch would mean nested-object values the CDC
-cannot materialize.
+### Choosing kinds
+
+Each RestDefinition runs one controller pod whether or not a CR of its kind exists
+([overview](./overview.md)), so `kinds` is what sets the provider's pod count. Each listed
+kind renders its RestDefinition and its OpenAPI ConfigMap, and an unknown name fails the
+schema:
+
+```yaml
+kinds: [Repository, PullRequest]   # 2 controllers instead of 32
+```
+
+As a Krateo component, set it on the composition's spec, for example through the installer's
+`componentValues.github-provider-kog.kinds`.
+
+- **Empty means all, and that is the default.** A default listing the 32 names would be
+  stored on the composition, so an install would never render a kind added by a later chart.
+- **Builder publishing needs `Repository` and `PullRequest`.** They are the only
+  `github.krateo.io` kinds `builder-publish` creates, and neither depends on another kind.
+- **Delete a kind's CRs before you remove it from a running install.** Removing a kind
+  deletes its RestDefinition, and oasgen-provider then drops the kind's CRD. While CRs still
+  exist it refuses: the RestDefinition stays in deletion and the controller keeps running
+  until they are gone. Adding a kind back generates it again.
 
 ## The RestDefinition mappings
 
@@ -479,8 +498,8 @@ What each did, and what a native return takes, is written down per kind:
   primitive that landed in 0.36.0 ([#120](https://github.com/krateo-platformops/oasgen-provider/issues/120),
   merged as #239), and the `compareScope: updatable` that 25 kinds declare does not exist
   below 0.23.0 — both floors still hold, now subsumed by 0.38.0.
-- **The chart stays free of a runtime component.** It renders 32 ConfigMaps and 32
-  RestDefinitions and nothing else; every kind reaches `api.github.com` directly, no
+- **The chart stays free of a runtime component.** It renders one ConfigMap and one
+  RestDefinition per selected kind, 32 of each by default, and nothing else; every kind reaches `api.github.com` directly, no
   asset overrides `servers`, and every ConfigMap is a plain `.Files.Get` with nothing for
   `tpl` to resolve. A kind that needed a hop would reintroduce a Deployment, a Service and
   an image to release — which is why the kinds that could return natively (`PullRequest`

@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "OrgWebhook") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -65,3 +66,4 @@ spec:
         requestFieldMapping:
           - inPath: hook_id
             inCustomResource: status.id
+{{- end }}

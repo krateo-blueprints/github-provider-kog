@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "AutomatedSecurityFixes") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -61,3 +62,4 @@ spec:
       - action: delete
         method: DELETE
         path: /repos/{owner}/{repo}/automated-security-fixes
+{{- end }}

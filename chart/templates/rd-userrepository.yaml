@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "UserRepository") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -139,3 +140,4 @@ spec:
     # RestDefinition or uninstalling the chart would DESTROY every user repository it ever created.
     # That is oasgen-provider #125. A leaked repo is an inconvenience; a destroyed one is not
     # recoverable. Restore the verb only alongside the #125 guard and a per-CR opt-in.
+{{- end }}

@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "Collaborator") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,3 +10,4 @@ data:
   # contains no template action. Only the plugin-backed kinds need `tpl`.
   collaborator.yaml: |
 {{ .Files.Get "assets/collaborator.yaml" | indent 4 }}
+{{- end }}

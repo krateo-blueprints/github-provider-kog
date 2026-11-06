@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "Team") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,3 +12,4 @@ data:
   # template action.
   team.yaml: |
 {{ .Files.Get "assets/team.yaml" | indent 4 }}
+{{- end }}

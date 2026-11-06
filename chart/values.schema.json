@@ -8,6 +8,48 @@
       "default": "github.krateo.io",
       "description": "The API group every generated CRD lands under: each resource kind plus a <Kind>Configuration auth kind for it."
     },
+    "kinds": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string",
+        "enum": [
+          "ActionsVariableOrg",
+          "ActionsVariableRepo",
+          "Autolink",
+          "AutomatedSecurityFixes",
+          "BranchProtection",
+          "CodeSecurityConfig",
+          "Collaborator",
+          "CustomProperty",
+          "DeployKey",
+          "DeploymentBranchPolicy",
+          "Environment",
+          "EnvironmentVariable",
+          "GitRef",
+          "Issue",
+          "Label",
+          "Milestone",
+          "OrgMembership",
+          "OrgRuleset",
+          "OrgWebhook",
+          "PullRequest",
+          "Release",
+          "RepoContent",
+          "RepoDeployment",
+          "RepoRuleset",
+          "RepoWebhook",
+          "Repository",
+          "RunnerGroup",
+          "Team",
+          "TeamMembership",
+          "TeamRepo",
+          "UserRepository",
+          "Workflow"
+        ]
+      },
+      "description": "Which kinds to render, by Kind name. Empty renders all 32. Each listed kind runs one controller pod, so a child that only publishes through the builders sets [Repository, PullRequest]."
+    },
     "global": {
       "type": "object",
       "title": "Global values",

@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "TeamRepo") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -82,3 +83,4 @@ spec:
       - action: delete
         method: DELETE
         path: /orgs/{org}/teams/{team_slug}/repos/{owner}/{repo}
+{{- end }}

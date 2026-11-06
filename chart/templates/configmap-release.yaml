@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "Release") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,3 +10,4 @@ data:
   # plugin-backed kinds need a tpl pass to resolve their per-operation `servers` override.
   release.yaml: |
 {{ .Files.Get "assets/release.yaml" | indent 4 }}
+{{- end }}

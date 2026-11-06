@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "GitRef") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -108,3 +109,4 @@ spec:
         # Short-form {ref} from spec.ref; the delete path is always addressable (spec always exists),
         # which Shape A's status-sourced delete was not — see docs/design-gitref.md §3.1.
         path: /repos/{owner}/{repo}/git/refs/{ref}
+{{- end }}

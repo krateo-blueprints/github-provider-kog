@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "Release") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -71,3 +72,4 @@ spec:
         requestFieldMapping:
           - inPath: release_id
             inCustomResource: status.id
+{{- end }}

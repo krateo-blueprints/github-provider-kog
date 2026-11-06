@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "EnvironmentVariable") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,3 +11,4 @@ data:
   # so the asset is copied verbatim and contains no template action.
   environmentvariable.yaml: |
 {{ .Files.Get "assets/environmentvariable.yaml" | indent 4 }}
+{{- end }}

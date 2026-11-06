@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "Team") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -61,3 +62,4 @@ spec:
         fieldMapping:
           - inPath: team_slug
             inCustomResource: status.slug
+{{- end }}

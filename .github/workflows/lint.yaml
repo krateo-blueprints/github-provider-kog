@@ -23,3 +23,14 @@ jobs:
           python-version: "3.12"
       - run: pip install pyyaml
       - run: python3 hack/assert-drift-invariants.py .
+
+  # `kinds` selects what renders, and the names in the guards and the schema enum are connected only
+  # by this check. A wrong name renders half a kind, and helm says nothing.
+  kinds-selectable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 hack/assert-kinds.py .

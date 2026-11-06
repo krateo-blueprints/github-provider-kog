@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "PullRequest") -}}
 apiVersion: ogen.krateo.io/v1alpha1
 kind: RestDefinition
 metadata:
@@ -183,3 +184,4 @@ spec:
                and ((($r.head.repo.full_name) // "") != (($r.base.repo.full_name) // ""))) as $cross
             | (if (.head | type) == "object" then .head = (if $cross then .head.label else .head.ref end) else . end)
             | (if (.base | type) == "object" then .base = .base.ref else . end)
+{{- end }}

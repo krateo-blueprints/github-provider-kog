@@ -1,3 +1,4 @@
+{{- if include "github-provider-kog.kindEnabled" (list . "Workflow") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,3 +11,4 @@ data:
   # so the asset is copied verbatim and contains no template action.
   workflow.yaml: |
 {{ .Files.Get "assets/workflow.yaml" | indent 4 }}
+{{- end }}
