@@ -101,6 +101,30 @@ immutable-field refusals — the `cannot patch "github-provider-kog-pullrequest"
 rejecting a change to an immutable field, well below helm, and is unaffected. That blocker is handled by
 the delete-and-recreate below; the orphaned RDs and the immutable field are two independent problems.
 
+## Leftover `DeploymentConfiguration` from the 0.6.0 rename
+
+The `Deployment`→`RepoDeployment` rename left a CRD behind on clusters that had a
+`DeploymentConfiguration`: nothing renders it any more, and no controller reads it. It does not configure
+`RepoDeployment`, which uses `RepoDeploymentConfiguration`. It is harmless, but anyone listing the group
+sees a kind that no longer exists. Measured on krateo-057 with one CR; removed there 2026-11-05.
+
+Match the name exactly. `repodeploymentconfigurations` contains `deploymentconfigurations`, so a substring
+match finds the live CRD too, and that one must stay.
+
+```sh
+# Is it here, and does it have instances?
+kubectl --context <ctx> get crd deploymentconfigurations.github.krateo.io
+kubectl --context <ctx> get deploymentconfigurations.github.krateo.io -A
+
+# Keep a copy, then delete every instance first and the CRD last.
+kubectl --context <ctx> get deploymentconfigurations.github.krateo.io -A -o yaml > deploymentconfigurations.yaml
+kubectl --context <ctx> -n <ns> delete deploymentconfigurations.github.krateo.io <name>
+kubectl --context <ctx> delete crd deploymentconfigurations.github.krateo.io
+```
+
+Stop if an instance has finalizers or `ownerReferences`. The chart does not do this for you, because a CRD
+it no longer renders is outside the release.
+
 ## PullRequest: `identifiers` `[number]` → `[head, base]` (crossing into 0.4.0)
 
 ### What changed and why the upgrade is refused
