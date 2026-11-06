@@ -11,6 +11,15 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-06 — docs: a RestDefinition is not free
+
+`values.yaml`, `overview`, `index` and `configuration` said a RestDefinition costs nothing until a CR of its
+kind exists. That was false: oasgen-provider runs one `rest-dynamic-controller` pod per RestDefinition, CR or
+not. krateo-057 runs 32 controllers plus one composition controller, and only `Repository` and `PullRequest`
+have resource CRs. The claim mattered when a child Krateo sized its pod quota, where the chart's 33 pods hit a
+100-pod limit and 6 were refused. No chart behaviour changes. Controllers that scale to zero until a first CR
+exists are proposed in oasgen-provider#481.
+
 ## 2026-11-05 — test(environment): 0.7.3 verified through a controller; sample corrected
 
 The 0.7.3 entry below says no `Environment` CR had run through a controller. One has now: krateo-057, chart
