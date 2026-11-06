@@ -163,7 +163,9 @@ is named that rather than `CodeSecurityConfiguration` so its generated auth kind
 `CodeSecurityConfigConfiguration`, not a doubled `…ConfigurationConfiguration`.)
 
 Whatever drives these kinds only **references** these Configuration CRs; it never creates
-them or the Secret. Full surface: [docs/configuration.md](docs/configuration.md).
+them or the Secret. For builder publishing, the second chart in this repo,
+`github-provider-kog-config`, renders the two Configurations it needs; the Secret stays
+yours to create. Full surface: [docs/configuration.md](docs/configuration.md).
 
 ## Examples
 
@@ -197,11 +199,11 @@ what the plugin did for it, and the native `RestDefinition` that replaces it (`R
 
 ## Develop & release
 
-- **Chart** — `chart/` is the single first-class chart; `chart/values.schema.json` types
-  its values (and is what the CDC derives the component CRD from).
+- **Charts** — `chart/` is the provider and `config-chart/` the publishing Configurations;
+  each `values.schema.json` types its values (and is what the CDC derives the component CRD
+  from).
 - **Release** — one plain-semver tag (`X.Y.Z`, no `v`) drives `release-oci.yaml`, which
-  packages `chart/` to `oci://ghcr.io/krateo-blueprints/charts`. The chart is the only
-  release artifact: there is no image in this repo any more, and nothing to co-version
-  with it. Details: [docs/release.md](docs/release.md).
+  packages both charts to `oci://ghcr.io/krateo-blueprints/charts` at the same version.
+  There is no image in this repo any more. Details: [docs/release.md](docs/release.md).
 - **CI** — `lint.yaml` runs the shared `lint-docs` docs-standard check; `security.yml`
   runs the shared org security workflow.

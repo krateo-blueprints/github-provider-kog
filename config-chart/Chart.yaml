@@ -1,0 +1,21 @@
+apiVersion: v2
+name: github-provider-kog-config
+description: >-
+  The two install-level Configurations that builder publishing needs from github-provider-kog:
+  RepositoryConfiguration and PullRequestConfiguration. They are a separate chart because their
+  CRDs do not exist until oasgen-provider has processed the github-provider-kog RestDefinitions.
+  Holds no credential; it only names the Secret.
+type: application
+
+# release-oci substitutes CHART_VERSION from the pushed semver tag.
+version: CHART_VERSION
+# Tracks the github-provider-kog appVersion: these objects follow the auth scheme in its assets.
+appVersion: "0.1.9"
+
+keywords:
+  - krateo
+  - github
+  - blueprint-authoring
+home: https://github.com/krateo-blueprints/github-provider-kog
+sources:
+  - https://github.com/krateo-blueprints/github-provider-kog

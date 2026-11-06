@@ -1,0 +1,20 @@
+# Default values for github-provider-kog-config.
+#
+# Renders one RepositoryConfiguration and one PullRequestConfiguration in the release namespace.
+# Install it only after github-provider-kog is Ready, and only where that chart's `kinds` includes
+# Repository and PullRequest: otherwise these kinds are not served and the render fails.
+#
+# When installed as a Krateo component, the CDC generates this chart's CRD from values.schema.json,
+# so keep values flat.
+
+# The API group of the Configuration kinds. Must match github-provider-kog's resourceGroup.
+resourceGroup: github.krateo.io
+
+# The name both Configurations carry. builder-publish references this name by default.
+configurationName: github-blueprints-config
+
+# The Secret holding the GitHub token, in the release namespace. This chart does not create it.
+secretName: git-provider-credentials
+
+# The key in that Secret that holds the token.
+secretKey: token

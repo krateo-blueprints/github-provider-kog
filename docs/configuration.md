@@ -1,7 +1,7 @@
 ---
 type: Configuration
 title: github-provider-kog — configuration
-description: The whole config surface — the chart values resourceGroup and kinds, the 32 RestDefinition mappings grouped by area, the compareScope tally and the reasoning behind each non-default choice, the native normalizations GitHub's REST inconsistencies demand, the OpenAPI ConfigMaps, and the invariants that must hold for a chart that ships no runtime component.
+description: The whole config surface — the chart values resourceGroup and kinds, the config chart that carries the publishing Configurations, the 32 RestDefinition mappings grouped by area, the compareScope tally and the reasoning behind each non-default choice, the native normalizations GitHub's REST inconsistencies demand, the OpenAPI ConfigMaps, and the invariants that must hold for a chart that ships no runtime component.
 resource: oci://ghcr.io/krateo-blueprints/charts/github-provider-kog
 tags: [krateo, values, restdefinition, oasgen-provider]
 timestamp: 2026-09-09T00:00:00Z
@@ -50,6 +50,35 @@ As a Krateo component, set it on the composition's spec, for example through the
   deletes its RestDefinition, and oasgen-provider then drops the kind's CRD. While CRs still
   exist it refuses: the RestDefinition stays in deletion and the controller keeps running
   until they are gone. Adding a kind back generates it again.
+
+### The config chart
+
+Builder publishing needs a `RepositoryConfiguration` and a `PullRequestConfiguration` in
+the claim namespace. `github-provider-kog-config` is a second chart that renders those two
+objects, so a fresh install or a child Krateo does not have to apply them by hand.
+
+They can't go in the main chart. oasgen-provider generates their CRDs from the
+RestDefinitions after the main chart installs, and a chart that renders a kind with no CRD
+cannot be rendered at all. The config chart therefore installs later, as its own component.
+
+| Value | Default | Meaning |
+|---|---|---|
+| `resourceGroup` | `github.krateo.io` | must match the main chart's `resourceGroup` |
+| `configurationName` | `github-blueprints-config` | the name both objects carry, and the name `builder-publish` references by default |
+| `secretName` | `git-provider-credentials` | the Secret holding the token, in the release namespace |
+| `secretKey` | `token` | the key in that Secret holding the token |
+
+- **It holds no credential.** It names the Secret and never creates it. `git-provider`
+  defaults to `basic` auth, so a Secret shared with it also needs a `username` key.
+- **As a Krateo component it needs two pins.** `deps: [github-provider-kog]` holds it until
+  the main composition is Ready, which requires every RestDefinition Ready.
+  `requiresApiGroups: [github.krateo.io]` holds it when the main chart is switched off, a
+  case `deps` skips.
+- **`kinds` must include both.** With `kinds` set, the main chart generates only those
+  kinds. If `Repository` or `PullRequest` is missing, the group is served, both pins pass,
+  and this chart can't render.
+- **A cluster with these objects applied by hand has them already.** Installing the chart
+  there takes over two existing objects, which hasn't been tried.
 
 ## The RestDefinition mappings
 

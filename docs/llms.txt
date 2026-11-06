@@ -28,7 +28,7 @@ docs/usage.md: install as a Krateo component, provision the token Secret (per-ki
 docs/configuration.md: the surface — the one value resourceGroup, the per-kind RestDefinition mappings (identifiers, excludedSpecFields, compareScope: 25 updatable / 3 default fullSpec / 1 explicit fullSpec / 3 identifiersAndStatus), invariants
 docs/api.md: the generated github.krateo.io CRDs (32 resource kinds + a <Kind>Configuration each) and the CompositionDefinition derived from values.schema.json
 docs/examples.md: index of the runnable examples
-docs/release.md: how a release ships — one plain-semver tag drives release-oci; the chart is the only artifact (no image in this repo)
+docs/release.md: how a release ships — one plain-semver tag drives release-oci, which publishes both charts at the same version (no image in this repo)
 docs/log.md: curated history
 docs/upgrading.md: upgrades that cross an oasgen-immutable field — the pre-roll immutable-field gate (oasgen-provider #290; seven fields read structurally off the live CRD's x-kubernetes-validations) and TakeOwnership adopting orphaned RDs, then the PullRequest identifiers [number]->[head,base] migration: pause the 17 composition-rendered BuilderPublish CRs, strip finalizers + delete, delete+recreate the pullrequests CRD, unpause so self-heal re-renders and findby re-adopts (non-destructive — PullRequest has no delete verb)
 docs/design-gitref.md: restoring GitRef natively (now shipped) — what the kind did, what the plugin's getGitRef/createGitRef did, the refs/-prefix asymmetry solved natively two ways, and the base-sha resolution via dependentLookups (oasgen-provider #120, landed in 0.36.0) so a sha-less create is native and spec.sha stays optional
@@ -38,11 +38,12 @@ examples/blueprint-authoring/README.md: the runnable example — the one-time to
 README.md: the repo front door — what it is (the 32 kinds grouped by family, what is deliberately not covered, and the git-write kinds with their design docs — RepoContent, PullRequest and GitRef all returned), install, configure, examples, docs, develop & release
 # Source (read at the same tag; the docs above are derived from these):
 chart/Chart.yaml: chart metadata; version is the CHART_VERSION placeholder, appVersion tracks the OpenAPI/mapping revision
-chart/values.yaml: the single value resourceGroup (the group all 32 generated CRDs land under), with its rationale
-chart/values.schema.json: the typed schema the CDC derives the component CRD from (scalar resourceGroup only)
+chart/values.yaml: the values resourceGroup (the group all 32 generated CRDs land under) and kinds (which kinds render; empty means all), with their rationale
+chart/values.schema.json: the typed schema the CDC derives the component CRD from (resourceGroup, and kinds with its 32-name enum)
 chart/templates/configmap-<kind>.yaml: one ConfigMap per kind wrapping chart/assets/<kind>.yaml; all 32 are a plain .Files.Get, copied verbatim — no template action anywhere in the assets
 chart/samples/configurations.yaml: the 32 <Kind>Configuration CRs — 31 share the name github-blueprints-config and one gh-token Secret; UserRepository's is github-user-config with its own gh-user-token, because its repos are created in the token's account (whose PAT needs org repo-create rights for Repository and org admin rights for the org-scoped kinds)
 chart/samples/test-<kind>.yaml: one applyable test CR per kind, with the per-kind caveats in comments
+config-chart/templates/configurations.yaml: the github-provider-kog-config chart — the RepositoryConfiguration and PullRequestConfiguration builder publishing needs, naming a Secret it does not create
 # The destination repository (native, like every other kind):
 chart/templates/rd-repository.yaml: the Repository RestDefinition (all four verbs native; compareScope updatable — DEFENSIVE, not load-bearing: the comparison SKIPS any spec key the observe response omits, so the create-only fields could never have drifted under fullSpec either, and the two scopes should agree today; the in-file comment corrects that earlier claim)
 chart/assets/repository.yaml: the Repository OpenAPI spec (org-scoped create only, auto_init defaults true, path params named org/name)

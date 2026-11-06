@@ -628,7 +628,9 @@ That is why `chart/samples/configurations.yaml` ships 31 of the 32 under the sam
 `UserRepository`, whose repositories are created in the token's own account, so its sample
 Configuration (`github-user-config`) carries the intended user's token instead. You only need
 the Configuration for the kinds you actually use; the rest are inert. The referenced
-`Secret` is provisioned out-of-band ([usage](./usage.md)); the chart ships none of this.
+`Secret` is provisioned out-of-band ([usage](./usage.md)). The main chart ships none of
+this. The [config chart](./configuration.md#the-config-chart) ships the two Configurations
+builder publishing needs.
 
 What that PAT needs differs by kind, and the token must satisfy the union of the kinds in
 use:
