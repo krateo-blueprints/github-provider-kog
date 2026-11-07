@@ -88,7 +88,7 @@ covered.
   the native RestDefinition that replaces it — `RepoContent`, `PullRequest` and `GitRef`
   all restored.
 - [examples](./examples.md) — the runnable examples under `examples/`.
-- [release](./release.md) — how a release ships (one tag → the chart on GHCR).
+- [release](./release.md) — how a release ships (one tag → both charts on GHCR and in the helm index).
 - [log](./log.md) — curated history.
 - [llms.txt](./llms.txt) — the file-by-file index of this bundle.
 

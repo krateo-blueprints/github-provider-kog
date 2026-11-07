@@ -1,17 +1,20 @@
-# Publishes this repo's Helm charts on a release tag. The workflow itself is the org-wide reusable —
-# this file supplies only the triggers (and our OCI path), so "identical across every chart repo"
-# becomes structural instead of a 137-line copy this repo has to keep in step by hand.
+# Publishes this repo's two Helm charts (github-provider-kog, github-provider-kog-config) on a release
+# tag, twice and with the same bytes, as krateo-blueprints/charts PUBLISHING.md requires:
+#   1. to GHCR, by the org-wide reusable release-oci (this file supplies only the triggers and our OCI
+#      path, so "identical across every chart repo" is structural rather than a copy kept in step);
+#   2. to the helm index the Marketplace installs from, by the org's one publisher, publish-chart.yaml.
 #
-# The shared workflow adds two things our local copy lacked: it STAMPS OCI provenance annotations
-# (org.opencontainers.image.revision/source/version/ref.name) onto each published chart (#38), and
-# it REFUSES to replace an already-published version whose contents differ, skipping it when the
-# contents are identical and pushing only when the version is absent (#39). It also asserts the
-# release tag is contained in main and gates on every chart-referenced image existing — this chart
-# ships no image, so that gate is a no-op for us.
+# The shared release-oci STAMPS OCI provenance annotations onto each chart (#38), REFUSES to replace a
+# published version whose contents differ and skips one whose contents are identical (#39), asserts the
+# tag is contained in main, and gates on chart-referenced images (none here).
 #
 # oci_repo is overridden to keep publishing to krateo-blueprints/charts (the shared default targets
-# krateo-platformops/charts). secrets.GITHUB_TOKEN is implicit and caller-scoped, so no secrets block
-# is needed; `secrets: inherit` would not work cross-org anyway and is not used.
+# krateo-platformops/charts). secrets.GITHUB_TOKEN is implicit and caller-scoped; `secrets: inherit`
+# would not work cross-org and is not used.
+#
+# CHANNEL: `operators` for both charts. Neither ships a CompositionDefinition (PUBLISHING.md rule 2), and
+# the publisher refuses a non-blueprint in `blueprints`. One tag publishes both at the same version, so
+# one artifact and one publisher call cover them.
 name: release-oci
 
 on:
@@ -27,7 +30,71 @@ on:
         required: false
 
 jobs:
+  # Everything that can refuse the release refuses it HERE, before GHCR holds anything. A failure after
+  # the GHCR push would leave a version that is in GHCR and not in the index, which PUBLISHING.md rule 1
+  # calls unpublished, and the shared release-oci then skips it on a re-run (identical contents), so the
+  # half-state would be hard to see.
+  preflight:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read # list this repo's lint runs
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      # The version the index entry will carry, and the one pulled back from GHCR below. It must be plain
+      # semver: a workflow_dispatch from a branch with no chart_version would otherwise resolve to the
+      # branch name, push nothing pullable, and fail only after the push.
+      - name: Resolve the chart version
+        id: version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.chart_version || '' }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          v="${INPUT_VERSION:-$REF_NAME}"
+          if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::chart version '$v' is not plain semver. Run on a release tag, or pass chart_version."
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "publishing version $v"
+
+      # PUBLISHING.md rule 10. This asserts only what it can see: that THIS commit has a concluded,
+      # successful run of lint.yaml (which runs on every push to main). A squash merge's history does not
+      # record what ran against the branch, so no claim is made about that.
+      - name: The commit being released must have passed lint
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          runs="repos/${REPO}/actions/workflows/lint.yaml/runs?head_sha=${SHA}&per_page=100"
+          done_n=$(gh api "$runs" --jq '[.workflow_runs[] | select(.status == "completed")] | length')
+          ok_n=$(gh api "$runs" --jq '[.workflow_runs[] | select(.conclusion == "success")] | length')
+          echo "lint runs on ${SHA}: ${done_n} completed, ${ok_n} successful"
+          if [ "$done_n" -eq 0 ]; then
+            echo "::error::No lint run exists for ${SHA}: no gate saw this commit. Dispatch lint.yaml on it, confirm it passes, then re-tag."
+            exit 1
+          fi
+          if [ "$ok_n" -eq 0 ]; then
+            echo "::error::lint ran on ${SHA} but never succeeded. Refusing to publish."
+            exit 1
+          fi
+
+      # PUBLISHING.md rule 7: one token, no fallback. The publisher checks it can WRITE; this only checks
+      # it is present, which is all a caller can see, so an unset secret stops the release before GHCR.
+      - name: The index publish token is configured
+        env:
+          TOKEN: ${{ secrets.CHARTS_PUBLISH_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::secrets.CHARTS_PUBLISH_TOKEN is empty, so the index step would fail after GHCR already holds the version. Refusing before anything is published."
+            exit 1
+          fi
+
   release-oci:
+    needs: preflight
     uses: krateo-platformops/.github/.github/workflows/release-oci.yaml@main
     permissions:
       contents: read
@@ -36,3 +103,65 @@ jobs:
       chart_version: ${{ github.event.inputs.chart_version || '' }}
       app_version: ${{ github.event.inputs.app_version || '' }}
       oci_repo: oci://ghcr.io/krateo-blueprints/charts
+
+  # PUBLISHING.md rule 1: the index gets THE SAME BYTES as GHCR. The shared release-oci does not hand its
+  # .tgz files back, and they could not be used if it did: `helm package` writes fresh mtimes, and when a
+  # version is already published with identical contents it skips the push, so its local archive is not
+  # what GHCR holds. Pulling each chart back from GHCR is the one way to get exactly the published bytes,
+  # whether this run pushed it or skipped it. The digest is printed so the two can be compared.
+  collect:
+    needs: [preflight, release-oci]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.preflight.outputs.version }}
+      OCI_REPO: oci://ghcr.io/krateo-blueprints/charts
+    steps:
+      - uses: azure/setup-helm@v4
+      - name: Pull both charts back from GHCR
+        run: |
+          set -euo pipefail
+          mkdir -p charts-dist
+          for name in github-provider-kog github-provider-kog-config; do
+            helm pull "${OCI_REPO}/${name}" --version "${VERSION}" -d charts-dist 2>&1 | sed "s/^/${name}: /"
+          done
+          ls -l charts-dist
+      # Assert the archive set itself, not the commands that produced it: exactly these two charts, each at
+      # the release version and carrying its own name, and nothing else in the artifact.
+      - name: The artifact holds exactly the two charts at this version
+        run: |
+          set -euo pipefail
+          want="github-provider-kog-${VERSION}.tgz github-provider-kog-config-${VERSION}.tgz"
+          got="$(find charts-dist -maxdepth 1 -type f -name '*.tgz' -exec basename {} \; | sort | tr '\n' ' ' | sed 's/ $//')"
+          if [ "$got" != "$want" ]; then
+            echo "::error::charts-dist holds '${got}', expected '${want}'"
+            exit 1
+          fi
+          for name in github-provider-kog github-provider-kog-config; do
+            meta="$(helm show chart "charts-dist/${name}-${VERSION}.tgz")"
+            n="$(sed -n 's/^name: //p' <<< "$meta")"; v="$(sed -n 's/^version: //p' <<< "$meta")"
+            if [ "$n" != "$name" ] || [ "$v" != "$VERSION" ]; then
+              echo "::error::${name}-${VERSION}.tgz declares name '${n}' version '${v}'"
+              exit 1
+            fi
+            echo "${name} ${VERSION} ok"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: charts-dist
+          path: charts-dist/*.tgz
+          if-no-files-found: error
+
+  # The org's one publisher, pinned at its major tag (PUBLISHING.md rule 9). It refuses a wrong channel,
+  # another repository's name or an already-stored version before writing anything, and succeeds only
+  # once the served index lists both charts and `helm pull --repo` installs each anonymously (rule 8).
+  publish-index:
+    needs: [preflight, collect]
+    uses: krateo-blueprints/charts/.github/workflows/publish-chart.yaml@1
+    with:
+      source_repo: ${{ github.repository }}
+      git_tag: ${{ needs.preflight.outputs.version }}
+      channel: operators
+    secrets:
+      PUBLISH_TOKEN: ${{ secrets.CHARTS_PUBLISH_TOKEN }}
