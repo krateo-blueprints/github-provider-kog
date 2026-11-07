@@ -309,10 +309,12 @@ an edited `spec.permission` was never pushed at all. Full account in [api](./api
 `Repository` is written out here because the rationale attached to it was wrong twice, and
 the wrong version was copied from here into other kinds.
 
-`updatable` compares exactly the fields the `PATCH` body can express, derived from the OAS
-rather than declared by hand: `description`, `homepage`, `has_issues`, `has_wiki`,
-`has_projects`, `default_branch` and `archived`. It requires an update verb, which
-`Repository` has.
+`updatable` compares exactly the fields the `PATCH` body can express that are also spec
+fields, derived from the OAS rather than declared by hand: `description`, `homepage`,
+`has_issues`, `has_wiki` and `has_projects`. The `PATCH` body also carries `default_branch`
+and `archived`, but the spec body comes from the create verb alone, so those two are not
+spec fields and are never compared or sent. It requires an update verb, which `Repository`
+has.
 
 Three fields are create-only because GitHub simply never echoes them — `auto_init`,
 `gitignore_template`, `license_template`. The comparison skips a spec key the response does

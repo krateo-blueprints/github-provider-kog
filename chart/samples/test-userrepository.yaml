@@ -10,8 +10,9 @@
 # `name` is the identifier. If a repository of that name already exists in the token's account it
 # is ADOPTED (matched on observe), not duplicated. Adoption is safe against loss — there is no
 # delete verb, so deleting this CR never deletes the repo, adopted or created — but the CR's
-# UPDATABLE fields (description, homepage, has_issues/has_wiki/has_projects, default_branch,
-# archived) are then reconciled onto that pre-existing repository. private/visibility are
+# UPDATABLE fields (description, homepage, has_issues/has_wiki/has_projects) are then reconciled
+# onto that pre-existing repository; default_branch/archived are PATCH-body-only and so not spec
+# fields at all. private/visibility are
 # create-only, so adoption never changes an existing repo's exposure.
 #
 # There is no delete verb: deleting this CR stops Krateo tracking the repo but never deletes it

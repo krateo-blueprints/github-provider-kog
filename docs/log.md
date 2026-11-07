@@ -11,6 +11,31 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-07 — docs: fields only the PATCH body accepts cannot be set from a CR
+
+The docs said `spec.state: closed` closes an `Issue`, and that `Repository` and `UserRepository`
+compare and push `default_branch` and `archived`. Neither holds. oasgen builds the spec body from
+the create verb alone and merges only *parameters* from the other verbs, so a field that exists
+only in the PATCH body never becomes a spec field: it can't be set, compared or sent.
+
+- **Measured on krateo-057:** the `Issue` CRD's spec has no `state` or `state_reason`. A server
+  dry-run of the sample with `state: closed` is rejected by a strict apply (`unknown field
+  "spec.state"`), and a non-strict apply silently drops it.
+- **All 32 kinds checked** against the live CRDs. The affected PATCH-body-only fields are `Issue`
+  `state`/`state_reason`, `PullRequest` `state` (already documented correctly), `Repository` and
+  `UserRepository` `default_branch`/`archived`, and `GitRef` `force` (not reachable under its
+  `identifiersAndStatus` scope anyway).
+- **Corrected:** the `Issue` sample, `rd-issue.yaml`, `assets/issue.yaml`, `test-userrepository.yaml`,
+  `api.md`, `configuration.md`, `usage.md`, `overview.md`, `examples.md` and `llms.txt`. The compared
+  sets are `{title, body}` for `Issue` and `{description, homepage, has_issues, has_wiki,
+  has_projects}` for both repository kinds.
+- **No behaviour change.** The RestDefinitions are unchanged. The `assets/issue.yaml` comment edit
+  moves that kind's `oasHash`, so the `Issue` CRD regenerates once on the next roll, with the same schema.
+- **Upstream:** update-only spec fields are requested in
+  [oasgen-provider#491](https://github.com/krateo-platformops/oasgen-provider/issues/491). Declaring
+  such a field on the create body and deleting it with a create `requestTransform` was considered
+  and rejected, because the asset would then misstate GitHub's create contract.
+
 ## 2026-11-06 — PullRequest findby read page 2 on a cluster
 
 The 2026-11-02 pagination fix was checked by render and dry-run only. This run tested it on

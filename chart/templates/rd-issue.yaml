@@ -29,8 +29,10 @@ spec:
     # Same shape as PullRequest's pull_number.
     excludedSpecFields:
       - issue_number
-    # `updatable` compares title, body, state and state_reason — the whole PATCH body, and all
-    # four are properties of the GET response.
+    # `updatable` compares title and body: the PATCH body's fields that are also spec fields.
+    # The PATCH body also carries state and state_reason, but oasgen builds the spec body from the
+    # create verb alone, so those two are not spec fields and are never compared or sent
+    # (oasgen-provider#491 asks for update-only spec fields).
     #
     # `fullSpec` would be actively wrong here. It compares the whole spec against the observed
     # body, and while spec keys the response omits are simply skipped, `labels`, `assignees` and
@@ -38,8 +40,8 @@ spec:
     # strings and an integer (see assets/issue.yaml). They would therefore be compared and always
     # differ: drift on every reconcile, a PATCH that cannot fix it, forever, against a
     # 5000 req/hr budget. `identifiersAndStatus` would avoid that too, but it would also stop
-    # comparing title, body and state — and those ARE fixable, so it would silently drop the one
-    # thing this kind is for: reopening/closing and re-titling an issue from the CR.
+    # comparing title and body — and those ARE fixable, so it would silently drop the one thing
+    # this kind can do after create: re-titling and re-wording an issue from the CR.
     compareScope: updatable
     configurationFields: []
     #
@@ -49,8 +51,8 @@ spec:
     # papered over: there is no 204-returning or otherwise substitutable endpoint to map.
     #
     # So deleting the CR only stops Krateo managing the issue; the issue stays where it is on
-    # GitHub. To CLOSE it, set `spec.state: closed` (optionally with `spec.state_reason`) and let
-    # the update verb run — then delete the CR if you no longer want it tracked.
+    # GitHub. It cannot be CLOSED from the CR either (state is not a spec field, see above):
+    # close it on GitHub, then delete the CR if you no longer want it tracked.
     verbsDescription:
       - action: create
         method: POST
