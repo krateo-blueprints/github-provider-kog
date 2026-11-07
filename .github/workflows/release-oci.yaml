@@ -153,12 +153,16 @@ jobs:
           path: charts-dist/*.tgz
           if-no-files-found: error
 
-  # The org's one publisher, pinned at its major tag (PUBLISHING.md rule 9). It refuses a wrong channel,
-  # another repository's name or an already-stored version before writing anything, and succeeds only
-  # once the served index lists both charts and `helm pull --repo` installs each anonymously (rule 8).
+  # The org's one publisher, pinned by FULL COMMIT SHA with its version in a comment (PUBLISHING.md rule 9):
+  # it receives CHARTS_PUBLISH_TOKEN, an org-wide write token, so a movable ref (a branch, or a tag like
+  # `1`) would let whoever moves it run code with that token here. Dependabot (.github/dependabot.yml)
+  # moves the pin, as a reviewed PR. a2d63ba5 is what refs/tags/1.0.0 peels to (checked 2026-11-07).
+  # It refuses a wrong channel, another repository's name or an already-stored version before writing
+  # anything, and succeeds only once the served index lists both charts and `helm pull --repo` installs
+  # each anonymously (rule 8).
   publish-index:
     needs: [preflight, collect]
-    uses: krateo-blueprints/charts/.github/workflows/publish-chart.yaml@1
+    uses: krateo-blueprints/charts/.github/workflows/publish-chart.yaml@a2d63ba50e138b17f678528d6d6be3afef48715a # 1.0.0
     with:
       source_repo: ${{ github.repository }}
       git_tag: ${{ needs.preflight.outputs.version }}

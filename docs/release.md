@@ -31,8 +31,8 @@ every chart is published twice, with the same bytes.
    writes fresh timestamps, and a skipped push means the local archive was never published.
    It asserts the artifact holds exactly the two charts at the tag version.
 4. **`publish-index`** calls the organisation's publisher,
-   `krateo-blueprints/charts/.github/workflows/publish-chart.yaml@1`, with
-   `channel: operators`. Neither chart ships a CompositionDefinition, so neither is a
+   `krateo-blueprints/charts/.github/workflows/publish-chart.yaml`, pinned by full
+   commit SHA (`# 1.0.0`) and moved by Dependabot, with `channel: operators`. Neither chart ships a CompositionDefinition, so neither is a
    blueprint. The publisher stores the archives, merges the index and succeeds only once
    `https://krateo-blueprints.github.io/charts/operators/index.yaml` lists both and
    `helm pull --repo` installs each anonymously.
