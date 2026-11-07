@@ -128,9 +128,11 @@ spec:
         # a duplicate create: 50 x 100 = 5000 PRs before the walk gives up.
         #
         # Neither `page` nor `per_page` is a declared OAS parameter of pulls/list and neither is
-        # added: the paginator sets both on the URL directly. A list (findby) verb's query parameters
-        # are not create parameters, so they would never be spec fields even if declared; and
-        # excludedSpecFields (oasgen-immutable, [pull_number]) stays unchanged regardless.
+        # added: the paginator sets both on the URL directly. That matters, because oasgen merges
+        # the parameters of EVERY verb into the spec, findby included: a declared list query would
+        # become a user-settable spec field unless excluded (Collaborator and UserRepository exclude
+        # theirs). `state=all` is a static `queries` entry, not an OAS parameter, so it never reaches
+        # the spec either; and excludedSpecFields (oasgen-immutable, [pull_number]) stays unchanged.
         pagination:
           type: pageNumber
           pageNumber:
