@@ -476,9 +476,9 @@ parameters as `org` and `name`. The spec fields come from the create operation: 
 create path parameter (`/orgs/{org}/repos`) and `name` is a create-body field. A non-create path
 parameter is filled by name from a same-named spec field, so naming the item-path parameters `org`
 and `name` lets that **one** pair of create-derived fields serve the create path, the create body
-and the get/update/delete path. Had the asset kept GitHub's `owner`/`repo` instead, there would be
-no `spec.owner`/`spec.repo` to fill them from — they are not create parameters, so they would not
-be spec fields — and the item verbs could not be addressed from the spec without extra mapping.
+and the get/update/delete path. Had the asset kept GitHub's `owner`/`repo` instead, oasgen — which
+merges the parameters of every verb into the spec — would have added `spec.owner` and `spec.repo`
+as a second, independent pair naming the same repository, free to disagree with `org`/`name`.
 `customproperty.yaml` applies the same rename, turning GitHub's `custom_property_name` into
 `property_name`.
 
