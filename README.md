@@ -203,7 +203,8 @@ what the plugin did for it, and the native `RestDefinition` that replaces it (`R
   each `values.schema.json` types its values (and is what the CDC derives the component CRD
   from).
 - **Release** — one plain-semver tag (`X.Y.Z`, no `v`) drives `release-oci.yaml`, which
-  packages both charts to `oci://ghcr.io/krateo-blueprints/charts` at the same version.
+  packages both charts to `oci://ghcr.io/krateo-blueprints/charts` at the same version, then
+  publishes the same bytes to the helm index at `https://krateo-blueprints.github.io/charts/operators`.
   There is no image in this repo any more. Details: [docs/release.md](docs/release.md).
 - **CI** — `lint.yaml` runs the shared `lint-docs` docs-standard check; `security.yml`
   runs the shared org security workflow.
