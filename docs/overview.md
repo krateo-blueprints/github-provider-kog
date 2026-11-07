@@ -74,7 +74,7 @@ in [api](./api.md).
 |------|-----------|---------------------|
 | `Label` | `POST /repos/{owner}/{repo}/labels` | a label; renaming is not expressible (below) |
 | `Milestone` | `POST /repos/{owner}/{repo}/milestones` | a milestone; `due_on` is create-only (below) |
-| `Issue` | `POST /repos/{owner}/{repo}/issues` | an issue — title, body, state, state reason |
+| `Issue` | `POST /repos/{owner}/{repo}/issues` | an issue — title and body reconciled; open/closed is read-only (below) |
 | `PullRequest` | `POST /repos/{owner}/{repo}/pulls` | a pull request from a head branch into a base branch |
 | `Release` | `POST /repos/{owner}/{repo}/releases` | a release |
 | `RepoDeployment` | `POST /repos/{owner}/{repo}/deployments` | an immutable deployment record |
@@ -307,9 +307,10 @@ plugin handler did, why, and exactly what it took (or would take) to bring that 
   on GitHub, then delete the CR.
 - **`Issue` has no delete verb.** GitHub's REST API has no endpoint that deletes an issue
   (only the GraphQL `deleteIssue` mutation, which a RestDefinition cannot reach).
-  Deleting such a CR stops Krateo managing the object; the issue stays on GitHub. To
-  close an issue, set `spec.state: closed` (optionally with `spec.state_reason`) and let
-  the update verb run, then delete the CR if you no longer want it tracked.
+  Deleting such a CR stops Krateo managing the object; the issue stays on GitHub. As with
+  `PullRequest`, `state` is in the PATCH body but not the create body, so it never becomes
+  a spec field and an issue cannot be closed from its CR. Close it on GitHub, then delete
+  the CR if you no longer want it tracked; `status.state` shows which it is.
 
 ## Limitations worth knowing
 

@@ -184,7 +184,7 @@ $ kubectl apply -f chart/samples/test-issue.yaml
 ```
 
 Deleting the `Issue` CR does not delete the issue — GitHub's REST API cannot — it only
-stops Krateo tracking it. Close it by setting `state: closed` instead. Deleting the
+stops Krateo tracking it, and `state` is not a spec field, so close it on GitHub. Deleting the
 `RepoDeployment` CR does delete the deployment record; re-deploying means a new CR, since
 GitHub has no update endpoint for one.
 

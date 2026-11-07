@@ -162,9 +162,10 @@ Five things to know before you apply it:
   that pair is this `org`/`name` pair, named the way GitHub names it.
 - **Editing an applied `Repository` reaches GitHub, but only for fields `PATCH` can
   send.** The RestDefinition sets `compareScope: updatable` rather than the default
-  `fullSpec`, so Observe compares exactly the fields the update body can express:
-  `description`, `homepage`, `has_issues`, `has_wiki`, `has_projects`, `default_branch`
-  and `archived` are compared and pushed. `auto_init`, `gitignore_template` and
+  `fullSpec`, so Observe compares exactly the spec fields the update body can express:
+  `description`, `homepage`, `has_issues`, `has_wiki` and `has_projects` are compared and
+  pushed. `default_branch` and `archived` are update-body-only, so they are not spec fields
+  and cannot be set from the CR at all. `auto_init`, `gitignore_template` and
   `license_template` are not reconciled under *any* scope, because GitHub never echoes
   them on `GET` and the comparison skips a spec key the response does not carry. Set them
   at create time; changing them afterwards does nothing.
@@ -515,7 +516,6 @@ spec:
   labels:
     - krateo/blueprint       # create-only, like assignees and milestone
   # milestone: 1             # a Milestone CR's status.number, not its title
-  # state: closed            # POST always opens; close by updating
 ```
 
 - **Numbers are server-assigned.** `Issue` and `Milestone` get theirs from GitHub on
@@ -524,8 +524,9 @@ spec:
 - **`PullRequest` has no delete verb and no close-from-spec.** `state` is PATCH-body-only,
   so it never becomes a spec field. Merge or close the PR on GitHub, then delete the CR.
 - **`Issue` has no delete verb**, because GitHub's REST API cannot delete an issue.
-  Deleting the CR only stops Krateo tracking it; to close the issue set `state: closed`
-  (optionally with `state_reason`) and let the update run.
+  Deleting the CR only stops Krateo tracking it, and like `PullRequest` it cannot be
+  closed from its spec: `state` is update-body-only, so it is not a spec field. Close the
+  issue on GitHub, then delete the CR.
 - **Some fields are create-only and quietly stay that way**: an `Issue`'s
   `labels`/`assignees`/`milestone` (GitHub returns them as objects rather than the
   strings and numbers it accepts, so comparing them could only produce an update that

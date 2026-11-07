@@ -9,8 +9,10 @@
 # `milestone` takes a Milestone CR's status.number, not its title.
 #
 # There is no delete: GitHub's REST API cannot delete an issue. Deleting this CR just stops
-# Krateo tracking it. To close the issue, set `state: closed` (with an optional `state_reason`)
-# and let the update run.
+# Krateo tracking it. The issue cannot be closed from this CR either: `state` and `state_reason`
+# exist only in GitHub's PATCH body, and oasgen builds the spec from the CREATE body, so neither
+# is a spec field (a strict apply rejects them as unknown fields; a non-strict one drops them).
+# Close the issue on GitHub, then delete the CR. Upstream: krateo-platformops/oasgen-provider#491.
 apiVersion: github.krateo.io/v2022-11-28
 kind: Issue
 metadata:
@@ -28,5 +30,3 @@ spec:
   # assignees:
   #   - octocat
   # milestone: 1          # a Milestone CR's status.number
-  # state: closed         # set to close the issue; POST always opens it
-  # state_reason: completed

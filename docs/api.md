@@ -201,10 +201,11 @@ destination; the branch/file/PR steps that follow it are `GitRef` → `RepoConte
 [design-repocontent](./design-repocontent.md) and
 [design-pullrequest](./design-pullrequest.md).
 
-Drift is compared with `compareScope: updatable`, not the default `fullSpec`: exactly
-the fields the `PATCH` body can express are compared, which is `description`, `homepage`,
-`has_issues`, `has_wiki`, `has_projects`, `default_branch` and `archived`. Edit one of
-those on an applied CR and it is pushed to GitHub.
+Drift is compared with `compareScope: updatable`, not the default `fullSpec`: the fields
+the `PATCH` body can express *and* the spec carries are compared, which is `description`,
+`homepage`, `has_issues`, `has_wiki` and `has_projects`. Edit one of those on an applied
+CR and it is pushed to GitHub. `default_branch` and `archived` are in the `PATCH` body but
+not the create body, so they are not spec fields (above) and cannot be set from the CR.
 
 **`private` and `visibility` are not in that set, deliberately.** They are create-body
 fields the `PATCH` body omits, so they are honoured when the repository is created and
@@ -430,9 +431,13 @@ above). The whole-value hazard and the sub-controls still left unmodelled are in
   raw that is permanent drift a PATCH cannot fix (`head` is not even in the PATCH body).
 - **`Issue` has no delete verb.** GitHub's REST API has no endpoint that deletes an issue
   (only the GraphQL `deleteIssue` mutation, unreachable from a RestDefinition). Deleting
-  the CR only stops Krateo managing the issue; it stays where it is on GitHub. To close
-  it, set `spec.state: closed` (optionally with `spec.state_reason`) and let the update
-  run, then delete the CR. `spec.labels`, `spec.assignees` and `spec.milestone` are
+  the CR only stops Krateo managing the issue; it stays where it is on GitHub. Like
+  `PullRequest`, it cannot be closed from its spec: `state` and `state_reason` live in the
+  PATCH body only, so they are not spec fields (a strict apply rejects them; a non-strict
+  one silently drops them). Close the issue on GitHub, then delete the CR; update-only spec
+  fields are requested upstream as
+  [oasgen-provider#491](https://github.com/krateo-platformops/oasgen-provider/issues/491).
+  The compared set is `title` and `body`. `spec.labels`, `spec.assignees` and `spec.milestone` are
   create-only: GitHub returns all three as
   objects where the request takes strings and an integer, so they are kept out of the
   update body and out of the comparison.

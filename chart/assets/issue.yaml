@@ -100,19 +100,21 @@ paths:
           application/json:
             schema:
               type: object
-              # Exactly the four fields GitHub returns in the same shape it takes them, so the
-              # compared set under `updatable` is title/body/state/state_reason and each one is
-              # a property of the GET response.
+              # Exactly the four fields GitHub returns in the same shape it takes them. Only
+              # title and body are ALSO spec fields, so the compared set under `updatable` is
+              # {title, body}: oasgen builds the spec body from the create verb alone, and
+              # state/state_reason are not in the create body.
               properties:
                 title:
                   type: string
                 body:
                   type: string
-                # POST cannot set state — an issue is always created open — so `state` reaches
-                # the spec through this update body alone. `spec.state: closed` is consequently
-                # how a Krateo-managed issue gets closed: the create opens it, the first observe
-                # sees the drift and PATCHes it shut. That is also the closest thing this kind
-                # has to a delete.
+                # POST cannot set state — an issue is always created open — and because the spec
+                # body comes from the create verb alone, `state` and `state_reason` never become
+                # spec fields. They are declared here because they ARE GitHub's PATCH contract,
+                # but no CR can set them, so a Krateo-managed issue cannot be closed from its
+                # spec (measured on 057: a strict apply rejects spec.state as an unknown field).
+                # An update-only spec field needs oasgen-provider#491.
                 state:
                   type: string
                   enum:
