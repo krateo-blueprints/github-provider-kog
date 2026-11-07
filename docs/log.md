@@ -11,6 +11,24 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-07 — feat: publish both charts to the helm index, not only GHCR
+
+The organisation adopted one publishing standard (krateo-blueprints/charts `PUBLISHING.md`):
+a chart in GHCR and missing from the helm index is not published, because the Marketplace
+installs from the index. Both of this repo's charts were GHCR-only.
+
+- **Channel `operators`:** neither chart has a CompositionDefinition, so neither is a
+  blueprint, and the publisher refuses a non-blueprint in `blueprints`.
+- **Same bytes:** after the shared `release-oci` push, the release pulls both charts back from
+  GHCR and hands those archives to the publisher. The shared workflow's own archives could
+  differ (fresh timestamps, or a skipped push of an identical version). A dry run against
+  0.7.5 pulled exactly the published digests.
+- **Refuse before publishing:** the tag must be plain semver, the tagged commit must have a
+  successful `lint.yaml` run, and `CHARTS_PUBLISH_TOKEN` must be set, all checked before GHCR
+  holds anything.
+- **Names are free:** neither `github-provider-kog` nor `github-provider-kog-config` had an
+  entry in either channel's index, so the one-owner-per-name rule has nothing to refuse.
+
 ## 2026-11-07 — docs: fields only the PATCH body accepts cannot be set from a CR
 
 The docs said `spec.state: closed` closes an `Issue`, and that `Repository` and `UserRepository`
