@@ -82,14 +82,22 @@ jobs:
             exit 1
           fi
 
-      # PUBLISHING.md rule 7: one token, no fallback. The publisher checks it can WRITE; this only checks
-      # it is present, which is all a caller can see, so an unset secret stops the release before GHCR.
-      - name: The index publish token is configured
+      # PUBLISHING.md rule 7: one token, no fallback. The publisher checks it can WRITE; a caller can see
+      # only the value, so this checks its presence AND its shape. It tests the same secret passed to the
+      # publisher below. The publisher refuses a token with whitespace in it too, but only at its own first
+      # step, after GHCR already holds the version; a trailing newline from re-saving the secret is what
+      # failed the first 0.7.6 index publish. The release-oci job depends on preflight, so either refusal
+      # here stops the release before anything is pushed. The value is never printed.
+      - name: The index publish token is configured and has no whitespace
         env:
           TOKEN: ${{ secrets.CHARTS_PUBLISH_TOKEN }}
         run: |
           if [ -z "$TOKEN" ]; then
             echo "::error::secrets.CHARTS_PUBLISH_TOKEN is empty, so the index step would fail after GHCR already holds the version. Refusing before anything is published."
+            exit 1
+          fi
+          if [[ "$TOKEN" =~ [[:space:]] ]]; then
+            echo "::error::secrets.CHARTS_PUBLISH_TOKEN contains whitespace (often a trailing newline from pasting), so the publisher would refuse it after GHCR already holds the version. Re-save the secret without it. Refusing before anything is published."
             exit 1
           fi
 
