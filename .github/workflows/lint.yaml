@@ -46,3 +46,15 @@ jobs:
           python-version: "3.12"
       - run: pip install pyyaml
       - run: python3 hack/assert-config-chart.py .
+
+  # A status field is filled from the get (or findby) response, so a path that response schema does
+  # not have stays empty forever while the resource reports Ready. Only this check notices.
+  status-fields-in-response:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - run: python3 hack/assert-status-fields.py .
