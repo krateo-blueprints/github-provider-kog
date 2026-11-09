@@ -164,15 +164,17 @@ jobs:
   # The org's one publisher, pinned by FULL COMMIT SHA with its version in a comment (PUBLISHING.md rule 9):
   # it receives CHARTS_PUBLISH_TOKEN, an org-wide write token, so a movable ref (a branch, or a tag like
   # `1`) would let whoever moves it run code with that token here. Dependabot (.github/dependabot.yml)
-  # moves the pin, as a reviewed PR. 36ea357c is what refs/tags/1.0.1 peels to (checked 2026-11-07). 1.0.1
-  # authenticates git through gh's credential helper instead of a token in the clone URL, which is what
-  # failed the 0.7.6 index publish under 1.0.0, and refuses a token carrying whitespace at its first step.
-  # It refuses a wrong channel, another repository's name or an already-stored version before writing
-  # anything, and succeeds only once the served index lists both charts and `helm pull --repo` installs
-  # each anonymously (rule 8).
+  # moves the pin, as a reviewed PR. ae5e1997 is the commit refs/tags/1.0.3 peels to (tag object b4242d7e,
+  # checked 2026-11-09); the pin names the commit, never the tag object. 1.0.3 keeps everything 1.0.1 did
+  # (git auth through gh's credential helper, which fixed the 0.7.6 index publish; refusing a token with
+  # whitespace at its first step) and adds: 1.0.2 merges and pushes the index from a fresh clone and retries
+  # when another repository published at the same moment; 1.0.3 compares repository names
+  # case-insensitively. It refuses a wrong channel, another repository's name or an already-stored version
+  # before writing anything, and succeeds only once the served index lists both charts and `helm pull
+  # --repo` installs each anonymously (rule 8).
   publish-index:
     needs: [preflight, collect]
-    uses: krateo-blueprints/charts/.github/workflows/publish-chart.yaml@36ea357cb0fe4b49628cc984d9939babf0049d03 # 1.0.1
+    uses: krateo-blueprints/charts/.github/workflows/publish-chart.yaml@ae5e19976a126abf5fb99c14c78180885ef3c97b # 1.0.3
     with:
       source_repo: ${{ github.repository }}
       git_tag: ${{ needs.preflight.outputs.version }}
