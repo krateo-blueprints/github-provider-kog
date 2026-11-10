@@ -51,6 +51,107 @@ paths:
                   type: string
                 license_template:
                   type: string
+                # As GitHub's create body publishes them (deviation review rows 28), with GitHub's
+                # `default`s left out on purpose: a CRD default would be written into every existing CR
+                # (oasgen-provider#562). Those also in the PATCH body below are compared and fixable;
+                # the rest act once, at create.
+                allow_auto_merge:
+                  type: boolean
+                  description: Either `true` to allow auto-merge on pull requests, or `false` to disallow auto-merge.
+                allow_merge_commit:
+                  type: boolean
+                  description: Either `true` to allow merging pull requests with a merge commit, or `false` to prevent
+                    merging pull requests with merge commits.
+                allow_rebase_merge:
+                  type: boolean
+                  description: Either `true` to allow rebase-merging pull requests, or `false` to prevent rebase-merging.
+                allow_squash_merge:
+                  type: boolean
+                  description: Either `true` to allow squash-merging pull requests, or `false` to prevent squash-merging.
+                custom_properties:
+                  type: object
+                  description: The custom properties for the new repository. The keys are the custom property names, and
+                    the values are the corresponding custom property values.
+                  additionalProperties: true
+                delete_branch_on_merge:
+                  type: boolean
+                  description: Either `true` to allow automatically deleting head branches when pull requests are merged,
+                    or `false` to prevent automatic deletion. **The authenticated user must be an organization owner to
+                    set this property to `true`.**
+                has_downloads:
+                  description: Whether downloads are enabled.
+                  type: boolean
+                is_template:
+                  type: boolean
+                  description: Either `true` to make this repo available as a template repository or `false` to prevent
+                    it.
+                merge_commit_message:
+                  type: string
+                  enum:
+                  - PR_BODY
+                  - PR_TITLE
+                  - BLANK
+                  description: 'The default value for a merge commit message.
+
+
+                    - `PR_TITLE` - default to the pull request''s title.
+
+                    - `PR_BODY` - default to the pull request''s body.
+
+                    - `BLANK` - default to a blank commit message.'
+                merge_commit_title:
+                  type: string
+                  enum:
+                  - PR_TITLE
+                  - MERGE_MESSAGE
+                  description: 'Required when using `merge_commit_message`.
+
+
+                    The default value for a merge commit title.
+
+
+                    - `PR_TITLE` - default to the pull request''s title.
+
+                    - `MERGE_MESSAGE` - default to the classic title for a merge message (e.g., Merge pull request #123
+                    from branch-name).'
+                squash_merge_commit_message:
+                  type: string
+                  enum:
+                  - PR_BODY
+                  - COMMIT_MESSAGES
+                  - BLANK
+                  description: 'The default value for a squash merge commit message:
+
+
+                    - `PR_BODY` - default to the pull request''s body.
+
+                    - `COMMIT_MESSAGES` - default to the branch''s commit messages.
+
+                    - `BLANK` - default to a blank commit message.'
+                squash_merge_commit_title:
+                  type: string
+                  enum:
+                  - PR_TITLE
+                  - COMMIT_OR_PR_TITLE
+                  description: 'Required when using `squash_merge_commit_message`.
+
+
+                    The default value for a squash merge commit title:
+
+
+                    - `PR_TITLE` - default to the pull request''s title.
+
+                    - `COMMIT_OR_PR_TITLE` - default to the commit''s title (if only one commit) or the pull request''s
+                    title (when more than one commit).'
+                team_id:
+                  type: integer
+                  description: The id of the team that will be granted access to this repository. This is only valid when
+                    creating a repository in an organization.
+                use_squash_pr_title_as_default:
+                  type: boolean
+                  description: Either `true` to allow squash-merge commits to use pull request title, or `false` to use
+                    commit message. **This property is closing down. Please use `squash_merge_commit_title` instead.
+                  deprecated: true
       responses:
         '201':
           description: Response
@@ -154,6 +255,239 @@ paths:
                   type: string
                 archived:
                   type: boolean
+                # As GitHub's update body publishes them (deviation review row 30b), `default`s left out.
+                # Compared under `updatable` only when the CR sets them (the create body declares them).
+                # allow_forking, allow_update_branch, has_pull_requests, pull_request_creation_policy,
+                # security_and_analysis and web_commit_signoff_required are update-only, so no CR can
+                # set them yet (oasgen builds the spec from the create body; oasgen-provider#491).
+                allow_auto_merge:
+                  type: boolean
+                  description: Either `true` to allow auto-merge on pull requests, or `false` to disallow auto-merge.
+                allow_forking:
+                  type: boolean
+                  description: Either `true` to allow private forks, or `false` to prevent private forks.
+                allow_merge_commit:
+                  type: boolean
+                  description: Either `true` to allow merging pull requests with a merge commit, or `false` to prevent
+                    merging pull requests with merge commits.
+                allow_rebase_merge:
+                  type: boolean
+                  description: Either `true` to allow rebase-merging pull requests, or `false` to prevent rebase-merging.
+                allow_squash_merge:
+                  type: boolean
+                  description: Either `true` to allow squash-merging pull requests, or `false` to prevent squash-merging.
+                allow_update_branch:
+                  type: boolean
+                  description: Either `true` to always allow a pull request head branch that is behind its base branch
+                    to be updated even if it is not required to be up to date before merging, or false otherwise.
+                delete_branch_on_merge:
+                  type: boolean
+                  description: Either `true` to allow automatically deleting head branches when pull requests are merged,
+                    or `false` to prevent automatic deletion.
+                has_pull_requests:
+                  type: boolean
+                  description: Either `true` to allow pull requests for this repository or `false` to prevent pull requests.
+                is_template:
+                  type: boolean
+                  description: Either `true` to make this repo available as a template repository or `false` to prevent
+                    it.
+                merge_commit_message:
+                  type: string
+                  enum:
+                  - PR_BODY
+                  - PR_TITLE
+                  - BLANK
+                  description: 'The default value for a merge commit message.
+
+
+                    - `PR_TITLE` - default to the pull request''s title.
+
+                    - `PR_BODY` - default to the pull request''s body.
+
+                    - `BLANK` - default to a blank commit message.'
+                merge_commit_title:
+                  type: string
+                  enum:
+                  - PR_TITLE
+                  - MERGE_MESSAGE
+                  description: 'Required when using `merge_commit_message`.
+
+
+                    The default value for a merge commit title.
+
+
+                    - `PR_TITLE` - default to the pull request''s title.
+
+                    - `MERGE_MESSAGE` - default to the classic title for a merge message (e.g., Merge pull request #123
+                    from branch-name).'
+                pull_request_creation_policy:
+                  type: string
+                  description: 'The policy that controls who can create pull requests for this repository: `all` or `collaborators_only`.'
+                  enum:
+                  - all
+                  - collaborators_only
+                security_and_analysis:
+                  type: object
+                  description: 'Specify which security and analysis features to enable or disable for the repository.
+
+
+                    To use this parameter, you must have admin permissions for the repository or be an owner or security
+                    manager for the organization that owns the repository. For more information, see "[Managing security
+                    managers in your organization](https://docs.github.com/organizations/managing-peoples-access-to-your-organization-with-roles/managing-security-managers-in-your-organization)."
+
+
+                    For example, to enable GitHub Advanced Security, use this data in the body of the `PATCH` request:
+
+                    `{ "security_and_analysis": {"advanced_security": { "status": "enabled" } } }`.
+
+
+                    You can check which security and analysis features are currently enabled by using a `GET /repos/{owner}/{repo}`
+                    request.'
+                  nullable: true
+                  properties:
+                    advanced_security:
+                      type: object
+                      description: 'Use the `status` property to enable or disable GitHub Advanced Security for this repository.
+
+                        For more information, see "[About GitHub Advanced
+
+                        Security](/github/getting-started-with-github/learning-about-github/about-github-advanced-security)."
+
+
+                        For standalone Code Scanning or Secret Protection products, this parameter cannot be used.'
+                      properties:
+                        status:
+                          type: string
+                          description: Can be `enabled` or `disabled`.
+                    code_security:
+                      type: object
+                      description: Use the `status` property to enable or disable GitHub Code Security for this repository.
+                      properties:
+                        status:
+                          type: string
+                          description: Can be `enabled` or `disabled`.
+                    secret_scanning:
+                      type: object
+                      description: Use the `status` property to enable or disable secret scanning for this repository.
+                        For more information, see "[About secret scanning](/code-security/secret-security/about-secret-scanning)."
+                      properties:
+                        status:
+                          type: string
+                          description: Can be `enabled` or `disabled`.
+                    secret_scanning_push_protection:
+                      type: object
+                      description: Use the `status` property to enable or disable secret scanning push protection for
+                        this repository. For more information, see "[Protecting pushes with secret scanning](/code-security/secret-scanning/protecting-pushes-with-secret-scanning)."
+                      properties:
+                        status:
+                          type: string
+                          description: Can be `enabled` or `disabled`.
+                    secret_scanning_ai_detection:
+                      type: object
+                      description: Use the `status` property to enable or disable secret scanning AI detection for this
+                        repository. For more information, see "[Responsible detection of generic secrets with AI](https://docs.github.com/code-security/secret-scanning/using-advanced-secret-scanning-and-push-protection-features/generic-secret-detection/responsible-ai-generic-secrets)."
+                      properties:
+                        status:
+                          type: string
+                          description: Can be `enabled` or `disabled`.
+                    secret_scanning_non_provider_patterns:
+                      type: object
+                      description: Use the `status` property to enable or disable secret scanning non-provider patterns
+                        for this repository. For more information, see "[Supported secret scanning patterns](/code-security/secret-scanning/introduction/supported-secret-scanning-patterns#supported-secrets)."
+                      properties:
+                        status:
+                          type: string
+                          description: Can be `enabled` or `disabled`.
+                    secret_scanning_delegated_alert_dismissal:
+                      type: object
+                      description: Use the `status` property to enable or disable secret scanning delegated alert dismissal
+                        for this repository.
+                      properties:
+                        status:
+                          type: string
+                          description: Can be `enabled` or `disabled`.
+                    secret_scanning_delegated_bypass:
+                      type: object
+                      description: Use the `status` property to enable or disable secret scanning delegated bypass for
+                        this repository.
+                      properties:
+                        status:
+                          type: string
+                          description: Can be `enabled` or `disabled`.
+                    secret_scanning_delegated_bypass_options:
+                      type: object
+                      description: 'Feature options for secret scanning delegated bypass.
+
+                        This object is only honored when `security_and_analysis.secret_scanning_delegated_bypass.status`
+                        is set to `enabled`.
+
+                        You can send this object in the same request as `secret_scanning_delegated_bypass`, or update
+                        just the options in a separate request.'
+                      properties:
+                        reviewers:
+                          type: array
+                          description: 'The bypass reviewers for secret scanning delegated bypass.
+
+                            If you omit this field, the existing set of reviewers is unchanged.'
+                          items:
+                            type: object
+                            required:
+                            - reviewer_id
+                            - reviewer_type
+                            properties:
+                              reviewer_id:
+                                type: integer
+                                description: The ID of the team or role selected as a bypass reviewer
+                              reviewer_type:
+                                type: string
+                                description: The type of the bypass reviewer
+                                enum:
+                                - TEAM
+                                - ROLE
+                              mode:
+                                type: string
+                                description: The bypass mode for the reviewer
+                                enum:
+                                - ALWAYS
+                                - EXEMPT
+                squash_merge_commit_message:
+                  type: string
+                  enum:
+                  - PR_BODY
+                  - COMMIT_MESSAGES
+                  - BLANK
+                  description: 'The default value for a squash merge commit message:
+
+
+                    - `PR_BODY` - default to the pull request''s body.
+
+                    - `COMMIT_MESSAGES` - default to the branch''s commit messages.
+
+                    - `BLANK` - default to a blank commit message.'
+                squash_merge_commit_title:
+                  type: string
+                  enum:
+                  - PR_TITLE
+                  - COMMIT_OR_PR_TITLE
+                  description: 'Required when using `squash_merge_commit_message`.
+
+
+                    The default value for a squash merge commit title:
+
+
+                    - `PR_TITLE` - default to the pull request''s title.
+
+                    - `COMMIT_OR_PR_TITLE` - default to the commit''s title (if only one commit) or the pull request''s
+                    title (when more than one commit).'
+                use_squash_pr_title_as_default:
+                  type: boolean
+                  description: Either `true` to allow squash-merge commits to use pull request title, or `false` to use
+                    commit message. **This property is closing down. Please use `squash_merge_commit_title` instead.
+                  deprecated: true
+                web_commit_signoff_required:
+                  type: boolean
+                  description: Either `true` to require contributors to sign off on web-based commits, or `false` to not
+                    require contributors to sign off on web-based commits.
       responses:
         '200':
           description: Response
@@ -265,6 +599,201 @@ components:
         has_projects:
           type: boolean
         archived:
+          type: boolean
+        # Returned by GET (GitHub's full-repository), so the fields above can be compared.
+        allow_auto_merge:
+          type: boolean
+        allow_forking:
+          type: boolean
+        allow_merge_commit:
+          type: boolean
+        allow_rebase_merge:
+          type: boolean
+        allow_squash_merge:
+          type: boolean
+        allow_update_branch:
+          type: boolean
+        custom_properties:
+          type: object
+          description: The custom properties that were defined for the repository. The keys are the custom property
+            names, and the values are the corresponding custom property values.
+          additionalProperties: true
+        delete_branch_on_merge:
+          type: boolean
+        has_downloads:
+          type: boolean
+        has_pull_requests:
+          type: boolean
+        is_template:
+          type: boolean
+        merge_commit_message:
+          type: string
+          enum:
+          - PR_BODY
+          - PR_TITLE
+          - BLANK
+          description: 'The default value for a merge commit message.
+
+
+            - `PR_TITLE` - default to the pull request''s title.
+
+            - `PR_BODY` - default to the pull request''s body.
+
+            - `BLANK` - default to a blank commit message.'
+        merge_commit_title:
+          type: string
+          enum:
+          - PR_TITLE
+          - MERGE_MESSAGE
+          description: "The default value for a merge commit title.\n\n  - `PR_TITLE` - default to the pull request's\
+            \ title.\n  - `MERGE_MESSAGE` - default to the classic title for a merge message (e.g., Merge pull\
+            \ request #123 from branch-name)."
+        pull_request_creation_policy:
+          description: 'The policy controlling who can create pull requests: all or collaborators_only.'
+          type: string
+          enum:
+          - all
+          - collaborators_only
+        security_and_analysis:
+          nullable: true
+          type: object
+          properties:
+            advanced_security:
+              description: 'Enable or disable GitHub Advanced Security for the repository.
+
+
+                For standalone Code Scanning or Secret Protection products, this parameter cannot be used.
+
+                '
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - enabled
+                  - disabled
+            code_security:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - enabled
+                  - disabled
+            dependabot_security_updates:
+              description: Enable or disable Dependabot security updates for the repository.
+              type: object
+              properties:
+                status:
+                  description: The enablement status of Dependabot security updates for the repository.
+                  type: string
+                  enum:
+                  - enabled
+                  - disabled
+            secret_scanning:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - enabled
+                  - disabled
+            secret_scanning_push_protection:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - enabled
+                  - disabled
+            secret_scanning_non_provider_patterns:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - enabled
+                  - disabled
+            secret_scanning_ai_detection:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - enabled
+                  - disabled
+            secret_scanning_delegated_alert_dismissal:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - enabled
+                  - disabled
+            secret_scanning_delegated_bypass:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - enabled
+                  - disabled
+            secret_scanning_delegated_bypass_options:
+              type: object
+              properties:
+                reviewers:
+                  type: array
+                  description: The bypass reviewers for secret scanning delegated bypass
+                  items:
+                    type: object
+                    required:
+                    - reviewer_id
+                    - reviewer_type
+                    properties:
+                      reviewer_id:
+                        type: integer
+                        description: The ID of the team or role selected as a bypass reviewer
+                      reviewer_type:
+                        type: string
+                        description: The type of the bypass reviewer
+                        enum:
+                        - TEAM
+                        - ROLE
+                      mode:
+                        type: string
+                        description: The bypass mode for the reviewer
+                        enum:
+                        - ALWAYS
+                        - EXEMPT
+        squash_merge_commit_message:
+          type: string
+          enum:
+          - PR_BODY
+          - COMMIT_MESSAGES
+          - BLANK
+          description: 'The default value for a squash merge commit message:
+
+
+            - `PR_BODY` - default to the pull request''s body.
+
+            - `COMMIT_MESSAGES` - default to the branch''s commit messages.
+
+            - `BLANK` - default to a blank commit message.'
+        squash_merge_commit_title:
+          type: string
+          enum:
+          - PR_TITLE
+          - COMMIT_OR_PR_TITLE
+          description: 'The default value for a squash merge commit title:
+
+
+            - `PR_TITLE` - default to the pull request''s title.
+
+            - `COMMIT_OR_PR_TITLE` - default to the commit''s title (if only one commit) or the pull request''s
+            title (when more than one commit).'
+        use_squash_pr_title_as_default:
+          type: boolean
+        web_commit_signoff_required:
           type: boolean
     basic-error:
       title: Basic Error
