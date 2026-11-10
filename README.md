@@ -3,7 +3,7 @@
 ## What is this
 
 A Krateo **KOG** (Krateo OpenAPI Generation) provider, built on
-[`oasgen-provider`](https://github.com/krateo-platformops/oasgen-provider) **≥ 0.38.0**,
+[`oasgen-provider`](https://github.com/krateo-platformops/oasgen-provider) **≥ 0.52.0**,
 that exposes 32 GitHub REST resources as Kubernetes kinds under the `github.krateo.io`
 group. Each kind is listed by its create endpoint; get/update/delete sit on the matching
 item path.
@@ -119,11 +119,13 @@ CRDs under `github.krateo.io`, and auto-deploys a `rest-dynamic-controller` per 
 
 ## Install
 
-Prerequisite: a Krateo cluster with `oasgen-provider` **≥ 0.38.0** — it provides
-`restdefinitions.ogen.krateo.io`, and 0.38.0 is where the `GitRef` pattern admission guard
-reaches the CRD. `GitRef`'s base-sha `dependentLookups` landed in 0.36.0; 0.23.0 is where
-`compareScope: updatable` arrives, which 25 of the 32 kinds declare — a floor now subsumed
-by 0.38.0.
+Prerequisite: a Krateo cluster with `oasgen-provider` **≥ 0.52.0** — it provides
+`restdefinitions.ogen.krateo.io`, and 0.52.0 is where `RestDefinition.spec.serverURL` arrives,
+which `githubBaseUrl` (GitHub Enterprise) sets. On an older oasgen that field would be dropped
+silently and requests would go to api.github.com. 0.38.0 is where the `GitRef` pattern admission
+guard reaches the CRD, a floor now subsumed. `GitRef`'s base-sha `dependentLookups` landed in 0.36.0; 0.23.0 is where
+`compareScope: updatable` arrives, which 25 of the 32 kinds declare — floors now subsumed
+by 0.52.0.
 
 Per the Krateo "everything is a Composition" rule, this chart is installed as a
 **component** — a `component-pins` entry that the core-provider CDC turns into a

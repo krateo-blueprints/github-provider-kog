@@ -5,6 +5,7 @@ metadata:
   name: {{ .Release.Name }}-reporuleset
   namespace: {{ .Release.Namespace }}
 spec:
+  {{- include "github-provider-kog.serverURL" . | nindent 2 }}
   oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-reporuleset/reporuleset.yaml
   resourceGroup: {{ .Values.resourceGroup }}
   resource:

@@ -35,8 +35,8 @@ def load_github_oas():
     return json.loads(data)
 
 
-def render_chart(root):
-    """All documents `helm template` renders from <root>/chart.
+def render_chart(root, sets=None):
+    """All documents `helm template` renders from <root>/chart, with optional `--set` values.
 
     helm refuses the CHART_VERSION placeholder, so a copy with a version in it is rendered.
     """
@@ -47,7 +47,10 @@ def render_chart(root):
         text = open(meta).read().replace("CHART_VERSION", "0.0.0").replace("APP_VERSION", "0.0.0")
         with open(meta, "w") as f:
             f.write(text)
-        out = subprocess.run(["helm", "template", "x", chart], check=True, capture_output=True, text=True).stdout
+        args = ["helm", "template", "x", chart]
+        for k, v in (sets or {}).items():
+            args += ["--set", "%s=%s" % (k, v)]
+        out = subprocess.run(args, check=True, capture_output=True, text=True).stdout
     return [d for d in yaml.safe_load_all(out) if d]
 
 

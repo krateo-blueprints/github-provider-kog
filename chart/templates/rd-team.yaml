@@ -5,6 +5,7 @@ metadata:
   name: {{ .Release.Name }}-team
   namespace: {{ .Release.Namespace }}
 spec:
+  {{- include "github-provider-kog.serverURL" . | nindent 2 }}
   oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-team/team.yaml
   resourceGroup: {{ .Values.resourceGroup }}
   resource:

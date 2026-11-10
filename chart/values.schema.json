@@ -50,6 +50,13 @@
       },
       "description": "Which kinds to render, by Kind name. Empty renders all 32. Each listed kind runs one controller pod, so a child that only publishes through the builders sets [Repository, PullRequest]."
     },
+    "githubBaseUrl": {
+      "type": "string",
+      "default": "",
+      "maxLength": 2048,
+      "pattern": "^$|^https?://[^/\\s]+(/[^\\s]*)?$",
+      "description": "GitHub Enterprise API base URL (e.g. https://ghe.corp.example.com/api/v3, or https://api.<subdomain>.ghe.com). Empty means github.com. Requires oasgen-provider >= 0.52.0."
+    },
     "global": {
       "type": "object",
       "title": "Global values",
