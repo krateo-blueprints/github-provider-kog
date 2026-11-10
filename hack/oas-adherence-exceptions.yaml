@@ -439,36 +439,16 @@ exceptions:
     from every verb into the spec), so an author could set a filter that makes findby miss the object it is looking
     for, and observe would then re-create it. The paginator sets page/per_page on the URL itself.
 - row: '22'
-  category: C
+  category: B
   kind: PullRequest
   method: PATCH
   path: /repos/{owner}/{repo}/pulls/{pull_number}
   deviation: dropped
   fields:
   - maintainer_can_modify
-  reason: 'Kept create-only. The recorded premise (that PATCH cannot change it) is wrong: GitHub''s pulls/update
-    accepts it and GET returns it, so this is a candidate to restore (deviation review row 22).'
-- row: '20'
-  category: D
-  kind: PullRequest
-  method: POST
-  path: /repos/{owner}/{repo}/pulls
-  deviation: dropped
-  fields:
-  - head_repo
-  - issue
-  restore: todo
-  reason: Unmodelled; to restore (deviation review row 20).
-- row: '20'
-  category: D
-  kind: PullRequest
-  method: POST
-  path: /repos/{owner}/{repo}/pulls
-  deviation: required-added
-  fields:
-  - title
-  restore: todo
-  reason: 'To restore: GitHub requires only head and base (row 20).'
+  reason: 'Measured live 2026-11-10: on a same-repo PR GitHub stores false whatever create sends, and PATCH true
+    is refused with 422 ''Fork collab can only be enabled on cross-repo pull requests''. As a compared field, a
+    CR setting true on a same-repo PR would 422 on every reconcile. Create-only. chart/assets/pullrequest.yaml'
 - row: '24'
   category: C
   kind: Release
@@ -533,55 +513,6 @@ exceptions:
   - visibility
   reason: 'Safety: as compared fields, `name` renamed live repositories back to a stale name, and `private`/`visibility`
     would flip live private repositories public, irreversibly. chart/assets/repository.yaml'
-- row: 30b
-  category: D
-  kind: Repository
-  method: PATCH
-  path: /repos/{org}/{name}
-  deviation: dropped
-  fields:
-  - allow_auto_merge
-  - allow_forking
-  - allow_merge_commit
-  - allow_rebase_merge
-  - allow_squash_merge
-  - allow_update_branch
-  - delete_branch_on_merge
-  - has_pull_requests
-  - is_template
-  - merge_commit_message
-  - merge_commit_title
-  - pull_request_creation_policy
-  - security_and_analysis
-  - squash_merge_commit_message
-  - squash_merge_commit_title
-  - use_squash_pr_title_as_default
-  - web_commit_signoff_required
-  restore: todo
-  reason: Unmodelled; to restore (deviation review row 30b).
-- row: '28'
-  category: D
-  kind: Repository
-  method: POST
-  path: /orgs/{org}/repos
-  deviation: dropped
-  fields:
-  - allow_auto_merge
-  - allow_merge_commit
-  - allow_rebase_merge
-  - allow_squash_merge
-  - custom_properties
-  - delete_branch_on_merge
-  - has_downloads
-  - is_template
-  - merge_commit_message
-  - merge_commit_title
-  - squash_merge_commit_message
-  - squash_merge_commit_title
-  - team_id
-  - use_squash_pr_title_as_default
-  restore: todo
-  reason: Unmodelled; to restore (deviation review row 28).
 - row: '36'
   category: C
   kind: Team
@@ -646,54 +577,6 @@ exceptions:
   - visibility
   reason: 'Safety, as Repository row 30a: would rename or flip the exposure of existing repositories, irreversibly.
     chart/assets/userrepository.yaml'
-- row: 41b
-  category: D
-  kind: UserRepository
-  method: PATCH
-  path: /repos/{owner}/{name}
-  deviation: dropped
-  fields:
-  - allow_auto_merge
-  - allow_forking
-  - allow_merge_commit
-  - allow_rebase_merge
-  - allow_squash_merge
-  - allow_update_branch
-  - delete_branch_on_merge
-  - has_pull_requests
-  - is_template
-  - merge_commit_message
-  - merge_commit_title
-  - pull_request_creation_policy
-  - security_and_analysis
-  - squash_merge_commit_message
-  - squash_merge_commit_title
-  - use_squash_pr_title_as_default
-  - web_commit_signoff_required
-  restore: todo
-  reason: Unmodelled; to restore (deviation review row 41b).
-- row: 38a
-  category: D
-  kind: UserRepository
-  method: POST
-  path: /user/repos
-  deviation: dropped
-  fields:
-  - allow_auto_merge
-  - allow_merge_commit
-  - allow_rebase_merge
-  - allow_squash_merge
-  - delete_branch_on_merge
-  - has_discussions
-  - has_downloads
-  - is_template
-  - merge_commit_message
-  - merge_commit_title
-  - squash_merge_commit_message
-  - squash_merge_commit_title
-  - team_id
-  restore: todo
-  reason: Unmodelled; to restore (deviation review row 38a).
 - row: 38b
   category: C
   kind: UserRepository

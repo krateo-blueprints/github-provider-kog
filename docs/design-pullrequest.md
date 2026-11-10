@@ -436,6 +436,14 @@ Traps specific to this kind, in the order they bite:
    adding a property there silently enlarges the drift comparison. If anybody adds `head` or
    `maintainer_can_modify` to that body to "make it updatable", GitHub's PATCH ignores `head`
    entirely and the loop returns.
+
+   *Correction, 2026-11-10 (measured live on a throwaway same-repo PR):* GitHub's `pulls/update`
+   does accept `maintainer_can_modify`, so "the PATCH can never fix" it (section 4) is wrong as
+   written. The conclusion holds for a different reason: on a same-repo pull request (every PR the
+   publish flow creates) GitHub stores `false` whatever create sends, and a PATCH to `true` is
+   refused with 422 "Fork collab can only be enabled on cross-repo pull requests". As a compared
+   field, a CR setting `true` would 422 on every reconcile. It stays create-only
+   (`hack/oas-adherence-exceptions.yaml`, row 22, category B).
 6. **Do not add a `notFoundBody` predicate for merged/closed PRs.** It reads the **raw** response,
    before the transform (`restResources.go:296-300` precedes `:346`), and "absent" means the
    controller **re-creates** — a second PR from the same branch on every reconcile.
