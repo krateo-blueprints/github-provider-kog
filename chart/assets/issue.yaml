@@ -74,7 +74,7 @@ paths:
                 # NOT YET MODELLED: GitHub's `issue_field_values` (an array of {field_id, value}). Its
                 # `value` is oneOf string | number | string-array, and oasgen 0.56.0 renders a oneOf as
                 # `type: object`, which the apiserver would reject for every value GitHub accepts.
-                # Held until that union can be expressed (deviation review row 14).
+                # Held until oasgen can express that union (oasgen-provider#563; deviation review row 14).
       responses:
         '201':
           description: Response
