@@ -15,29 +15,20 @@ Two cases are allowed, both explicit:
 Deletion protection is not done by leaving operations out: annotate the CR
 `krateo.io/deletion-policy: orphan` (docs/usage.md).
 
-The GitHub description is downloaded at a PINNED commit and checked against its SHA-256, so the
-check cannot change under the chart. Bump both together, on purpose.
+The GitHub description is downloaded at a PINNED commit and checked against its SHA-256
+(hack/github_oas.py), so the check cannot change under the chart.
 
 Usage: assert-oas-operations.py <repo root>
 """
-import hashlib
-import json
 import os
 import re
-import shutil
-import subprocess
 import sys
-import tempfile
-import urllib.request
 
 import yaml
 
-GITHUB_OAS_COMMIT = "fa8d7bfb041cc9ef90ac51dcb8ed8cc8a0007166"  # github/rest-api-description main, 2026-11-10
-GITHUB_OAS_SHA256 = "bd948bdc47be1b76d8ff25322f01820c5d65027a3a265bb4eb677aeda034dcf5"
-GITHUB_OAS_URL = (
-    "https://raw.githubusercontent.com/github/rest-api-description/%s/descriptions/api.github.com/api.github.com.json"
-    % GITHUB_OAS_COMMIT
-)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from github_oas import GITHUB_OAS_COMMIT, load_github_oas, render_chart  # noqa: E402
+
 METHODS = ("get", "post", "put", "patch", "delete")
 
 # (kind, METHOD, path as the kind's verbs write it): why the kind does not expose it.
@@ -50,12 +41,7 @@ EXCEPTIONS = {
 root = sys.argv[1] if len(sys.argv) > 1 else "."
 errors = []
 
-data = urllib.request.urlopen(GITHUB_OAS_URL, timeout=120).read()
-digest = hashlib.sha256(data).hexdigest()
-if digest != GITHUB_OAS_SHA256:
-    sys.exit("GitHub OpenAPI at %s has sha256 %s, expected %s: refusing to check against an unverified "
-             "description" % (GITHUB_OAS_COMMIT, digest, GITHUB_OAS_SHA256))
-github = json.loads(data)["paths"]
+github = load_github_oas()["paths"]
 
 
 def norm(path):
@@ -66,15 +52,7 @@ github_ops = {}
 for path, ops in github.items():
     github_ops.setdefault(norm(path), set()).update(m.upper() for m in ops if m in METHODS)
 
-# helm refuses the CHART_VERSION placeholder, so render a copy with a version in it.
-with tempfile.TemporaryDirectory() as tmp:
-    chart = os.path.join(tmp, "chart")
-    shutil.copytree(os.path.join(root, "chart"), chart)
-    meta = os.path.join(chart, "Chart.yaml")
-    text = open(meta).read().replace("CHART_VERSION", "0.0.0").replace("APP_VERSION", "0.0.0")
-    open(meta, "w").write(text)
-    rendered = subprocess.run(["helm", "template", "x", chart], check=True, capture_output=True, text=True).stdout
-docs = [d for d in yaml.safe_load_all(rendered) if d]
+docs = render_chart(root)
 configmaps = {d["metadata"]["name"]: d.get("data") or {} for d in docs if d.get("kind") == "ConfigMap"}
 
 examined = 0

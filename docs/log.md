@@ -11,6 +11,25 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-10 — ci: every deviation from GitHub's OpenAPI is listed and checked
+
+Diego asked for the chart to be 100% adherent to GitHub's OpenAPI. The deviation review that
+followed found 55 field-level deviations; this adds the gate that keeps the list complete.
+
+- **`hack/assert-oas-adherence.py`** (lint job `oas-adherence`) compares each of the 123
+  verbs with GitHub's operation at the pinned commit: parameters, body properties and
+  `required`, recursing into nested objects (the review compared top-level fields only, and
+  the nested comparison adds 13 entries, e.g. RepoContent's author/committer `date` and the rulesets' flattened `rules[]` union).
+- **`hack/oas-adherence-exceptions.yaml`** holds every difference (204 at main 96e75dc, in 65
+  entries) with its category and reason. #58–#62, merged the same day, restored 24 fields and
+  deleted their entries. The remaining category D entries say `todo` or name the issue holding
+  them (oasgen-provider#563 for Issue `issue_field_values`).
+- **Defaults are frozen** (Diego, 2026-11-10): no new asset copies a GitHub `default`; the 34
+  existing declarations (29 kind/field pairs) are listed with GitHub's own value. Removing `make_latest`'s default from #58 was
+  the first application.
+- Negative controls: restoring a field without deleting its entry fails as stale; adding a
+  `default` fails as NEW DEFAULT.
+
 ## 2026-11-10 — feat: Repository and UserRepository delete the GitHub repository, as GitHub's API defines
 
 The chart now follows GitHub's OpenAPI description: every kind exposes every operation GitHub

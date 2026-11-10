@@ -70,3 +70,15 @@ jobs:
           python-version: "3.12"
       - run: pip install pyyaml
       - run: python3 hack/assert-oas-operations.py .
+
+  # Every difference between a kind's requests and GitHub's OpenAPI is listed, with its reason,
+  # in hack/oas-adherence-exceptions.yaml; asset defaults are frozen (oasgen-provider#562).
+  oas-adherence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - run: python3 hack/assert-oas-adherence.py .

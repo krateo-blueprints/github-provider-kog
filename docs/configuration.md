@@ -493,6 +493,30 @@ need a LibSodium sealed box plus a prior public-key fetch, and **`VulnerabilityA
 whose GET returns 404 or a bodiless 204 and therefore yields no status schema. Variables
 are not secrets and are covered at all three scopes.
 
+### Adherence to GitHub's description
+
+The assets follow GitHub's REST description (`github/rest-api-description`, pinned by commit
+and SHA-256 in `hack/github_oas.py`). Where a kind's request differs from it, the difference
+is listed with its reason in `hack/oas-adherence-exceptions.yaml`, and
+`hack/assert-oas-adherence.py` (the `oas-adherence` lint job) compares every verb of every
+kind against GitHub's operation: path and query parameters, and request-body properties and
+`required`, recursing into nested objects. A difference with no entry fails, and so does an
+entry that no longer matches one, so the file is always the complete list. Restoring a field
+means deleting its entry. Types and enums are not compared yet.
+
+Each entry has a category: **A** safety (restoring it would let drift damage live objects),
+**B** drift (GitHub does not echo it as sent, so a compared field would update forever),
+**C** a deliberate modelling choice (a renamed parameter, a flattened union), or **D**
+unmodelled, with `restore` naming the PR restoring it or the issue holding it.
+
+**Defaults are frozen.** The assets never copy GitHub's request `default`s into new fields.
+A CRD default is written by the apiserver into every CR, existing ones included, and cannot
+be withdrawn later (oasgen-provider#562), while GitHub applies its default only to a create
+that omits the field; leaving the field out keeps GitHub's behaviour. The defaults the chart
+already had stay, each listed under `defaults:` with its value and GitHub's own; three of
+them contradict GitHub on purpose (`auto_init: true` on Repository and UserRepository,
+`auto_merge: false` on RepoDeployment), for the reasons given there.
+
 ## No runtime component
 
 The chart renders 32 ConfigMaps and 32 RestDefinitions, and nothing else — no Deployment,
