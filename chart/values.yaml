@@ -20,3 +20,13 @@ resourceGroup: github.krateo.io
 #   kinds: [Repository, PullRequest]
 # Before removing a kind from a running install, delete its CRs. See docs/configuration.md.
 kinds: []
+
+# GitHub Enterprise: the API base URL every kind calls instead of https://api.github.com. Empty
+# (the default) means github.com. Give the WHOLE base URL, scheme and path included:
+#   GitHub Enterprise Server:                     https://ghe.corp.example.com/api/v3
+#   GitHub Enterprise Cloud with data residency:  https://api.octocorp.ghe.com
+# A GHES URL without /api/v3 is accepted but every request 404s. One cluster talks to one GitHub
+# host (the CRDs are cluster-wide). Requires oasgen-provider >= 0.52.0, which REPLACES the
+# documents' servers[0] with it, so api.github.com stops being reachable at all and a misconfigured
+# install fails closed. See docs/configuration.md.
+githubBaseUrl: ""

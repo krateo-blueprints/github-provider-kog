@@ -5,6 +5,7 @@ metadata:
   name: {{ .Release.Name }}-pullrequest
   namespace: {{ .Release.Namespace }}
 spec:
+  {{- include "github-provider-kog.serverURL" . | nindent 2 }}
   oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-pullrequest/pullrequest.yaml
   resourceGroup: {{ .Values.resourceGroup }}
   resource:

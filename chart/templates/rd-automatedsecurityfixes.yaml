@@ -5,6 +5,7 @@ metadata:
   name: {{ .Release.Name }}-automatedsecurityfixes
   namespace: {{ .Release.Namespace }}
 spec:
+  {{- include "github-provider-kog.serverURL" . | nindent 2 }}
   oasPath: configmap://{{ .Release.Namespace }}/{{ .Release.Name }}-automatedsecurityfixes/automatedsecurityfixes.yaml
   resourceGroup: {{ .Values.resourceGroup }}
   resource:

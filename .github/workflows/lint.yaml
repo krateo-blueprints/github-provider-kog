@@ -82,3 +82,15 @@ jobs:
           python-version: "3.12"
       - run: pip install pyyaml
       - run: python3 hack/assert-oas-adherence.py .
+
+  # githubBaseUrl (GitHub Enterprise) must reach every RestDefinition as spec.serverURL, and only
+  # when set: a kind that missed it would send the Enterprise token to api.github.com.
+  server-url:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - run: python3 hack/assert-server-url.py .

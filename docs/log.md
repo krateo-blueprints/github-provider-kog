@@ -11,6 +11,22 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-10 — feat: GitHub Enterprise through `githubBaseUrl`
+
+Closes the GitHub Enterprise parity gap with the legacy github-provider. Diego's choices: one value
+for every kind, oasgen floor raised to 0.52.0, validation by oasgen's own URL rule.
+
+- **`githubBaseUrl`** (values and values.schema.json, empty by default) renders
+  `spec.serverURL` on all 32 RestDefinitions through one helper, and nothing when empty.
+- **oasgen-provider ≥ 0.52.0 is now the floor**: 0.52.0 adds `spec.serverURL`. Below it the field
+  would be pruned silently and requests would go to api.github.com with the Enterprise token.
+- **Fails closed by construction**: oasgen replaces `servers[0]` and builds the host policy from it,
+  so api.github.com is not reachable from an Enterprise install.
+- **`hack/assert-server-url.py`** (lint job `server-url`) checks the value reaches every
+  RestDefinition when set and none when unset, and that every asset has the single
+  api.github.com server with no per-operation `servers`. Negative control: removing the include
+  from one template fails it.
+
 ## 2026-11-10 — fix: RepoWebhook create requires what GitHub requires (nothing)
 
 Deviation review row 32. GitHub's repos/create-webhook body requires nothing; the asset required

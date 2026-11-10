@@ -28,6 +28,35 @@ CDC derives the CompositionDefinition CRD from this schema, and a scalar or list
 materializes cleanly in the component CR (nested-object toggles would not)
 ([api](./api.md)).
 
+### GitHub Enterprise (`githubBaseUrl`)
+
+Empty by default, which means github.com. Set it to the API base URL of a GitHub Enterprise
+instance, scheme and path included:
+
+| product | `githubBaseUrl` |
+|---|---|
+| GitHub Enterprise Server | `https://ghe.corp.example.com/api/v3` |
+| GitHub Enterprise Cloud with data residency | `https://api.octocorp.ghe.com` |
+
+Every RestDefinition then carries `spec.serverURL` with that value (oasgen-provider ≥ 0.52.0).
+oasgen **replaces** each document's `servers[0]` with it, and the endpoint host policy is built
+from the result, so `api.github.com` stops being permitted at all: a misconfigured install fails
+closed rather than sending the Enterprise token to the public API. `hack/assert-server-url.py`
+(lint job `server-url`) fails if any RestDefinition misses the value, or carries it while unset.
+
+- **Validation** is oasgen's own rule, `^https?://host(/path)?`: a value without a scheme is
+  refused at install. A GHES URL without `/api/v3` is accepted but every request 404s, because the
+  prefix is part of the base URL, not of the paths.
+- **One host per cluster.** The generated CRDs are cluster-wide, so a cluster's kinds all talk to
+  one GitHub host. The value can be changed in place; oasgen reads it on the next reconcile.
+- **Credentials** are unchanged: each kind's `<Kind>Configuration` points at a token Secret, which
+  must hold a token for the Enterprise instance.
+- **API coverage follows the instance.** GitHub Enterprise Server versions lag github.com, and some
+  of the 32 kinds use endpoints an older GHES lacks; such a kind answers 404 there. Check the REST
+  documentation for your GHES version before enabling a kind.
+- **Setting it through the installer** needs the installer's component-values schema to declare
+  `githubBaseUrl` first: an undeclared key there is pruned silently.
+
 ### Choosing kinds
 
 Each RestDefinition runs one controller pod whether or not a CR of its kind exists
@@ -546,13 +575,15 @@ What each did, and what a native return takes, is written down per kind:
 
 ## Invariants
 
-- **oasgen-provider must be ≥ 0.38.0.** 0.38.0 is where the `GitRef` pattern admission
+- **oasgen-provider must be ≥ 0.52.0.** 0.52.0 adds `RestDefinition.spec.serverURL`, which
+  `githubBaseUrl` sets on every RestDefinition for GitHub Enterprise; below it the field would be
+  dropped silently and requests would reach api.github.com. Earlier floors: 0.38.0 is where the `GitRef` pattern admission
   guard reaches the generated CRD — the fix that makes the OpenAPI validation keywords
   land on the CRD ([#249](https://github.com/krateo-platformops/oasgen-provider/issues/249),
   merged as #250). `GitRef`'s create resolves its base sha with **dependent lookups**, a
   primitive that landed in 0.36.0 ([#120](https://github.com/krateo-platformops/oasgen-provider/issues/120),
   merged as #239), and the `compareScope: updatable` that 25 kinds declare does not exist
-  below 0.23.0 — both floors still hold, now subsumed by 0.38.0.
+  below 0.23.0 — all still hold, now subsumed by 0.52.0.
 - **The chart stays free of a runtime component.** It renders one ConfigMap and one
   RestDefinition per selected kind, 32 of each by default, and nothing else; every kind reaches `api.github.com` directly, no
   asset overrides `servers`, and every ConfigMap is a plain `.Files.Get` with nothing for
