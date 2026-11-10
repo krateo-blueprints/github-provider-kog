@@ -57,6 +57,24 @@ paths:
                 # The milestone NUMBER (a Milestone CR's status.number), not its title.
                 milestone:
                   type: integer
+                # The three below are GitHub's create body as published (deviation review row 14). They
+                # are create-time only: the PATCH body leaves them out, so `updatable` never compares them.
+                assignee:
+                  type: string
+                  description: 'Login for the user that this issue should be assigned to. _NOTE: Only users with push access can set the assignee for new issues. The assignee is silently dropped otherwise. **This field is closing down.**_'
+                  nullable: true
+                parent_issue_id:
+                  type: integer
+                  description: "The id of the parent issue to add this issue to as a sub-issue. _NOTE: Only users with triage access to both the parent issue's repository and this repository can set the parent issue._"
+                type:
+                  type: string
+                  description: 'The name of the issue type to associate with this issue. _NOTE: Only users with push access can set the type for new issues. The type is silently dropped otherwise._'
+                  nullable: true
+                  example: Epic
+                # NOT YET MODELLED: GitHub's `issue_field_values` (an array of {field_id, value}). Its
+                # `value` is oneOf string | number | string-array, and oasgen 0.56.0 renders a oneOf as
+                # `type: object`, which the apiserver would reject for every value GitHub accepts.
+                # Held until oasgen can express that union (oasgen-provider#563; deviation review row 14).
       responses:
         '201':
           description: Response
