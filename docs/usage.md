@@ -188,8 +188,35 @@ Five things to know before you apply it:
   destinations are normally org-owned; use `UserRepository` when the destination belongs to
   the token's own account.
 
-`Repository` has **no delete verb**, so deleting the CR orphans the repository
-on GitHub. The full spec/status field list is in [api](./api.md).
+**Deleting a `Repository` CR deletes the repository on GitHub**, code and history included
+(GitHub's `DELETE /repos/{owner}/{repo}`); so does deleting a `UserRepository` CR. See
+[Keeping a repository when its CR is deleted](#keeping-a-repository-when-its-cr-is-deleted).
+The full spec/status field list is in [api](./api.md).
+
+### Keeping a repository when its CR is deleted
+
+Annotate the CR:
+
+```yaml
+metadata:
+  annotations:
+    krateo.io/deletion-policy: orphan
+```
+
+rest-dynamic-controller then releases the CR's finalizer without calling GitHub, and the
+repository stays. It reads the annotation through unstructured-runtime (`pkg/meta`
+`ShouldDelete`): `krateo.io/deletion-policy: orphan` keeps the external object, and so does
+`krateo.io/management-policy: observe-create-update` or `observe`. The annotation must be on the
+CR **before** it is deleted. The portal's builder-publish chart sets it on the `Repository` it
+renders, so uninstalling a publish never removes the published repository.
+
+A `UserRepository` can **adopt** a repository that already exists in the token's account (its
+findby matches by name). Deleting that CR deletes the adopted repository too, although Krateo
+never created it, so annotate it if you adopt an existing repository.
+
+Nothing else deletes repositories: removing the `Repository` RestDefinition or uninstalling the
+chart does not cascade to the CRs, because oasgen-provider refuses to drop a CRD that still has
+instances.
 
 The status fields carry what the kinds that follow need: `full_name`, `clone_url`,
 `ssh_url`, `html_url` and the `default_branch` a ruleset or a branch protection binds to.
