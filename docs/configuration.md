@@ -171,7 +171,7 @@ Three patterns recur across the set and are worth reading once:
 
 | kind | identifiers | key mapping facts |
 |---|---|---|
-| `CustomProperty` | `property_name` | GitHub's `custom_property_name` path parameter is **renamed** `property_name` in the asset so one CR field covers path, identifier and status — the same technique `repository.yaml` uses. PUT is an upsert on the same URL get and delete use, so create and update are the same call. |
+| `CustomProperty` | `property_name` | GitHub's `custom_property_name` path parameter is **renamed** `property_name` in the asset so one CR field covers path, identifier and status — the same technique `repository.yaml` uses. PUT is an upsert on the same URL get and delete use, so create and update are the same call. `regex` (RE2, string properties only) is carried as GitHub publishes it. |
 | `CodeSecurityConfig` | `id` | `configuration_id` excluded, sourced from `status.id`. GitHub's update accepts everything its create does, so nothing here is create-only. |
 | `AutomatedSecurityFixes` | *(none)* | a singleton sub-resource with no identity of its own: the repository is the key and lives in the path. A `notFoundBody` predicate reports `enabled == false` as absent — load-bearing, because a repository with the feature off answers **200**, not 404. `paused` is surfaced on status but excluded from the predicate. |
 
