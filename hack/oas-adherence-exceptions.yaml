@@ -1,0 +1,1070 @@
+# Every place a kind's requests differ from GitHub's OpenAPI description, and why.
+# Checked by hack/assert-oas-adherence.py: a difference with no entry fails CI, and so does an
+# entry that no longer matches a difference (restoring a field means deleting its entry here).
+#
+# category  A safety: restoring it would let drift damage live objects
+#           B drift: GitHub does not echo it as sent, so a compared field would PATCH forever
+#           C modelling: a deliberate shape choice (renamed parameter, flattened union, ...)
+#           D unmodelled: no reason found; `restore` says where it is being restored, or why it is held
+# row       the deviation review (2026-11-10) row; "new" = found by this check's nested comparison
+#
+# defaults: the asset `default`s, frozen (Diego, 2026-11-10). A CRD default is materialized into
+# every existing CR and cannot be withdrawn (oasgen-provider#562), so new fields never copy one.
+# `github` is GitHub's own schema default (null = none declared); the check verifies both values.
+github_oas_commit: fa8d7bfb041cc9ef90ac51dcb8ed8cc8a0007166
+exceptions:
+- row: 1a
+  category: B
+  kind: ActionsVariableOrg
+  method: PATCH
+  path: /orgs/{org}/actions/variables/{name}
+  deviation: dropped
+  fields:
+  - name
+  reason: 'A rename can never be observed: GitHub names variables case-insensitively and the item path is keyed
+    by name, so a compared `name` would PATCH forever. chart/assets/actionsvariableorg.yaml, rd-actionsvariableorg.yaml'
+- row: 1b
+  category: C
+  kind: ActionsVariableOrg
+  method: PATCH
+  path: /orgs/{org}/actions/variables/{name}
+  deviation: dropped
+  fields:
+  - selected_repository_ids
+  reason: GET never returns it, so it could never be reconciled. chart/assets/actionsvariableorg.yaml
+- row: '2'
+  category: B
+  kind: ActionsVariableRepo
+  method: PATCH
+  path: /repos/{owner}/{repo}/actions/variables/{name}
+  deviation: dropped
+  fields:
+  - name
+  reason: 'Same as row 1a: a rename can never be observed and would reconcile forever. chart/assets/actionsvariablerepo.yaml'
+- row: '12'
+  category: B
+  kind: EnvironmentVariable
+  method: PATCH
+  path: /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}
+  deviation: dropped
+  fields:
+  - name
+  reason: 'Same as row 1a: a rename can never be observed. chart/assets/environmentvariable.yaml'
+- row: '3'
+  category: C
+  kind: BranchProtection
+  method: PUT
+  path: /repos/{owner}/{repo}/branches/{branch}/protection
+  deviation: required-dropped
+  fields:
+  - enforce_admins
+  - required_pull_request_reviews
+  - required_status_checks
+  - restrictions
+  reason: GitHub requires these four keys but lets them be null ('off'). oasgen does not carry `nullable` into the
+    CRD, so requiring them would force every author to spell out all four controls. chart/assets/branchprotection.yaml
+- row: new
+  category: C
+  kind: BranchProtection
+  method: PUT
+  path: /repos/{owner}/{repo}/branches/{branch}/protection
+  deviation: dropped
+  fields:
+  - required_status_checks.checks
+  restore: 'blocked: oasgen-provider#396'
+  reason: GitHub returns `checks` and `contexts` and derives each from the other; exposing both asks the author
+    to keep two spellings of one list in sync, and setting both differently loops. Needs a cross-field rule (oasgen-provider#396).
+    chart/assets/branchprotection.yaml
+- row: 4a
+  category: B
+  kind: CodeSecurityConfig
+  method: POST
+  path: /orgs/{org}/code-security/configurations
+  deviation: dropped
+  fields:
+  - code_scanning_default_setup_options
+  - code_scanning_options
+  - code_security
+  - dependency_graph_autosubmit_action_options
+  - secret_protection
+  - secret_scanning_delegated_bypass_options
+  reason: '`code_security`/`secret_protection` are not carried by the configuration GET returns, so they are drift
+    that can never be confirmed (`advanced_security` covers the same ground). The `*_options` blocks are normalized
+    server-side, so the value read back is not the value sent. chart/assets/codesecurityconfig.yaml'
+- row: 5a
+  category: B
+  kind: CodeSecurityConfig
+  method: PATCH
+  path: /orgs/{org}/code-security/configurations/{configuration_id}
+  deviation: dropped
+  fields:
+  - code_scanning_default_setup_options
+  - code_scanning_options
+  - code_security
+  - dependency_graph_autosubmit_action_options
+  - secret_protection
+  - secret_scanning_delegated_bypass_options
+  reason: As row 4a; the PATCH body mirrors POST by design.
+- row: 4b
+  category: D
+  kind: CodeSecurityConfig
+  method: POST
+  path: /orgs/{org}/code-security/configurations
+  deviation: dropped
+  fields:
+  - code_scanning_delegated_alert_dismissal
+  - dependabot_delegated_alert_dismissal
+  - dependabot_reachability
+  - secret_scanning_delegated_alert_dismissal
+  - secret_scanning_delegated_bypass
+  - secret_scanning_extended_metadata
+  - secret_scanning_generic_secrets
+  - secret_scanning_generic_secrets_push_protection
+  restore: '#61'
+  reason: 'Unmodelled; restored by PR #61.'
+- row: 5b
+  category: D
+  kind: CodeSecurityConfig
+  method: PATCH
+  path: /orgs/{org}/code-security/configurations/{configuration_id}
+  deviation: dropped
+  fields:
+  - code_scanning_delegated_alert_dismissal
+  - dependabot_delegated_alert_dismissal
+  - dependabot_reachability
+  - secret_scanning_delegated_alert_dismissal
+  - secret_scanning_delegated_bypass
+  - secret_scanning_extended_metadata
+  - secret_scanning_generic_secrets
+  - secret_scanning_generic_secrets_push_protection
+  restore: '#61'
+  reason: 'Unmodelled; restored by PR #61.'
+- row: '6'
+  category: C
+  kind: Collaborator
+  method: PUT
+  path: /repos/{owner}/{repo}/collaborators/{login}
+  deviation: param-renamed
+  fields:
+  - login<-username
+  reason: Named `login`, not `username`, so one CR field covers path, findby match and status; a path parameter's
+    name is never sent to GitHub. chart/assets/collaborator.yaml
+- row: '7'
+  category: C
+  kind: Collaborator
+  method: DELETE
+  path: /repos/{owner}/{repo}/collaborators/{login}
+  deviation: param-renamed
+  fields:
+  - login<-username
+  reason: As row 6.
+- row: '6'
+  category: C
+  kind: Collaborator
+  method: PUT
+  path: /repos/{owner}/{repo}/collaborators/{login}
+  deviation: required-added
+  fields:
+  - permission
+  reason: Required so the grant level is always in spec and compared; omitted, GitHub applies its own default and
+    the grant would silently never be reconciled. chart/assets/collaborator.yaml
+- row: 8a
+  category: C
+  kind: Collaborator
+  method: GET
+  path: /repos/{owner}/{repo}/collaborators
+  deviation: query-dropped
+  fields:
+  - page
+  reason: A query parameter declared on the findby list operation becomes a spec field (oasgen merges parameters
+    from every verb into the spec), so an author could set a filter that makes findby miss the object it is looking
+    for, and observe would then re-create it. The paginator sets page/per_page on the URL itself.
+- row: 8b
+  category: D
+  kind: Collaborator
+  method: GET
+  path: /repos/{owner}/{repo}/collaborators
+  deviation: query-dropped
+  fields:
+  - permission
+  reason: A query parameter declared on the findby list operation becomes a spec field (oasgen merges parameters
+    from every verb into the spec), so an author could set a filter that makes findby miss the object it is looking
+    for, and observe would then re-create it. The paginator sets page/per_page on the URL itself.
+- row: 9a
+  category: D
+  kind: CustomProperty
+  method: PUT
+  path: /orgs/{org}/properties/schema/{property_name}
+  deviation: dropped
+  fields:
+  - regex
+  restore: '#60'
+  reason: 'Unmodelled; restored by PR #60.'
+- row: 9b
+  category: C
+  kind: CustomProperty
+  method: PUT
+  path: /orgs/{org}/properties/schema/{property_name}
+  deviation: param-renamed
+  fields:
+  - property_name<-custom_property_name
+  reason: '`custom_property_name` is renamed `property_name` so one CR field covers path, identifier and status;
+    the rename is invisible to GitHub. chart/assets/customproperty.yaml'
+- row: '10'
+  category: C
+  kind: CustomProperty
+  method: GET
+  path: /orgs/{org}/properties/schema/{property_name}
+  deviation: param-renamed
+  fields:
+  - property_name<-custom_property_name
+  reason: As row 9b.
+- row: '11'
+  category: C
+  kind: CustomProperty
+  method: DELETE
+  path: /orgs/{org}/properties/schema/{property_name}
+  deviation: param-renamed
+  fields:
+  - property_name<-custom_property_name
+  reason: As row 9b.
+- row: '13'
+  category: C
+  kind: GitRef
+  method: POST
+  path: /repos/{owner}/{repo}/git/refs
+  deviation: required-dropped
+  fields:
+  - sha
+  reason: GitHub requires `sha`; the CR may instead name a source branch and the chart resolves the sha with a dependentLookup
+    before the request is sent. chart/assets/gitref.yaml
+- row: '14'
+  category: D
+  kind: Issue
+  method: POST
+  path: /repos/{owner}/{repo}/issues
+  deviation: dropped
+  fields:
+  - assignee
+  - parent_issue_id
+  - type
+  restore: '#62'
+  reason: 'Unmodelled; restored by PR #62.'
+- row: '14'
+  category: D
+  kind: Issue
+  method: POST
+  path: /repos/{owner}/{repo}/issues
+  deviation: dropped
+  fields:
+  - issue_field_values
+  restore: 'blocked: oasgen-provider#563'
+  reason: 'Its `value` is oneOf string | number | string-array, which oasgen renders as `type: object`, so the apiserver
+    would refuse every value GitHub accepts. Held, not narrowed (Diego, 2026-11-10).'
+- row: 15a
+  category: B
+  kind: Issue
+  method: PATCH
+  path: /repos/{owner}/{repo}/issues/{issue_number}
+  deviation: dropped
+  fields:
+  - assignee
+  - assignees
+  - labels
+  - milestone
+  - type
+  reason: GitHub returns these as objects where the request takes strings/integers, so as compared fields they would
+    PATCH on every reconcile, forever. Sent once, at create. chart/assets/issue.yaml
+- row: 15b
+  category: D
+  kind: Issue
+  method: PATCH
+  path: /repos/{owner}/{repo}/issues/{issue_number}
+  deviation: dropped
+  fields:
+  - issue_field_values
+  restore: 'blocked: oasgen-provider#563'
+  reason: As the create-body entry (row 14).
+- row: 15b
+  category: C
+  kind: Issue
+  method: PATCH
+  path: /repos/{owner}/{repo}/issues/{issue_number}
+  deviation: dropped
+  fields:
+  - duplicate_issue_id
+  reason: 'Update-only: the spec is built from the create body, so it could never be set from a CR (needs oasgen-provider#491).'
+- row: 16a
+  category: A
+  kind: Label
+  method: PATCH
+  path: /repos/{owner}/{repo}/labels/{name}
+  deviation: dropped
+  fields:
+  - new_name
+  reason: A rename moves the label out from under the item path, orphaning the CR from the label it renamed. chart/assets/label.yaml
+- row: 16b
+  category: C
+  kind: Label
+  method: PATCH
+  path: /repos/{owner}/{repo}/labels/{name}
+  deviation: dropped
+  fields:
+  - archived
+  reason: GET does not return it, so it could never be reconciled. chart/assets/label.yaml
+- row: '17'
+  category: B
+  kind: Milestone
+  method: PATCH
+  path: /repos/{owner}/{repo}/milestones/{milestone_number}
+  deviation: dropped
+  fields:
+  - due_on
+  reason: GitHub re-times `due_on` to midnight in the token owner's timezone, so as a compared field it would PATCH
+    on every reconcile. Create-only; read status.due_on. chart/assets/milestone.yaml
+- row: '18'
+  category: C
+  kind: OrgMembership
+  method: PUT
+  path: /orgs/{org}/memberships/{username}
+  deviation: required-added
+  fields:
+  - role
+  reason: Required so the role is always compared; omitted, the membership's role would silently never be reconciled.
+    chart/assets/orgmembership.yaml
+- row: '19'
+  category: C
+  kind: OrgWebhook
+  method: PATCH
+  path: /orgs/{org}/hooks/{hook_id}
+  deviation: dropped
+  fields:
+  - name
+  reason: Only ever "web", and set at create; nothing to update. chart/assets/orgwebhook.yaml
+- row: new
+  category: B
+  kind: OrgWebhook
+  method: PATCH
+  path: /orgs/{org}/hooks/{hook_id}
+  deviation: dropped
+  fields:
+  - config.secret
+  reason: GET masks the secret as "********", so as a compared field it is permanent, unfixable drift. It is still
+    sent on update, because the whole `config` map is forwarded. chart/assets/repowebhook.yaml
+- row: new
+  category: C
+  kind: OrgWebhook
+  method: PATCH
+  path: /orgs/{org}/hooks/{hook_id}
+  deviation: required-dropped
+  fields:
+  - config.url
+  reason: The update forwards the whole spec `config`, whose `url` the create body requires, so it is always present.
+- row: new
+  category: C
+  kind: OrgWebhook
+  method: POST
+  path: /orgs/{org}/hooks
+  deviation: dropped
+  fields:
+  - config.password
+  - config.username
+  reason: 'Legacy basic-auth credentials: they would sit in the CR in clear text and the org-hook response does
+    not carry them, so they are write-only with nothing to reconcile against. chart/assets/orgwebhook.yaml'
+- row: new
+  category: B
+  kind: RepoWebhook
+  method: PATCH
+  path: /repos/{owner}/{repo}/hooks/{hook_id}
+  deviation: dropped
+  fields:
+  - config.secret
+  reason: As OrgWebhook config.secret.
+- row: '33'
+  category: C
+  kind: RepoWebhook
+  method: PATCH
+  path: /repos/{owner}/{repo}/hooks/{hook_id}
+  deviation: dropped
+  fields:
+  - add_events
+  - remove_events
+  reason: Incremental edits cannot be expressed by a declarative spec that states the whole event list. chart/assets/repowebhook.yaml
+- row: '32'
+  category: D
+  kind: RepoWebhook
+  method: POST
+  path: /repos/{owner}/{repo}/hooks
+  deviation: required-added
+  fields:
+  - config
+  - config.url
+  restore: todo
+  reason: Unmodelled difference; to restore (deviation review row 32).
+- row: new
+  category: C
+  kind: OrgRuleset
+  method: POST
+  path: /orgs/{org}/rulesets
+  deviation: union-flattened
+  fields:
+  - rules[]
+  reason: GitHub's rule items are a oneOf of 23 variants; oasgen has no oneOf handling, so an item is a flat {type,
+    parameters} pair. chart/assets/reporuleset.yaml (THE HARD TRIM)
+- row: new
+  category: C
+  kind: OrgRuleset
+  method: PUT
+  path: /orgs/{org}/rulesets/{ruleset_id}
+  deviation: union-flattened
+  fields:
+  - rules[]
+  reason: As POST.
+- row: new
+  category: C
+  kind: RepoRuleset
+  method: POST
+  path: /repos/{owner}/{repo}/rulesets
+  deviation: union-flattened
+  fields:
+  - rules[]
+  reason: As OrgRuleset rules[].
+- row: new
+  category: C
+  kind: RepoRuleset
+  method: PUT
+  path: /repos/{owner}/{repo}/rulesets/{ruleset_id}
+  deviation: union-flattened
+  fields:
+  - rules[]
+  reason: As OrgRuleset rules[].
+- row: new
+  category: C
+  kind: OrgRuleset
+  method: POST
+  path: /orgs/{org}/rulesets
+  deviation: union-flattened
+  fields:
+  - conditions
+  reason: GitHub's conditions are a oneOf of repository_name / repository_id / repository_property targeting; flattened
+    to repository_name alone. The asset's reason for dropping repository_property (custom properties are not modelled)
+    predates the CustomProperty kind. chart/assets/orgruleset.yaml
+- row: new
+  category: C
+  kind: OrgRuleset
+  method: PUT
+  path: /orgs/{org}/rulesets/{ruleset_id}
+  deviation: union-flattened
+  fields:
+  - conditions
+  reason: As POST.
+- row: '27'
+  category: C
+  kind: RepoRuleset
+  method: GET
+  path: /repos/{owner}/{repo}/rulesets/{ruleset_id}
+  deviation: query-dropped
+  fields:
+  - includes_parents
+  reason: '`includes_parents` could only make the observe read someone else''s (an org''s) ruleset. chart/assets/reporuleset.yaml'
+- row: 21a
+  category: C
+  kind: PullRequest
+  method: GET
+  path: /repos/{owner}/{repo}/pulls
+  deviation: query-dropped
+  fields:
+  - page
+  - per_page
+  - state
+  reason: A query parameter declared on the findby list operation becomes a spec field (oasgen merges parameters
+    from every verb into the spec), so an author could set a filter that makes findby miss the object it is looking
+    for, and observe would then re-create it. The paginator sets page/per_page on the URL itself.
+- row: 21b
+  category: D
+  kind: PullRequest
+  method: GET
+  path: /repos/{owner}/{repo}/pulls
+  deviation: query-dropped
+  fields:
+  - base
+  - direction
+  - head
+  - sort
+  reason: A query parameter declared on the findby list operation becomes a spec field (oasgen merges parameters
+    from every verb into the spec), so an author could set a filter that makes findby miss the object it is looking
+    for, and observe would then re-create it. The paginator sets page/per_page on the URL itself.
+- row: '22'
+  category: C
+  kind: PullRequest
+  method: PATCH
+  path: /repos/{owner}/{repo}/pulls/{pull_number}
+  deviation: dropped
+  fields:
+  - maintainer_can_modify
+  reason: 'Kept create-only. The recorded premise (that PATCH cannot change it) is wrong: GitHub''s pulls/update
+    accepts it and GET returns it, so this is a candidate to restore (deviation review row 22).'
+- row: '20'
+  category: D
+  kind: PullRequest
+  method: POST
+  path: /repos/{owner}/{repo}/pulls
+  deviation: dropped
+  fields:
+  - head_repo
+  - issue
+  restore: todo
+  reason: Unmodelled; to restore (deviation review row 20).
+- row: '20'
+  category: D
+  kind: PullRequest
+  method: POST
+  path: /repos/{owner}/{repo}/pulls
+  deviation: required-added
+  fields:
+  - title
+  restore: todo
+  reason: 'To restore: GitHub requires only head and base (row 20).'
+- row: '23'
+  category: D
+  kind: Release
+  method: POST
+  path: /repos/{owner}/{repo}/releases
+  deviation: dropped
+  fields:
+  - discussion_category_name
+  - make_latest
+  restore: '#58'
+  reason: 'Unmodelled; restored by PR #58.'
+- row: '24'
+  category: C
+  kind: Release
+  method: PATCH
+  path: /repos/{owner}/{repo}/releases/{release_id}
+  deviation: dropped
+  fields:
+  - discussion_category_name
+  - make_latest
+  reason: GET returns neither, so neither could ever be reconciled; they act once, at create. chart/assets/release.yaml
+- row: '25'
+  category: D
+  kind: RepoContent
+  method: DELETE
+  path: /repos/{owner}/{repo}/contents/{path}
+  deviation: dropped
+  fields:
+  - author
+  - committer
+  restore: todo
+  reason: Unmodelled; to restore (deviation review row 25).
+- row: new
+  category: D
+  kind: RepoContent
+  method: PUT
+  path: /repos/{owner}/{repo}/contents/{path}
+  deviation: dropped
+  fields:
+  - author.date
+  - committer.date
+  restore: todo
+  reason: Unmodelled nested fields; to restore with row 25.
+- row: new
+  category: D
+  kind: RepoContent
+  method: PUT
+  path: /repos/{owner}/{repo}/contents/{path}
+  deviation: required-dropped
+  fields:
+  - author.email
+  - author.name
+  - committer.email
+  - committer.name
+  restore: todo
+  reason: GitHub requires name and email inside author/committer; to restore with row 25.
+- row: '26'
+  category: C
+  kind: RepoDeployment
+  method: POST
+  path: /repos/{owner}/{repo}/deployments
+  deviation: dropped
+  fields:
+  - payload
+  reason: '`payload` is oneOf object | string, which does not survive CRD generation (see also oasgen-provider#563).
+    chart/assets/repodeployment.yaml'
+- row: '29'
+  category: C
+  kind: Repository
+  method: GET
+  path: /repos/{org}/{name}
+  deviation: param-renamed
+  fields:
+  - name<-repo
+  - org<-owner
+  reason: '`owner`/`repo` are spelled `org`/`name` so one CR field each covers create body, path and status, with
+    no duplicate to keep in sync. chart/assets/repository.yaml'
+- row: 30c
+  category: C
+  kind: Repository
+  method: PATCH
+  path: /repos/{org}/{name}
+  deviation: param-renamed
+  fields:
+  - name<-repo
+  - org<-owner
+  reason: As row 29.
+- row: 30a
+  category: A
+  kind: Repository
+  method: PATCH
+  path: /repos/{org}/{name}
+  deviation: dropped
+  fields:
+  - name
+  - private
+  - visibility
+  reason: 'Safety: as compared fields, `name` renamed live repositories back to a stale name, and `private`/`visibility`
+    would flip live private repositories public, irreversibly. chart/assets/repository.yaml'
+- row: 30b
+  category: D
+  kind: Repository
+  method: PATCH
+  path: /repos/{org}/{name}
+  deviation: dropped
+  fields:
+  - allow_auto_merge
+  - allow_forking
+  - allow_merge_commit
+  - allow_rebase_merge
+  - allow_squash_merge
+  - allow_update_branch
+  - delete_branch_on_merge
+  - has_pull_requests
+  - is_template
+  - merge_commit_message
+  - merge_commit_title
+  - pull_request_creation_policy
+  - security_and_analysis
+  - squash_merge_commit_message
+  - squash_merge_commit_title
+  - use_squash_pr_title_as_default
+  - web_commit_signoff_required
+  restore: todo
+  reason: Unmodelled; to restore (deviation review row 30b).
+- row: '28'
+  category: D
+  kind: Repository
+  method: POST
+  path: /orgs/{org}/repos
+  deviation: dropped
+  fields:
+  - allow_auto_merge
+  - allow_merge_commit
+  - allow_rebase_merge
+  - allow_squash_merge
+  - custom_properties
+  - delete_branch_on_merge
+  - has_downloads
+  - is_template
+  - merge_commit_message
+  - merge_commit_title
+  - squash_merge_commit_message
+  - squash_merge_commit_title
+  - team_id
+  - use_squash_pr_title_as_default
+  restore: todo
+  reason: Unmodelled; to restore (deviation review row 28).
+- row: '34'
+  category: D
+  kind: RunnerGroup
+  method: POST
+  path: /orgs/{org}/actions/runner-groups
+  deviation: dropped
+  fields:
+  - network_configuration_id
+  restore: '#59'
+  reason: 'Unmodelled; restored by PR #59.'
+- row: '35'
+  category: D
+  kind: RunnerGroup
+  method: PATCH
+  path: /orgs/{org}/actions/runner-groups/{runner_group_id}
+  deviation: dropped
+  fields:
+  - network_configuration_id
+  restore: '#59'
+  reason: 'Unmodelled; restored by PR #59.'
+- row: '36'
+  category: C
+  kind: Team
+  method: POST
+  path: /orgs/{org}/teams
+  deviation: dropped
+  fields:
+  - maintainers
+  - parent_team_id
+  - parent_team_slug
+  - permission
+  - repo_names
+  reason: 'maintainers/repo_names: a second writer for facts TeamMembership and TeamRepo own; permission: GitHub''s
+    closing-down notice; parent_team_*: would silently never be reconciled. chart/assets/team.yaml'
+- row: '37'
+  category: C
+  kind: Team
+  method: PATCH
+  path: /orgs/{org}/teams/{team_slug}
+  deviation: dropped
+  fields:
+  - parent_team_id
+  - parent_team_slug
+  - permission
+  reason: As row 36.
+- row: '40'
+  category: C
+  kind: UserRepository
+  method: GET
+  path: /repos/{owner}/{name}
+  deviation: param-renamed
+  fields:
+  - name<-repo
+  reason: '`repo` is spelled `name`, sourced from status.name, as in Repository (row 29). chart/assets/userrepository.yaml'
+- row: 41c
+  category: C
+  kind: UserRepository
+  method: PATCH
+  path: /repos/{owner}/{name}
+  deviation: param-renamed
+  fields:
+  - name<-repo
+  reason: As row 40.
+- row: 41a
+  category: A
+  kind: UserRepository
+  method: PATCH
+  path: /repos/{owner}/{name}
+  deviation: dropped
+  fields:
+  - name
+  - private
+  - visibility
+  reason: 'Safety, as Repository row 30a: would rename or flip the exposure of existing repositories, irreversibly.
+    chart/assets/userrepository.yaml'
+- row: 41b
+  category: D
+  kind: UserRepository
+  method: PATCH
+  path: /repos/{owner}/{name}
+  deviation: dropped
+  fields:
+  - allow_auto_merge
+  - allow_forking
+  - allow_merge_commit
+  - allow_rebase_merge
+  - allow_squash_merge
+  - allow_update_branch
+  - delete_branch_on_merge
+  - has_pull_requests
+  - is_template
+  - merge_commit_message
+  - merge_commit_title
+  - pull_request_creation_policy
+  - security_and_analysis
+  - squash_merge_commit_message
+  - squash_merge_commit_title
+  - use_squash_pr_title_as_default
+  - web_commit_signoff_required
+  restore: todo
+  reason: Unmodelled; to restore (deviation review row 41b).
+- row: 38a
+  category: D
+  kind: UserRepository
+  method: POST
+  path: /user/repos
+  deviation: dropped
+  fields:
+  - allow_auto_merge
+  - allow_merge_commit
+  - allow_rebase_merge
+  - allow_squash_merge
+  - delete_branch_on_merge
+  - has_discussions
+  - has_downloads
+  - is_template
+  - merge_commit_message
+  - merge_commit_title
+  - squash_merge_commit_message
+  - squash_merge_commit_title
+  - team_id
+  restore: todo
+  reason: Unmodelled; to restore (deviation review row 38a).
+- row: 38b
+  category: C
+  kind: UserRepository
+  method: POST
+  path: /user/repos
+  deviation: added
+  fields:
+  - visibility
+  reason: GitHub's POST /user/repos has no `visibility`, but the org endpoint does; kept so the field can be set
+    at creation (hack/assert-drift-invariants.py requires it).
+- row: '39'
+  category: D
+  kind: UserRepository
+  method: GET
+  path: /user/repos
+  deviation: query-dropped
+  fields:
+  - before
+  - since
+  - type
+  - visibility
+  reason: A query parameter declared on the findby list operation becomes a spec field (oasgen merges parameters
+    from every verb into the spec), so an author could set a filter that makes findby miss the object it is looking
+    for, and observe would then re-create it. The paginator sets page/per_page on the URL itself.
+defaults:
+- kind: Autolink
+  method: POST
+  path: /repos/{owner}/{repo}/autolinks
+  field: is_alphanumeric
+  value: true
+  github: true
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: BranchProtection
+  method: PUT
+  path: /repos/{owner}/{repo}/branches/{branch}/protection
+  field: enforce_admins
+  value: false
+  github: null
+  reason: GitHub requires the key (nullable, null = off); defaulted so it is always present. chart/assets/branchprotection.yaml
+- kind: DeployKey
+  method: POST
+  path: /repos/{owner}/{repo}/keys
+  field: read_only
+  value: true
+  github: null
+  reason: 'Chart choice: a write-capable deploy key must be asked for explicitly. GitHub''s prose: read-write unless
+    true. chart/assets/deploykey.yaml'
+- kind: GitRef
+  method: PATCH
+  path: /repos/{owner}/{repo}/git/refs/{ref}
+  field: force
+  value: false
+  github: false
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: Milestone
+  method: PATCH
+  path: /repos/{owner}/{repo}/milestones/{milestone_number}
+  field: state
+  value: open
+  github: open
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: Milestone
+  method: POST
+  path: /repos/{owner}/{repo}/milestones
+  field: state
+  value: open
+  github: open
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: OrgRuleset
+  method: POST
+  path: /orgs/{org}/rulesets
+  field: bypass_actors[].bypass_mode
+  value: always
+  github: always
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: OrgRuleset
+  method: POST
+  path: /orgs/{org}/rulesets
+  field: target
+  value: branch
+  github: branch
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: OrgRuleset
+  method: PUT
+  path: /orgs/{org}/rulesets/{ruleset_id}
+  field: bypass_actors[].bypass_mode
+  value: always
+  github: always
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: OrgWebhook
+  method: POST
+  path: /orgs/{org}/hooks
+  field: active
+  value: true
+  github: true
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: OrgWebhook
+  method: POST
+  path: /orgs/{org}/hooks
+  field: config.content_type
+  value: form
+  github: null
+  reason: 'GitHub''s prose: "The default is `form`." Frozen (#562).'
+- kind: OrgWebhook
+  method: POST
+  path: /orgs/{org}/hooks
+  field: config.insecure_ssl
+  value: '0'
+  github: null
+  reason: 'GitHub''s prose: "The default is `0`" (verify TLS). Frozen (#562).'
+- kind: OrgWebhook
+  method: POST
+  path: /orgs/{org}/hooks
+  field: events
+  value:
+  - push
+  github:
+  - push
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: OrgWebhook
+  method: POST
+  path: /orgs/{org}/hooks
+  field: name
+  value: web
+  github: null
+  reason: 'GitHub''s prose: must be "web". Frozen (#562).'
+- kind: RepoDeployment
+  method: POST
+  path: /repos/{owner}/{repo}/deployments
+  field: auto_merge
+  value: false
+  github: true
+  reason: CONTRADICTS GitHub (true). With auto_merge, GitHub may merge instead of deploying (202, no deployment
+    id), and the CR is left unobservable with a green create. chart/assets/repodeployment.yaml. Frozen (#562).
+- kind: RepoRuleset
+  method: POST
+  path: /repos/{owner}/{repo}/rulesets
+  field: bypass_actors[].bypass_mode
+  value: always
+  github: always
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: RepoRuleset
+  method: POST
+  path: /repos/{owner}/{repo}/rulesets
+  field: target
+  value: branch
+  github: branch
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: RepoRuleset
+  method: PUT
+  path: /repos/{owner}/{repo}/rulesets/{ruleset_id}
+  field: bypass_actors[].bypass_mode
+  value: always
+  github: always
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: RepoWebhook
+  method: POST
+  path: /repos/{owner}/{repo}/hooks
+  field: active
+  value: true
+  github: true
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: RepoWebhook
+  method: POST
+  path: /repos/{owner}/{repo}/hooks
+  field: config.content_type
+  value: form
+  github: null
+  reason: 'GitHub''s prose: "The default is `form`." Frozen (#562).'
+- kind: RepoWebhook
+  method: POST
+  path: /repos/{owner}/{repo}/hooks
+  field: config.insecure_ssl
+  value: '0'
+  github: null
+  reason: 'GitHub''s prose: "The default is `0`" (verify TLS). Frozen (#562).'
+- kind: RepoWebhook
+  method: POST
+  path: /repos/{owner}/{repo}/hooks
+  field: events
+  value:
+  - push
+  github:
+  - push
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: RepoWebhook
+  method: POST
+  path: /repos/{owner}/{repo}/hooks
+  field: name
+  value: web
+  github: null
+  reason: 'GitHub''s prose: "Default: `web`". Frozen (#562).'
+- kind: Repository
+  method: POST
+  path: /orgs/{org}/repos
+  field: auto_init
+  value: true
+  github: false
+  reason: 'CONTRADICTS GitHub (false). Load-bearing: a repository created empty has no default branch, so a GitRef
+    or RepoContent aimed at it fails until someone pushes by hand. chart/assets/repository.yaml. Frozen (#562).
+    On 057 (2026-11-10) all 15 CRs carry it as a field-manager-owned value, not a materialized default.'
+- kind: RunnerGroup
+  method: PATCH
+  path: /orgs/{org}/actions/runner-groups/{runner_group_id}
+  field: allows_public_repositories
+  value: false
+  github: false
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: RunnerGroup
+  method: PATCH
+  path: /orgs/{org}/actions/runner-groups/{runner_group_id}
+  field: restricted_to_workflows
+  value: false
+  github: false
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: RunnerGroup
+  method: POST
+  path: /orgs/{org}/actions/runner-groups
+  field: allows_public_repositories
+  value: false
+  github: false
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: RunnerGroup
+  method: POST
+  path: /orgs/{org}/actions/runner-groups
+  field: restricted_to_workflows
+  value: false
+  github: false
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: RunnerGroup
+  method: POST
+  path: /orgs/{org}/actions/runner-groups
+  field: visibility
+  value: all
+  github: all
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: Team
+  method: POST
+  path: /orgs/{org}/teams
+  field: notification_setting
+  value: notifications_enabled
+  github: null
+  reason: 'GitHub''s prose: "Default: `notifications_enabled`". Frozen (#562).'
+- kind: Team
+  method: POST
+  path: /orgs/{org}/teams
+  field: privacy
+  value: secret
+  github: null
+  reason: 'GitHub''s prose: "Default: `secret`" for a non-nested team. Frozen (#562).'
+- kind: TeamMembership
+  method: PUT
+  path: /orgs/{org}/teams/{team_slug}/memberships/{username}
+  field: role
+  value: member
+  github: member
+  reason: 'Same value as GitHub''s default. Frozen: already materialized into existing CRs (oasgen-provider#562).'
+- kind: TeamRepo
+  method: PUT
+  path: /orgs/{org}/teams/{team_slug}/repos/{owner}/{repo}
+  field: permission
+  value: pull
+  github: null
+  reason: Defaulted so the grant level is always compared; omitted, GitHub falls back to the team's own permission
+    and the grant is unmanaged. chart/assets/teamrepo.yaml
+- kind: UserRepository
+  method: POST
+  path: /user/repos
+  field: auto_init
+  value: true
+  github: false
+  reason: CONTRADICTS GitHub (false). As Repository auto_init. Frozen (#562).

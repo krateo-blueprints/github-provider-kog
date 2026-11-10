@@ -11,6 +11,24 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-10 — ci: every deviation from GitHub's OpenAPI is listed and checked
+
+Diego asked for the chart to be 100% adherent to GitHub's OpenAPI. The deviation review that
+followed found 55 field-level deviations; this adds the gate that keeps the list complete.
+
+- **`hack/assert-oas-adherence.py`** (lint job `oas-adherence`) compares each of the 121
+  verbs with GitHub's operation at the pinned commit: parameters, body properties and
+  `required`, recursing into nested objects (the review compared top-level fields only, and
+  the nested comparison adds 13 entries, e.g. RepoContent's author/committer `date` and the rulesets' flattened `rules[]` union).
+- **`hack/oas-adherence-exceptions.yaml`** holds every difference (225 at main 61ae3ea, in 70
+  entries) with its category and reason. Category D entries name the PR restoring them
+  (#58–#62) or the issue holding them (oasgen-provider#563 for Issue `issue_field_values`).
+- **Defaults are frozen** (Diego, 2026-11-10): no new asset copies a GitHub `default`; the 34
+  existing declarations (29 kind/field pairs) are listed with GitHub's own value. Removing `make_latest`'s default from #58 was
+  the first application.
+- Negative controls: restoring a field without deleting its entry fails as stale; adding a
+  `default` fails as NEW DEFAULT.
+
 ## 2026-11-07 — feat: publish both charts to the helm index, not only GHCR
 
 The organisation adopted one publishing standard (krateo-blueprints/charts `PUBLISHING.md`):
