@@ -107,12 +107,11 @@ spec:
       # sources it (the body property `sha` is in the operation's request-body schema, and
       # processFields writes any status field whose name is in that set when spec has not set it).
       #
-      # NOTE for maintainers: unlike Repository (which deliberately has NO delete verb to keep
-      # oasgen-provider #125's unconditional CRD cascade-delete harmless), RepoContent keeps delete
-      # — deleting the CR deletes the FILE on the branch. A file is recoverable from git history and
-      # delete is the documented RepoContent lifecycle, so the trade differs from a whole repo. But
-      # the same cascade applies: dropping this RestDefinition or uninstalling the chart will delete
-      # every file every RepoContent CR manages. Weigh that before adding a destructive default.
+      # NOTE for maintainers: deleting the CR deletes the FILE on the branch, as GitHub's API defines
+      # (every kind exposes every operation GitHub defines on its paths; Repository too). To keep the
+      # file, annotate the CR `krateo.io/deletion-policy: orphan`. The oasgen-provider #125 cascade
+      # (dropping the RestDefinition deleting every CR, and so every file) is fixed: oasgen refuses
+      # to drop a CRD that still has instances.
       - action: delete
         method: DELETE
         path: /repos/{owner}/{repo}/contents/{path}

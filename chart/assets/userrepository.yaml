@@ -88,10 +88,10 @@ paths:
   # status.name (the name GitHub assigned) on both verbs too — the oasgen-provider #386 fix — so a
   # name GitHub normalised on create ("my repo" -> "my-repo") is still addressable; see
   # rd-userrepository.yaml. Before that status exists the get cannot be built, so the
-  # controller observes through the findby above instead. There is NO delete verb: deleting the CR
-  # ORPHANS the repository, it does not destroy it — the same deliberate choice Repository makes,
-  # so the oasgen-provider #125 CRD cascade (uninstall / RD-drop) can never delete a user's
-  # repositories. Restore delete only with the #125 guard and a per-CR opt-in.
+  # controller observes through the findby above instead. DELETE (below) deletes the repository on
+  # GitHub, an adopted one included; annotate the CR `krateo.io/deletion-policy: orphan` to keep
+  # it. The oasgen-provider #125 CRD cascade that once made a delete verb dangerous is fixed:
+  # oasgen refuses to drop a CRD that still has instances.
   "/repos/{owner}/{name}":
     get:
       summary: Get a repository
