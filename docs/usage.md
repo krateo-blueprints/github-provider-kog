@@ -530,7 +530,7 @@ spec:
 - **Some fields are create-only and quietly stay that way**: an `Issue`'s
   `labels`/`assignees`/`milestone` (GitHub returns them as objects rather than the
   strings and numbers it accepts, so comparing them could only produce an update that
-  changes nothing), a `Milestone`'s `due_on` (GitHub keeps the day and re-times it to
+  changes nothing) and `assignee`/`type`/`parent_issue_id`, a `Milestone`'s `due_on` (GitHub keeps the day and re-times it to
   midnight in the token account's timezone, so what `GET` returns is not what was
   written — read `status.due_on` to see what it stored), and a `Release`'s
   `generate_release_notes`. A `Release`'s `name`, `body`, `draft` and `prerelease` *are*
