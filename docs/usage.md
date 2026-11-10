@@ -557,10 +557,10 @@ spec:
 - **Some fields are create-only and quietly stay that way**: an `Issue`'s
   `labels`/`assignees`/`milestone` (GitHub returns them as objects rather than the
   strings and numbers it accepts, so comparing them could only produce an update that
-  changes nothing), a `Milestone`'s `due_on` (GitHub keeps the day and re-times it to
+  changes nothing) and `assignee`/`type`/`parent_issue_id`, a `Milestone`'s `due_on` (GitHub keeps the day and re-times it to
   midnight in the token account's timezone, so what `GET` returns is not what was
   written — read `status.due_on` to see what it stored), and a `Release`'s
-  `generate_release_notes`. A `Release`'s `name`, `body`, `draft` and `prerelease` *are*
+  `generate_release_notes`, `discussion_category_name` and `make_latest` (set once, at create). A `Release`'s `name`, `body`, `draft` and `prerelease` *are*
   compared and pushed.
 - **`Label`'s `name` is its identity, and `color` is lower-case hex without the `#`.**
   `"D73A4A"` reads as permanent drift because GitHub echoes it lower-cased, and editing
@@ -614,6 +614,10 @@ spec:
   and a `PATCH` on every reconcile. Without GHAS licences, set
   `advanced_security: disabled` and leave the GHAS-gated toggles at `not_set`;
   `not_set` means "leave the repository's own setting alone".
+  Every toggle in GitHub's create and update bodies is modelled except `code_security`,
+  `secret_protection` and the four `*_options` blocks (reasons in the asset). The chart
+  copies none of GitHub's create-time defaults: a toggle left out of the CR gets GitHub's
+  default on create and is not compared afterwards.
 - **`AutomatedSecurityFixes` has no settings — its existence is the desired state.**
   Deleting the CR turns Dependabot security updates back off, and turning them off in the
   UI is reverted at the next reconcile. `status.paused` reports Dependabot's own back-off

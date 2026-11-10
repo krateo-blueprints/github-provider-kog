@@ -67,6 +67,12 @@ paths:
                     - org_and_repo_actors
                 require_explicit_values:
                   type: boolean
+                # As published in GitHub's create-or-update body (deviation review row 9a). GET echoes
+                # it, and compareScope is updatable over this same PUT body, so drift on it is fixed.
+                regex:
+                  description: 'A regular expression (RE2 syntax) that values of the property must match. Only supported for properties with a value_type of string.'
+                  nullable: true
+                  type: string
       responses:
         '200':
           description: Response
@@ -137,6 +143,8 @@ components:
           type: string
         require_explicit_values:
           type: boolean
+        regex:
+          type: string
         # organization | enterprise — where the definition comes from. Worth surfacing on
         # status: an enterprise-sourced property cannot be edited at org level.
         source_type:
