@@ -55,6 +55,10 @@ paths:
                   type: array
                   items:
                     type: integer
+                # From GitHub's actions/create-self-hosted-runner-group-for-org body as published.
+                network_configuration_id:
+                  description: The identifier of a hosted compute network configuration.
+                  type: string
       responses:
         '201':
           description: Response
@@ -117,6 +121,12 @@ paths:
                   type: array
                   items:
                     type: string
+                # From GitHub's actions/update-self-hosted-runner-group-for-org body. GET returns it,
+                # so it is compared like the fields above.
+                network_configuration_id:
+                  description: The identifier of a hosted compute network configuration.
+                  nullable: true
+                  type: string
       responses:
         '200':
           description: Response
@@ -175,6 +185,9 @@ components:
           type: array
           items:
             type: string
+        network_configuration_id:
+          description: The identifier of a hosted compute network configuration.
+          type: string
         # Server-managed, read-only facts: whether this is the org's Default group, whether it
         # is inherited from an enterprise, and the sub-collection links a caller needs to
         # inspect or manage membership out of band.
