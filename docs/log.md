@@ -20,9 +20,10 @@ followed found 55 field-level deviations; this adds the gate that keeps the list
   verbs with GitHub's operation at the pinned commit: parameters, body properties and
   `required`, recursing into nested objects (the review compared top-level fields only, and
   the nested comparison adds 13 entries, e.g. RepoContent's author/committer `date` and the rulesets' flattened `rules[]` union).
-- **`hack/oas-adherence-exceptions.yaml`** holds every difference (228 at main 39c9294, in 72
-  entries) with its category and reason. Category D entries name the PR restoring them
-  (#58–#62) or the issue holding them (oasgen-provider#563 for Issue `issue_field_values`).
+- **`hack/oas-adherence-exceptions.yaml`** holds every difference (204 at main 96e75dc, in 65
+  entries) with its category and reason. #58–#62, merged the same day, restored 24 fields and
+  deleted their entries. The remaining category D entries say `todo` or name the issue holding
+  them (oasgen-provider#563 for Issue `issue_field_values`).
 - **Defaults are frozen** (Diego, 2026-11-10): no new asset copies a GitHub `default`; the 34
   existing declarations (29 kind/field pairs) are listed with GitHub's own value. Removing `make_latest`'s default from #58 was
   the first application.

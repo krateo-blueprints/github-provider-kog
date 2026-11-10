@@ -105,40 +105,6 @@ exceptions:
   - secret_protection
   - secret_scanning_delegated_bypass_options
   reason: As row 4a; the PATCH body mirrors POST by design.
-- row: 4b
-  category: D
-  kind: CodeSecurityConfig
-  method: POST
-  path: /orgs/{org}/code-security/configurations
-  deviation: dropped
-  fields:
-  - code_scanning_delegated_alert_dismissal
-  - dependabot_delegated_alert_dismissal
-  - dependabot_reachability
-  - secret_scanning_delegated_alert_dismissal
-  - secret_scanning_delegated_bypass
-  - secret_scanning_extended_metadata
-  - secret_scanning_generic_secrets
-  - secret_scanning_generic_secrets_push_protection
-  restore: '#61'
-  reason: 'Unmodelled; restored by PR #61.'
-- row: 5b
-  category: D
-  kind: CodeSecurityConfig
-  method: PATCH
-  path: /orgs/{org}/code-security/configurations/{configuration_id}
-  deviation: dropped
-  fields:
-  - code_scanning_delegated_alert_dismissal
-  - dependabot_delegated_alert_dismissal
-  - dependabot_reachability
-  - secret_scanning_delegated_alert_dismissal
-  - secret_scanning_delegated_bypass
-  - secret_scanning_extended_metadata
-  - secret_scanning_generic_secrets
-  - secret_scanning_generic_secrets_push_protection
-  restore: '#61'
-  reason: 'Unmodelled; restored by PR #61.'
 - row: '6'
   category: C
   kind: Collaborator
@@ -190,16 +156,6 @@ exceptions:
   reason: A query parameter declared on the findby list operation becomes a spec field (oasgen merges parameters
     from every verb into the spec), so an author could set a filter that makes findby miss the object it is looking
     for, and observe would then re-create it. The paginator sets page/per_page on the URL itself.
-- row: 9a
-  category: D
-  kind: CustomProperty
-  method: PUT
-  path: /orgs/{org}/properties/schema/{property_name}
-  deviation: dropped
-  fields:
-  - regex
-  restore: '#60'
-  reason: 'Unmodelled; restored by PR #60.'
 - row: 9b
   category: C
   kind: CustomProperty
@@ -238,18 +194,6 @@ exceptions:
   - sha
   reason: GitHub requires `sha`; the CR may instead name a source branch and the chart resolves the sha with a dependentLookup
     before the request is sent. chart/assets/gitref.yaml
-- row: '14'
-  category: D
-  kind: Issue
-  method: POST
-  path: /repos/{owner}/{repo}/issues
-  deviation: dropped
-  fields:
-  - assignee
-  - parent_issue_id
-  - type
-  restore: '#62'
-  reason: 'Unmodelled; restored by PR #62.'
 - row: '14'
   category: D
   kind: Issue
@@ -525,17 +469,6 @@ exceptions:
   - title
   restore: todo
   reason: 'To restore: GitHub requires only head and base (row 20).'
-- row: '23'
-  category: D
-  kind: Release
-  method: POST
-  path: /repos/{owner}/{repo}/releases
-  deviation: dropped
-  fields:
-  - discussion_category_name
-  - make_latest
-  restore: '#58'
-  reason: 'Unmodelled; restored by PR #58.'
 - row: '24'
   category: C
   kind: Release
@@ -684,26 +617,6 @@ exceptions:
   - use_squash_pr_title_as_default
   restore: todo
   reason: Unmodelled; to restore (deviation review row 28).
-- row: '34'
-  category: D
-  kind: RunnerGroup
-  method: POST
-  path: /orgs/{org}/actions/runner-groups
-  deviation: dropped
-  fields:
-  - network_configuration_id
-  restore: '#59'
-  reason: 'Unmodelled; restored by PR #59.'
-- row: '35'
-  category: D
-  kind: RunnerGroup
-  method: PATCH
-  path: /orgs/{org}/actions/runner-groups/{runner_group_id}
-  deviation: dropped
-  fields:
-  - network_configuration_id
-  restore: '#59'
-  reason: 'Unmodelled; restored by PR #59.'
 - row: '36'
   category: C
   kind: Team
