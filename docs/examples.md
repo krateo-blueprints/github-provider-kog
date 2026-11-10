@@ -27,11 +27,10 @@ timestamp: 2026-09-09T00:00:00Z
   Three things to settle before running it. The PAT needs repo-creation rights in the
   org — classic token `repo`, fine-grained token organization **Administration: read &
   write** — which is more than the repository-scoped kinds need, so a token that
-  configures an existing repository fine can still fail here. `Repository` has **no
-  delete verb**, so deleting the CR orphans the repository rather than destroying it —
-  deliberate, because oasgen deletes a RestDefinition's CRD unconditionally and every
-  finalizer would otherwise run (oasgen-provider #125). Still point the sample at a
-  scratch org. And editing the applied CR is pushed to
+  configures an existing repository fine can still fail here. **Deleting the
+  `Repository` CR deletes the repository on GitHub**; add the annotation
+  `krateo.io/deletion-policy: orphan` to the sample if you want to keep it. Point the
+  sample at a scratch org. And editing the applied CR is pushed to
   GitHub only for fields `PATCH` can send — `Repository` compares with
   `compareScope: updatable`, so `description` reconciles while `auto_init`,
   `gitignore_template`, `license_template` and — deliberately — `private` and

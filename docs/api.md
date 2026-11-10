@@ -139,8 +139,8 @@ authoring one are written out in full below the tables.
 
 | kind | verbs | identifiers | `compareScope` | status |
 |---|---|---|---|---|
-| `Repository` | create `POST /orgs/{org}/repos`; get/update `GET`/`PATCH /repos/{org}/{name}` with `name` from `status.name` (the name GitHub assigned). **No delete verb** — deleting the CR orphans the repository, it does not destroy it (see below) | `name` | `updatable` | `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
-| `UserRepository` | create `POST /user/repos`; get/update `GET`/`PATCH /repos/{owner}/{name}` with `owner` from `status.owner.login` and `name` from `status.name`; **findby** `GET /user/repos?affiliation=owner` (paginated) before status exists — **no delete verb** | `name` | `updatable` | `owner.login`, `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
+| `Repository` | create `POST /orgs/{org}/repos`; get/update/delete `GET`/`PATCH`/`DELETE /repos/{org}/{name}` with `name` from `status.name` (the name GitHub assigned). **Deleting the CR deletes the repository**; annotate it `krateo.io/deletion-policy: orphan` to keep the repository ([usage](./usage.md#keeping-a-repository-when-its-cr-is-deleted)) | `name` | `updatable` | `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
+| `UserRepository` | create `POST /user/repos`; get/update/delete `GET`/`PATCH`/`DELETE /repos/{owner}/{name}` with `owner` from `status.owner.login` and `name` from `status.name`; **findby** `GET /user/repos?affiliation=owner` (paginated) before status exists. **Deleting the CR deletes the repository**, an adopted one included; annotate it `krateo.io/deletion-policy: orphan` to keep it | `name` | `updatable` | `owner.login`, `id`, `node_id`, `full_name`, `html_url`, `clone_url`, `ssh_url`, `default_branch` |
 
 ### `Repository` — create the destination repository
 

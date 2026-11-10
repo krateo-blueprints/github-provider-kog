@@ -85,22 +85,27 @@ spec:
         fieldMapping:
           - inPath: name
             inCustomResource: status.name
-    # NO DELETE VERB, DELIBERATELY. Deleting this CR ORPHANS the GitHub repository; it does not
-    # destroy it. rest-dynamic-controller handles an absent delete verb by releasing the finalizer
-    # and leaving the external resource alone (restResources.go Delete: `apiCall == nil` -> log
-    # "API action delete not found" -> return nil), so nothing wedges.
-    #
-    # WHY, and it is not squeamishness. oasgen-provider deletes a RestDefinition's CRD
-    # UNCONDITIONALLY (SkipCRD:false), which cascade-deletes every CR of that kind, which runs every
-    # finalizer. With a delete verb here, that chain ends in DELETE /repos/{org}/{name} — so
-    # removing this RestDefinition, uninstalling the chart, or any CRD-version migration would
-    # DESTROY EVERY REPOSITORY IT EVER CREATED, including the code in them. That is oasgen-provider
-    # #125, found on krateo-057 where a duplicate install could not be hand-cleaned for exactly this
-    # reason. Until the upstream guard lands, not having the verb is the only thing that makes the
-    # cascade harmless.
-    #
-    # The trade is deliberate and one-directional: a leaked repository is an inconvenience someone
-    # can delete in GitHub; a destroyed one is not recoverable from here. For a blueprint
-    # DESTINATION repo, "removing the CR should never remove the code" is the right default. Restore
-    # the verb only alongside the #125 guard, and only with a per-CR opt-in.
+      # DELETING THE CR DELETES THE REPOSITORY ON GITHUB, code and history included. GitHub's API
+      # defines this operation (repos/delete), and this chart exposes every operation GitHub
+      # defines on the paths it uses. To keep the repository when the CR goes away, annotate the CR:
+      #
+      #   metadata:
+      #     annotations:
+      #       krateo.io/deletion-policy: orphan
+      #
+      # rest-dynamic-controller then releases the finalizer without calling GitHub
+      # (unstructured-runtime pkg/meta ShouldDelete, pkg/controller/worker.go). A builder-publish
+      # repository carries this annotation from the portal chart.
+      #
+      # This verb was absent until oasgen-provider #125 was fixed: oasgen used to drop a
+      # RestDefinition's CRD unconditionally, which deleted every CR of the kind and would have
+      # run this DELETE for every repository the kind ever created. oasgen-provider now refuses
+      # to drop a CRD that still has instances (internal/tools/deploy/deploy.go, ErrLiveInstances),
+      # so removing this RestDefinition or uninstalling the chart no longer reaches GitHub.
+      - action: delete
+        method: DELETE
+        path: /repos/{org}/{name}
+        fieldMapping:
+          - inPath: name
+            inCustomResource: status.name
 {{- end }}

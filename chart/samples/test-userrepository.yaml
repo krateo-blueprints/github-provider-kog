@@ -15,8 +15,8 @@
 # fields at all. private/visibility are
 # create-only, so adoption never changes an existing repo's exposure.
 #
-# There is no delete verb: deleting this CR stops Krateo tracking the repo but never deletes it
-# on GitHub (same safety as Repository). `private`/`visibility` are honoured at create and NOT
+# Deleting this CR DELETES the repository on GitHub (as for Repository), an adopted one included.
+# To keep it, add the annotation `krateo.io/deletion-policy: orphan` before deleting the CR. `private`/`visibility` are honoured at create and NOT
 # reconciled afterward (changing them here will not flip an existing repo's exposure).
 apiVersion: github.krateo.io/v2022-11-28
 kind: UserRepository

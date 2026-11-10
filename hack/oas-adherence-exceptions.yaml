@@ -612,6 +612,17 @@ exceptions:
   - name<-repo
   - org<-owner
   reason: As row 29.
+- row: '31'
+  category: C
+  kind: Repository
+  method: DELETE
+  path: /repos/{org}/{name}
+  deviation: param-renamed
+  fields:
+  - name<-repo
+  - org<-owner
+  reason: 'As row 29. The keying matters most here: the DELETE path is built from status.name, so it can only address
+    the repository the CR created (hack/assert-drift-invariants.py).'
 - row: 30a
   category: A
   kind: Repository
@@ -731,6 +742,15 @@ exceptions:
   category: C
   kind: UserRepository
   method: PATCH
+  path: /repos/{owner}/{name}
+  deviation: param-renamed
+  fields:
+  - name<-repo
+  reason: As row 40.
+- row: '42'
+  category: C
+  kind: UserRepository
+  method: DELETE
   path: /repos/{owner}/{name}
   deviation: param-renamed
   fields:

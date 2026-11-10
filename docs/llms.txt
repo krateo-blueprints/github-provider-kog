@@ -47,7 +47,7 @@ config-chart/templates/configurations.yaml: the github-provider-kog-config chart
 # The destination repository (native, like every other kind):
 chart/templates/rd-repository.yaml: the Repository RestDefinition (all four verbs native; compareScope updatable — DEFENSIVE, not load-bearing: the comparison SKIPS any spec key the observe response omits, so the create-only fields could never have drifted under fullSpec either, and the two scopes should agree today; the in-file comment corrects that earlier claim)
 chart/assets/repository.yaml: the Repository OpenAPI spec (org-scoped create only, auto_init defaults true, path params named org/name)
-chart/templates/rd-userrepository.yaml + chart/assets/userrepository.yaml: UserRepository — the user-owned sibling of Repository (create POST /user/repos in the TOKEN's account; owner read back to status.owner.login, never hand-set; observe via get /repos/{owner}/{name} or, before status exists, a paginated findby on GET /user/repos?affiliation=owner; no delete verb), compareScope updatable
+chart/templates/rd-userrepository.yaml + chart/assets/userrepository.yaml: UserRepository — the user-owned sibling of Repository (create POST /user/repos in the TOKEN's account; owner read back to status.owner.login, never hand-set; observe via get /repos/{owner}/{name} or, before status exists, a paginated findby on GET /user/repos?affiliation=owner; delete deletes the repository, adopted ones included, unless annotated krateo.io/deletion-policy: orphan), compareScope updatable
 # The other 31 kinds — rd-<kind>.yaml carries the identifiers/compareScope reasoning, assets/<kind>.yaml the
 # trimmed field set and the measured GitHub quirks. <kind> is the kind name lowercased.
 # access:
