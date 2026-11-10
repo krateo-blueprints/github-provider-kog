@@ -11,6 +11,17 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-10 — feat: RepoContent author and committer as GitHub defines them
+
+Deviation review row 25 and the two nested entries `assert-oas-adherence` found:
+- the PUT body's `author`/`committer` gain `date` and require `name` and `email` inside each, as
+  GitHub does (it answers 422 when either is missing). The objects themselves stay optional;
+- the DELETE body gains `author`/`committer` (GitHub requires nothing inside them there). They are
+  the CR's own spec fields, so the deleting commit carries the same identity as the writes.
+RepoContent no longer has any entry in `hack/oas-adherence-exceptions.yaml`. There were 0
+RepoContent CRs on 057 when the `required` tightening was made, so no existing CR can be
+invalidated there.
+
 ## 2026-11-10 — ci: every deviation from GitHub's OpenAPI is listed and checked
 
 Diego asked for the chart to be 100% adherent to GitHub's OpenAPI. The deviation review that
