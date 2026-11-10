@@ -47,6 +47,10 @@ paths:
                 # CREATE-TIME, from GitHub's repos/create-release body as published. GET returns
                 # neither, and the PATCH body below leaves both out, so under compareScope
                 # `updatable` neither is ever compared: they act once, at create.
+                # GitHub's `default: 'true'` on make_latest is NOT copied. GitHub applies it only
+                # to a newly published release that omits the field (drafts and prereleases cannot
+                # be latest). A CRD default would send 'true' on every create, drafts included,
+                # and be written into existing CRs, where it cannot be removed (oasgen-provider#562).
                 discussion_category_name:
                   type: string
                   description: >-
@@ -65,7 +69,6 @@ paths:
                     - 'true'
                     - 'false'
                     - legacy
-                  default: 'true'
       responses:
         '201':
           description: Response
