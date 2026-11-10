@@ -587,6 +587,10 @@ spec:
   and a `PATCH` on every reconcile. Without GHAS licences, set
   `advanced_security: disabled` and leave the GHAS-gated toggles at `not_set`;
   `not_set` means "leave the repository's own setting alone".
+  Every toggle in GitHub's create and update bodies is modelled except `code_security`,
+  `secret_protection` and the four `*_options` blocks (reasons in the asset). The chart
+  copies none of GitHub's create-time defaults: a toggle left out of the CR gets GitHub's
+  default on create and is not compared afterwards.
 - **`AutomatedSecurityFixes` has no settings — its existence is the desired state.**
   Deleting the CR turns Dependabot security updates back off, and turning them off in the
   UI is reverted at the next reconcile. `status.paused` reports Dependabot's own back-off
