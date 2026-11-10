@@ -334,17 +334,6 @@ exceptions:
   - add_events
   - remove_events
   reason: Incremental edits cannot be expressed by a declarative spec that states the whole event list. chart/assets/repowebhook.yaml
-- row: '32'
-  category: D
-  kind: RepoWebhook
-  method: POST
-  path: /repos/{owner}/{repo}/hooks
-  deviation: required-added
-  fields:
-  - config
-  - config.url
-  restore: todo
-  reason: Unmodelled difference; to restore (deviation review row 32).
 - row: new
   category: C
   kind: OrgRuleset

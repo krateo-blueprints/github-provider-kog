@@ -11,6 +11,13 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-10 — fix: RepoWebhook create requires what GitHub requires (nothing)
+
+Deviation review row 32. GitHub's repos/create-webhook body requires nothing; the asset required
+`config` and `config.url`, copied from the org-webhook endpoint, which does require them. The two
+`required` lists are removed. This only relaxes validation, so no existing CR can be invalidated. A
+hook created without a url is GitHub's to refuse.
+
 ## 2026-11-10 — feat: RepoContent author and committer as GitHub defines them
 
 Deviation review row 25 and the two nested entries `assert-oas-adherence` found:

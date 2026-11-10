@@ -21,8 +21,9 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - config
+              # GitHub's repos/create-webhook requires nothing (its org twin requires name, config and
+              # config.url; this endpoint does not), so neither `config` nor `config.url` is required
+              # here (deviation review row 32). A hook created without a url is GitHub's to refuse.
               properties:
                 # CREATE-ONLY: GitHub accepts exactly one value, "web", and the update endpoint
                 # has no `name` field at all. Defaulted rather than left to the author, so the
@@ -32,8 +33,6 @@ paths:
                   default: web
                 config:
                   type: object
-                  required:
-                    - url
                   properties:
                     url:
                       type: string
