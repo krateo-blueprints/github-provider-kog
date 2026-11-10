@@ -161,6 +161,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Repository'
+    # DELETE is GitHub's repos/delete (rest-api-description api.github.com.json, operationId
+    # repos/delete), copied as it is: same responses, same error schema. The path parameters keep this asset's `org`/`name` names, as get and patch do.
+    # Deleting the CR now deletes the repository on GitHub. To keep the repository when its CR goes
+    # away, annotate the CR with `krateo.io/deletion-policy: orphan` (see docs/usage.md).
+    delete:
+      summary: Delete a repository
+      operationId: repos/delete
+      parameters:
+        - $ref: '#/components/parameters/org'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '204':
+          description: Response
+        '307':
+          $ref: '#/components/responses/temporary_redirect'
+        '403':
+          description: "If an organization owner has configured the organization to prevent members from deleting organization-owned repositories, a member will get this response:"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  documentation_url:
+                    type: string
+        '404':
+          $ref: '#/components/responses/not_found'
+        '409':
+          $ref: '#/components/responses/conflict'
 components:
   securitySchemes:
     accessToken:
@@ -179,6 +209,25 @@ components:
       required: true
       schema:
         type: string
+  responses:
+    temporary_redirect:
+      description: Temporary Redirect
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/basic-error'
+    not_found:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/basic-error'
+    conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/basic-error'
   schemas:
     Repository:
       type: object
@@ -217,5 +266,18 @@ components:
           type: boolean
         archived:
           type: boolean
+    basic-error:
+      title: Basic Error
+      description: Basic Error
+      type: object
+      properties:
+        message:
+          type: string
+        documentation_url:
+          type: string
+        url:
+          type: string
+        status:
+          type: string
 security:
   - accessToken: []

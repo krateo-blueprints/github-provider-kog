@@ -83,9 +83,11 @@ spec:
       # FINDBY — lists the token user's own repositories and matches `name`. It needs no owner, so
       # it works before any status exists, and its match fills status.owner.login for the get.
       # A repository of that name that ALREADY exists in the token's account is ADOPTED, not
-      # duplicated. Safe against loss (no delete verb: deleting the CR never deletes an adopted
-      # repo), but its updatable fields are then reconciled to the CR's spec. This list walk runs
-      # only while status.owner.login is empty; once set, observe is the single get above.
+      # duplicated, and its updatable fields are then reconciled to the CR's spec. BEWARE: because
+      # this kind has a delete verb, deleting a CR that ADOPTED a pre-existing repository deletes
+      # that repository too, although Krateo never created it. Annotate such a CR with
+      # `krateo.io/deletion-policy: orphan` to keep it. This list walk runs only while
+      # status.owner.login is empty; once set, observe is the single get above.
       - action: findby
         method: GET
         path: /user/repos
@@ -133,11 +135,18 @@ spec:
           # `updatable` compare set and keying on status.name cannot trigger a rename-back loop.
           - inPath: name
             inCustomResource: status.name
-    # NO DELETE VERB, DELIBERATELY — same as Repository. Deleting this CR ORPHANS the GitHub
-    # repository; it does not destroy it. oasgen-provider deletes a RestDefinition's CRD
-    # unconditionally (SkipCRD:false), cascade-deleting every CR and running every finalizer; with
-    # a delete verb here that chain would end in DELETE /repos/{owner}/{name} — so removing this
-    # RestDefinition or uninstalling the chart would DESTROY every user repository it ever created.
-    # That is oasgen-provider #125. A leaked repo is an inconvenience; a destroyed one is not
-    # recoverable. Restore the verb only alongside the #125 guard and a per-CR opt-in.
+      # DELETING THE CR DELETES THE REPOSITORY ON GITHUB, as for Repository (see rd-repository.yaml
+      # for the oasgen-provider #125 history and why the verb is safe to have now). GitHub defines
+      # the operation (repos/delete) and this chart exposes every operation GitHub defines on the
+      # paths it uses. To keep the repository, annotate the CR with
+      # `krateo.io/deletion-policy: orphan`; the controller then releases the finalizer without
+      # calling GitHub. Mind the findby above: an ADOPTED repository is deleted the same way.
+      - action: delete
+        method: DELETE
+        path: /repos/{owner}/{name}
+        requestFieldMapping:
+          - inPath: owner
+            inCustomResource: status.owner.login
+          - inPath: name
+            inCustomResource: status.name
 {{- end }}

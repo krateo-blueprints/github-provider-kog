@@ -11,9 +11,9 @@ timestamp: 2026-09-09T00:00:00Z
 > `chart/templates/{configmap,rd}-repocontent.yaml`, `chart/samples/test-repocontent.yaml` and a
 > `RepoContentConfiguration` in `chart/samples/configurations.yaml`. The chart is now **31 kinds**;
 > this document is the design record it was built from. The one deviation worth noting: RepoContent
-> keeps its native **delete verb** (deleting the CR deletes the file), so — unlike `Repository` — the
-> oasgen-provider #125 CRD cascade would delete every managed file on an uninstall; a file is
-> recoverable from git history, but weigh it before a destructive default.
+> keeps its native **delete verb** (deleting the CR deletes the file). The oasgen-provider #125 CRD
+> cascade that once made a delete verb dangerous on an uninstall is fixed: oasgen now refuses to drop
+> a CRD that still has instances. `Repository` gained its delete verb on the same grounds.
 
 Written against `be409bc` (the last commit that still carries the kind).
 

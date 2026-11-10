@@ -4,7 +4,7 @@
 Several fixes in this chart are shaped the same way: a guarantee that exists only as the
 PRESENCE or ABSENCE of something in an asset/RD, with nothing in the generated CRD to enforce it
 and nothing that fails when it is undone. Two are a field removed from an update request body so
-drift can no longer act on it (plus a non-default `compareScope`); one is the get/update path
+drift can no longer act on it (plus a non-default `compareScope`); one is the get/update/delete path
 parameter `name` keyed on status.name so a GitHub-normalised name stays addressable (#386). Each
 is one careless edit from being undone, with no error and nothing failing.
 
@@ -75,7 +75,7 @@ ASSET_INVARIANTS = [
 
 # (template, kind, how many verbs must key `name` on status.name, why it is load-bearing)
 #
-# 0.1.x  The get/update own-identity path parameter `name` sources from status.name (the name
+# 0.1.x  The get/update/delete own-identity path parameter `name` sources from status.name (the name
 #        GitHub ACTUALLY assigned), not spec.name (oasgen-provider #386). GitHub normalises a
 #        disallowed character on create ("my repo" -> "my-repo"); a GET built from spec.name then
 #        404s while the repo exists, and the controller re-creates and loops on 422. Keying on
@@ -89,14 +89,15 @@ NAME_STATUS_KEYING_INVARIANTS = [
     (
         "chart/templates/rd-repository.yaml",
         "Repository",
-        2,  # get + update
-        "a GET/PATCH built from spec.name 404s on a GitHub-normalised name and loops on re-create (#386)",
+        3,  # get + update + delete
+        "a GET/PATCH/DELETE built from spec.name misses a GitHub-normalised name: the GET 404s and loops on "
+        "re-create (#386), and the DELETE would 404 or, worse, address a different repository",
     ),
     (
         "chart/templates/rd-userrepository.yaml",
         "UserRepository",
-        2,  # get + update (owner is keyed separately on status.owner.login)
-        "same as Repository: the user-repo get/update must address the name GitHub assigned, not spec.name (#386)",
+        3,  # get + update + delete (owner is keyed separately on status.owner.login)
+        "same as Repository: the user-repo get/update/delete must address the name GitHub assigned, not spec.name (#386)",
     ),
 ]
 
@@ -200,9 +201,9 @@ def main(root="."):
             )
         if keyed != expected:
             failures.append(
-                "%s: %s must key `name` on status.name on exactly %d verb(s) (get + update), "
+                "%s: %s must key `name` on status.name on exactly %d verb(s) (get, update and delete), "
                 "found %d `inCustomResource: status.name` mapping(s).\n    %s\n"
-                "    This is the #386 fix; a GET/PATCH keyed on spec.name loops on a normalised name."
+                "    This is the #386 fix; a verb keyed on spec.name misses a normalised name."
                 % (template, kind, expected, keyed, why))
 
     for template, kind, field, why in LOAD_BEARING_EXCLUSIONS:

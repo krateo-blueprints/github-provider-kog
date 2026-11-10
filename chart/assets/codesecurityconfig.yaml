@@ -55,6 +55,22 @@ paths:
                   $ref: '#/components/schemas/FeatureStatus'
                 private_vulnerability_reporting:
                   $ref: '#/components/schemas/FeatureStatus'
+                code_scanning_delegated_alert_dismissal:
+                  $ref: '#/components/schemas/FeatureStatus'
+                dependabot_delegated_alert_dismissal:
+                  $ref: '#/components/schemas/FeatureStatus'
+                dependabot_reachability:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_delegated_alert_dismissal:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_delegated_bypass:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_extended_metadata:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_generic_secrets:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_generic_secrets_push_protection:
+                  $ref: '#/components/schemas/FeatureStatus'
                 enforcement:
                   type: string
                   enum:
@@ -70,6 +86,11 @@ paths:
                 #    secret_scanning_delegated_bypass_options): nested feature-option blocks
                 #    GitHub normalizes server-side, so the value read back is not the value
                 #    sent. They belong to a later, hand-verified pass, not to a first cut.
+                # DEFAULTS: GitHub's create body gives most toggles a `default`. None is copied
+                # here, on purpose. GitHub applies its default only to a create that omits the
+                # field; a CRD default would instead be written into every CR, existing ones
+                # included, and the controller would then PATCH org settings nobody set.
+                # Omitting a field keeps GitHub's own create-time behaviour.
       responses:
         '201':
           description: Response
@@ -132,6 +153,22 @@ paths:
                 secret_scanning_non_provider_patterns:
                   $ref: '#/components/schemas/FeatureStatus'
                 private_vulnerability_reporting:
+                  $ref: '#/components/schemas/FeatureStatus'
+                code_scanning_delegated_alert_dismissal:
+                  $ref: '#/components/schemas/FeatureStatus'
+                dependabot_delegated_alert_dismissal:
+                  $ref: '#/components/schemas/FeatureStatus'
+                dependabot_reachability:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_delegated_alert_dismissal:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_delegated_bypass:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_extended_metadata:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_generic_secrets:
+                  $ref: '#/components/schemas/FeatureStatus'
+                secret_scanning_generic_secrets_push_protection:
                   $ref: '#/components/schemas/FeatureStatus'
                 enforcement:
                   type: string
@@ -222,6 +259,28 @@ components:
         secret_scanning_non_provider_patterns:
           $ref: '#/components/schemas/FeatureStatus'
         private_vulnerability_reporting:
+          $ref: '#/components/schemas/FeatureStatus'
+        code_scanning_delegated_alert_dismissal:
+          $ref: '#/components/schemas/FeatureStatus'
+        # The only one of the eight GitHub's configuration object declares nullable.
+        dependabot_delegated_alert_dismissal:
+          type: string
+          nullable: true
+          enum:
+            - enabled
+            - disabled
+            - not_set
+        dependabot_reachability:
+          $ref: '#/components/schemas/FeatureStatus'
+        secret_scanning_delegated_alert_dismissal:
+          $ref: '#/components/schemas/FeatureStatus'
+        secret_scanning_delegated_bypass:
+          $ref: '#/components/schemas/FeatureStatus'
+        secret_scanning_extended_metadata:
+          $ref: '#/components/schemas/FeatureStatus'
+        secret_scanning_generic_secrets:
+          $ref: '#/components/schemas/FeatureStatus'
+        secret_scanning_generic_secrets_push_protection:
           $ref: '#/components/schemas/FeatureStatus'
         enforcement:
           type: string

@@ -11,6 +11,26 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-10 — feat: Repository and UserRepository delete the GitHub repository, as GitHub's API defines
+
+The chart now follows GitHub's OpenAPI description: every kind exposes every operation GitHub
+defines on the paths it uses. `Repository` and `UserRepository` were the two exceptions, with no
+`DELETE /repos/{owner}/{repo}`. They now have it.
+
+- **Deleting the CR deletes the repository**, code and history included. To keep it, annotate the
+  CR `krateo.io/deletion-policy: orphan` before deleting it: rest-dynamic-controller then releases
+  the finalizer without calling GitHub (unstructured-runtime `ShouldDelete`).
+- **A `UserRepository` that adopted an existing repository** deletes it too; annotate it to keep it.
+- **Why it was absent:** oasgen-provider #125. oasgen dropped a RestDefinition's CRD unconditionally,
+  which would have run this DELETE for every repository the kind created. oasgen now refuses to drop
+  a CRD that still has instances, so the verb is safe to have.
+- **The portal's builder-publish chart** annotates the `Repository` it renders with
+  `deletion-policy: orphan`, so uninstalling a publish keeps the published repository. This release
+  reaches 057 only after that portal change has rolled.
+- **New CI check, `oas-operations`:** fails if a kind leaves out an operation GitHub defines on one of
+  its paths. It reads GitHub's description at a pinned commit, verified by SHA-256. A list GET on a
+  POST collection is allowed, and so is one documented exception (Collaborator's check-collaborator).
+
 ## 2026-11-07 — feat: publish both charts to the helm index, not only GHCR
 
 The organisation adopted one publishing standard (krateo-blueprints/charts `PUBLISHING.md`):

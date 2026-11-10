@@ -188,8 +188,35 @@ Five things to know before you apply it:
   destinations are normally org-owned; use `UserRepository` when the destination belongs to
   the token's own account.
 
-`Repository` has **no delete verb**, so deleting the CR orphans the repository
-on GitHub. The full spec/status field list is in [api](./api.md).
+**Deleting a `Repository` CR deletes the repository on GitHub**, code and history included
+(GitHub's `DELETE /repos/{owner}/{repo}`); so does deleting a `UserRepository` CR. See
+[Keeping a repository when its CR is deleted](#keeping-a-repository-when-its-cr-is-deleted).
+The full spec/status field list is in [api](./api.md).
+
+### Keeping a repository when its CR is deleted
+
+Annotate the CR:
+
+```yaml
+metadata:
+  annotations:
+    krateo.io/deletion-policy: orphan
+```
+
+rest-dynamic-controller then releases the CR's finalizer without calling GitHub, and the
+repository stays. It reads the annotation through unstructured-runtime (`pkg/meta`
+`ShouldDelete`): `krateo.io/deletion-policy: orphan` keeps the external object, and so does
+`krateo.io/management-policy: observe-create-update` or `observe`. The annotation must be on the
+CR **before** it is deleted. The portal's builder-publish chart sets it on the `Repository` it
+renders, so uninstalling a publish never removes the published repository.
+
+A `UserRepository` can **adopt** a repository that already exists in the token's account (its
+findby matches by name). Deleting that CR deletes the adopted repository too, although Krateo
+never created it, so annotate it if you adopt an existing repository.
+
+Nothing else deletes repositories: removing the `Repository` RestDefinition or uninstalling the
+chart does not cascade to the CRs, because oasgen-provider refuses to drop a CRD that still has
+instances.
 
 The status fields carry what the kinds that follow need: `full_name`, `clone_url`,
 `ssh_url`, `html_url` and the `default_branch` a ruleset or a branch protection binds to.
@@ -533,7 +560,7 @@ spec:
   changes nothing) and `assignee`/`type`/`parent_issue_id`, a `Milestone`'s `due_on` (GitHub keeps the day and re-times it to
   midnight in the token account's timezone, so what `GET` returns is not what was
   written — read `status.due_on` to see what it stored), and a `Release`'s
-  `generate_release_notes`. A `Release`'s `name`, `body`, `draft` and `prerelease` *are*
+  `generate_release_notes`, `discussion_category_name` and `make_latest` (set once, at create). A `Release`'s `name`, `body`, `draft` and `prerelease` *are*
   compared and pushed.
 - **`Label`'s `name` is its identity, and `color` is lower-case hex without the `#`.**
   `"D73A4A"` reads as permanent drift because GitHub echoes it lower-cased, and editing
@@ -587,6 +614,10 @@ spec:
   and a `PATCH` on every reconcile. Without GHAS licences, set
   `advanced_security: disabled` and leave the GHAS-gated toggles at `not_set`;
   `not_set` means "leave the repository's own setting alone".
+  Every toggle in GitHub's create and update bodies is modelled except `code_security`,
+  `secret_protection` and the four `*_options` blocks (reasons in the asset). The chart
+  copies none of GitHub's create-time defaults: a toggle left out of the CR gets GitHub's
+  default on create and is not compared afterwards.
 - **`AutomatedSecurityFixes` has no settings — its existence is the desired state.**
   Deleting the CR turns Dependabot security updates back off, and turning them off in the
   UI is reverted at the next reconcile. `status.paused` reports Dependabot's own back-off
