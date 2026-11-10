@@ -11,6 +11,21 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-10 — feat: PullRequest carries GitHub's head_repo and issue; maintainer_can_modify measured
+
+- **Row 20 (category D):** `head_repo` and `issue` are added to the create body as GitHub publishes
+  them; both act once, at create. `title` is no longer required, because GitHub requires only `head`
+  and `base`, with `title` required unless `issue` is given. That is a cross-field rule a CRD cannot
+  express (oasgen-provider#396).
+- **Row 22, measured instead of assumed.** Diego asked for a live test before restoring
+  `maintainer_can_modify` to the update body. On a throwaway same-repo PR in krateo-blueprints,
+  GitHub stored `false` when create sent `true`, and refused `PATCH true` with 422 "Fork collab can
+  only be enabled on cross-repo pull requests". As a compared field it would 422 every reconcile for
+  a CR setting `true`, so it stays create-only and the exception moves from C to B with that
+  evidence. The repository was deleted at the end of the probe (confirmed gone).
+  `docs/design-pullrequest.md` gets a dated correction: its premise ("the PATCH can never fix it")
+  was wrong, though its conclusion holds.
+
 ## 2026-11-10 — feat: Repository and UserRepository carry GitHub's merge settings
 
 Deviation review rows 28, 30b, 38a and 41b (category D): 61 fields GitHub's create and update

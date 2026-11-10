@@ -29,12 +29,36 @@ paths:
                   type: string
                 draft:
                   type: boolean
+                # CREATE-ONLY, measured live on 2026-11-10 (throwaway repo in krateo-blueprints): on a
+                # same-repo pull request GitHub stores `false` whatever is sent, and a PATCH to `true` is
+                # refused with 422 "Fork collab can only be enabled on cross-repo pull requests". In the
+                # update body a CR setting `true` on a same-repo PR would 422 on every reconcile, so it
+                # stays out of the PATCH body below (deviation review row 22).
                 maintainer_can_modify:
                   type: boolean
+                # As GitHub's create body publishes them (deviation review row 20). Neither is in the
+                # PATCH body, so both act once, at create. With `issue`, GitHub converts that issue into
+                # the pull request and takes its title and body, which is why `title` is not required.
+                # `head` is an identifier, and findby matches it against the normalized response, which
+                # for a cross-repository PR (what `head_repo` creates) is the label "owner:branch". A
+                # `head` written as a bare branch will not match there, so recovery by findby fails for it.
+                head_repo:
+                  type: string
+                  description: The name of the repository where the changes in the pull request were made.
+                    This field is required for cross-repository pull requests if both repositories are
+                    owned by the same organization.
+                  format: repo.nwo
+                issue:
+                  type: integer
+                  description: An issue in the repository to convert to a pull request. The issue title,
+                    body, and comments will become the title, body, and comments on the new pull request.
+                    Required unless `title` is specified.
+                  format: int64
+              # GitHub requires only head and base: `title` is required unless `issue` is given, a
+              # cross-field rule a CRD cannot express (oasgen-provider#396), so neither is required here.
               required:
                 - head
                 - base
-                - title
       responses:
         '201':
           description: Response
