@@ -614,17 +614,20 @@ nothing else.
 To trace what a kind's controller does against GitHub, set the opt-in
 `krateo.io/connector-verbose: "true"` annotation on a single CR and read that kind's own
 controller's logs. There is one log to check per kind and no second place to look: with all
-32 kinds native, nothing sits in front of them.
+32 kinds native, nothing sits in front of them. The annotation works only on the CR being
+reconciled: the controller reads it from that object, so setting it on a RestDefinition does
+nothing (oasgen-provider#552).
 
 > **Treat verbose as a temporary debug aid only — never leave it on by default, and never set
 > it on a CR that carries a secret.** With the annotation on, rest-dynamic-controller dumps
 > every request *including the body*, and every response, to the pod log
 > (`httputil.DumpRequestOut(req, true)` at
-> `go/rest-dynamic-controller/internal/tools/client/restclient.go:1185`, oasgen-provider tag
-> 0.50.0). Redaction is narrow by design: it covers only values the provider resolved through a
-> `secretRef` (`RedactValues`, :1179-1189, :1276) and credential *header* names
-> (`credentialHeaderRe`, :1289-1348) — there is deliberately no pattern-based redaction of the
-> body (:114). This chart resolves nothing through `secretRef`, so every value a spec sends in
+> `go/rest-dynamic-controller/internal/tools/client/restclient.go:1316`, oasgen-provider tag
+> 0.56.0). Redaction is narrow by design: it covers only values the provider resolved through a
+> `secretRef` (`RedactValues`, :1310-1320, :1407) and nine credential *header* names, among them
+> `Authorization`, so the bearer token is not written to the log (`credentialHeaders` and
+> `credentialHeaderRe`, :1455-1479). There is deliberately no pattern-based redaction of the
+> body (:122). This chart resolves nothing through `secretRef`, so every value a spec sends in
 > the request body is written to the log in cleartext. That includes a
 > `RepoWebhook`/`OrgWebhook` `spec.config.secret` (the HMAC key, sent on create and update),
 > `RepoContent` file content, and anything else in the spec. Pod logs are usually readable far
