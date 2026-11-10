@@ -26,6 +26,25 @@ Curated history; release notes live in GitHub Releases.
   `docs/design-pullrequest.md` gets a dated correction: its premise ("the PATCH can never fix it")
   was wrong, though its conclusion holds.
 
+## 2026-11-10 — feat: Repository and UserRepository carry GitHub's merge settings
+
+Deviation review rows 28, 30b, 38a and 41b (category D): 61 fields GitHub's create and update
+bodies define were missing. They are copied from GitHub's description (type, enum, description),
+with every `default` stripped (frozen-defaults rule, oasgen-provider#562).
+
+- **Compared and fixable when set:** `allow_auto_merge`, `allow_merge_commit`, `allow_rebase_merge`,
+  `allow_squash_merge`, `delete_branch_on_merge`, `is_template`, `merge_commit_title`/`_message`,
+  `squash_merge_commit_title`/`_message`, `use_squash_pr_title_as_default` (Repository). They are in
+  both bodies and GitHub's GET returns them; the response schema gains them so the compare sees them.
+- **Create-only:** `has_downloads`, `custom_properties` (Repository), `has_discussions`
+  (UserRepository) and `team_id`.
+- **Update-only, declared but not settable yet:** `allow_forking`, `allow_update_branch`,
+  `has_pull_requests`, `pull_request_creation_policy`, `security_and_analysis`,
+  `web_commit_signoff_required`. oasgen builds the spec from the create body (oasgen-provider#491).
+- Existing CRs are unaffected: a field a CR does not set is not compared, and the outgoing PATCH is
+  filtered to declared fields. All 15 Repository CRs on 057 set none of them.
+- `hack/oas-adherence-exceptions.yaml` loses the four entries (61 fields): 143 differences remain.
+
 ## 2026-11-10 — ci: every deviation from GitHub's OpenAPI is listed and checked
 
 Diego asked for the chart to be 100% adherent to GitHub's OpenAPI. The deviation review that
