@@ -30,20 +30,36 @@ paths:
                   type: string
                 branch:
                   type: string
+                # committer/author as GitHub's create-or-update body publishes them (deviation review
+                # row 25): GitHub answers 422 when either object lacks `name` or `email`, so both are
+                # required inside it, and `date` is accepted. Both objects stay optional; omitted, the
+                # commit is attributed to the token's account.
                 committer:
                   type: object
+                  description: 'The person that committed the file. Default: the authenticated user.'
                   properties:
                     name:
                       type: string
                     email:
                       type: string
+                    date:
+                      type: string
+                  required:
+                    - name
+                    - email
                 author:
                   type: object
+                  description: 'The author of the file. Default: The `committer` or the authenticated user if you omit `committer`.'
                   properties:
                     name:
                       type: string
                     email:
                       type: string
+                    date:
+                      type: string
+                  required:
+                    - name
+                    - email
               required:
                 - message
                 - content
@@ -124,6 +140,23 @@ paths:
                   type: string
                 branch:
                   type: string
+                # As GitHub's delete-file body publishes them (deviation review row 25). They are the CR's
+                # own spec.committer/spec.author, so the deleting commit carries the same identity as the
+                # commits that wrote the file. GitHub's delete body requires nothing inside them.
+                committer:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    email:
+                      type: string
+                author:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    email:
+                      type: string
               required:
                 - message
                 - sha

@@ -18,6 +18,51 @@ Deviation review row 32. GitHub's repos/create-webhook body requires nothing; th
 `required` lists are removed. This only relaxes validation, so no existing CR can be invalidated. A
 hook created without a url is GitHub's to refuse.
 
+## 2026-11-10 — feat: RepoContent author and committer as GitHub defines them
+
+Deviation review row 25 and the two nested entries `assert-oas-adherence` found:
+- the PUT body's `author`/`committer` gain `date` and require `name` and `email` inside each, as
+  GitHub does (it answers 422 when either is missing). The objects themselves stay optional;
+- the DELETE body gains `author`/`committer` (GitHub requires nothing inside them there). They are
+  the CR's own spec fields, so the deleting commit carries the same identity as the writes.
+RepoContent no longer has any entry in `hack/oas-adherence-exceptions.yaml`. There were 0
+RepoContent CRs on 057 when the `required` tightening was made, so no existing CR can be
+invalidated there.
+
+## 2026-11-10 — feat: PullRequest carries GitHub's head_repo and issue; maintainer_can_modify measured
+
+- **Row 20 (category D):** `head_repo` and `issue` are added to the create body as GitHub publishes
+  them; both act once, at create. `title` is no longer required, because GitHub requires only `head`
+  and `base`, with `title` required unless `issue` is given. That is a cross-field rule a CRD cannot
+  express (oasgen-provider#396).
+- **Row 22, measured instead of assumed.** Diego asked for a live test before restoring
+  `maintainer_can_modify` to the update body. On a throwaway same-repo PR in krateo-blueprints,
+  GitHub stored `false` when create sent `true`, and refused `PATCH true` with 422 "Fork collab can
+  only be enabled on cross-repo pull requests". As a compared field it would 422 every reconcile for
+  a CR setting `true`, so it stays create-only and the exception moves from C to B with that
+  evidence. The repository was deleted at the end of the probe (confirmed gone).
+  `docs/design-pullrequest.md` gets a dated correction: its premise ("the PATCH can never fix it")
+  was wrong, though its conclusion holds.
+
+## 2026-11-10 — feat: Repository and UserRepository carry GitHub's merge settings
+
+Deviation review rows 28, 30b, 38a and 41b (category D): 61 fields GitHub's create and update
+bodies define were missing. They are copied from GitHub's description (type, enum, description),
+with every `default` stripped (frozen-defaults rule, oasgen-provider#562).
+
+- **Compared and fixable when set:** `allow_auto_merge`, `allow_merge_commit`, `allow_rebase_merge`,
+  `allow_squash_merge`, `delete_branch_on_merge`, `is_template`, `merge_commit_title`/`_message`,
+  `squash_merge_commit_title`/`_message`, `use_squash_pr_title_as_default` (Repository). They are in
+  both bodies and GitHub's GET returns them; the response schema gains them so the compare sees them.
+- **Create-only:** `has_downloads`, `custom_properties` (Repository), `has_discussions`
+  (UserRepository) and `team_id`.
+- **Update-only, declared but not settable yet:** `allow_forking`, `allow_update_branch`,
+  `has_pull_requests`, `pull_request_creation_policy`, `security_and_analysis`,
+  `web_commit_signoff_required`. oasgen builds the spec from the create body (oasgen-provider#491).
+- Existing CRs are unaffected: a field a CR does not set is not compared, and the outgoing PATCH is
+  filtered to declared fields. All 15 Repository CRs on 057 set none of them.
+- `hack/oas-adherence-exceptions.yaml` loses the four entries (61 fields): 143 differences remain.
+
 ## 2026-11-10 — ci: every deviation from GitHub's OpenAPI is listed and checked
 
 Diego asked for the chart to be 100% adherent to GitHub's OpenAPI. The deviation review that
