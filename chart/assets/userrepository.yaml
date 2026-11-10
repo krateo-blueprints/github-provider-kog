@@ -88,10 +88,10 @@ paths:
   # status.name (the name GitHub assigned) on both verbs too — the oasgen-provider #386 fix — so a
   # name GitHub normalised on create ("my repo" -> "my-repo") is still addressable; see
   # rd-userrepository.yaml. Before that status exists the get cannot be built, so the
-  # controller observes through the findby above instead. There is NO delete verb: deleting the CR
-  # ORPHANS the repository, it does not destroy it — the same deliberate choice Repository makes,
-  # so the oasgen-provider #125 CRD cascade (uninstall / RD-drop) can never delete a user's
-  # repositories. Restore delete only with the #125 guard and a per-CR opt-in.
+  # controller observes through the findby above instead. DELETE (below) deletes the repository on
+  # GitHub, an adopted one included; annotate the CR `krateo.io/deletion-policy: orphan` to keep
+  # it. The oasgen-provider #125 CRD cascade that once made a delete verb dangerous is fixed:
+  # oasgen refuses to drop a CRD that still has instances.
   "/repos/{owner}/{name}":
     get:
       summary: Get a repository
@@ -148,6 +148,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Repository'
+    # DELETE is GitHub's repos/delete (rest-api-description api.github.com.json, operationId
+    # repos/delete), copied as it is: same responses, same error schema. The path parameters keep this asset's `owner`/`name` names, as get and patch do.
+    # Deleting the CR now deletes the repository on GitHub. To keep the repository when its CR goes
+    # away, annotate the CR with `krateo.io/deletion-policy: orphan` (see docs/usage.md).
+    delete:
+      summary: Delete a repository
+      operationId: repos/delete
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/name'
+      responses:
+        '204':
+          description: Response
+        '307':
+          $ref: '#/components/responses/temporary_redirect'
+        '403':
+          description: "If an organization owner has configured the organization to prevent members from deleting organization-owned repositories, a member will get this response:"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  documentation_url:
+                    type: string
+        '404':
+          $ref: '#/components/responses/not_found'
+        '409':
+          $ref: '#/components/responses/conflict'
 components:
   securitySchemes:
     accessToken:
@@ -203,6 +233,25 @@ components:
       schema:
         type: integer
         default: 1
+  responses:
+    temporary_redirect:
+      description: Temporary Redirect
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/basic-error'
+    not_found:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/basic-error'
+    conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/basic-error'
   schemas:
     Repository:
       type: object
@@ -246,5 +295,18 @@ components:
           type: boolean
         archived:
           type: boolean
+    basic-error:
+      title: Basic Error
+      description: Basic Error
+      type: object
+      properties:
+        message:
+          type: string
+        documentation_url:
+          type: string
+        url:
+          type: string
+        status:
+          type: string
 security:
   - accessToken: []
