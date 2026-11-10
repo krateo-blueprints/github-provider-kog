@@ -560,7 +560,7 @@ spec:
   changes nothing), a `Milestone`'s `due_on` (GitHub keeps the day and re-times it to
   midnight in the token account's timezone, so what `GET` returns is not what was
   written — read `status.due_on` to see what it stored), and a `Release`'s
-  `generate_release_notes`. A `Release`'s `name`, `body`, `draft` and `prerelease` *are*
+  `generate_release_notes`, `discussion_category_name` and `make_latest` (set once, at create). A `Release`'s `name`, `body`, `draft` and `prerelease` *are*
   compared and pushed.
 - **`Label`'s `name` is its identity, and `color` is lower-case hex without the `#`.**
   `"D73A4A"` reads as permanent drift because GitHub echoes it lower-cased, and editing
