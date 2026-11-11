@@ -32,8 +32,16 @@ paths:
                   type: string
                 private:
                   type: boolean
+                # GitHub's create body enumerates public|private; `internal` is added on purpose
+                # (Diego, 2026-11-11). GitHub's own GET schema documents it ("public, private, or
+                # internal") and Enterprise organizations create internal repositories, which
+                # githubBaseUrl now supports. A typo is still rejected at apply.
                 visibility:
                   type: string
+                  enum:
+                    - public
+                    - private
+                    - internal
                 has_issues:
                   type: boolean
                 has_wiki:

@@ -32,6 +32,7 @@ paths:
                     - branch
                     - tag
                     - push
+                    - repository
                   default: branch
                 # `evaluate` (dry-run) is GitHub Enterprise only; elsewhere GitHub 422s.
                 enforcement:
@@ -96,6 +97,7 @@ paths:
                     - branch
                     - tag
                     - push
+                    - repository
                 enforcement:
                   type: string
                   enum:

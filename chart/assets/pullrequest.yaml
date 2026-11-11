@@ -123,8 +123,12 @@ paths:
                   type: string
                 body:
                   type: string
+                # GitHub enumerates open|closed. Update-only, so not settable from a CR yet (oasgen #491).
                 state:
                   type: string
+                  enum:
+                    - open
+                    - closed
                 base:
                   type: string
       responses:
