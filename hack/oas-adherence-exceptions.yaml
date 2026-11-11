@@ -1106,6 +1106,82 @@ exceptions:
   reason: 'internal is added to GitHub public|private on purpose (Diego, 2026-11-11): the GET schema documents it
     (public, private, or internal) and Enterprise organizations create internal repositories, which githubBaseUrl
     supports. chart/assets/repository.yaml'
+- row: new
+  category: C
+  kind: OrgRuleset
+  method: POST
+  path: /orgs/{org}/rulesets
+  deviation: dropped
+  fields:
+  - conditions.repository_id
+  - conditions.repository_property
+  reason: GitHub's org conditions are a oneOf of repository_name / repository_id / repository_property targeting;
+    flattened to repository_name alone (stable, human-authored). repository_id changes meaning if a repo is recreated.
+    chart/assets/orgruleset.yaml (the reason given there for repository_property predates the CustomProperty kind).
+- row: new
+  category: C
+  kind: OrgRuleset
+  method: POST
+  path: /orgs/{org}/rulesets
+  deviation: dropped
+  fields:
+  - rules[].parameters.dismissal_restriction
+  - rules[].parameters.required_reviewers
+  restore: 'blocked: oasgen-provider#563'
+  reason: pull_request's dismissal_restriction.allowed_actors and required_reviewers[].reviewer are actor unions
+    of their own (oneOf over actor types), which oasgen cannot render; a CR cannot express them, so the PUT that
+    re-sends the whole rules array would drop them from an adopted ruleset. Held for oasgen-provider#563. chart/assets/reporuleset.yaml
+- row: new
+  category: C
+  kind: OrgRuleset
+  method: PUT
+  path: /orgs/{org}/rulesets/{ruleset_id}
+  deviation: dropped
+  fields:
+  - conditions.repository_id
+  - conditions.repository_property
+  reason: GitHub's org conditions are a oneOf of repository_name / repository_id / repository_property targeting;
+    flattened to repository_name alone (stable, human-authored). repository_id changes meaning if a repo is recreated.
+    chart/assets/orgruleset.yaml (the reason given there for repository_property predates the CustomProperty kind).
+- row: new
+  category: C
+  kind: OrgRuleset
+  method: PUT
+  path: /orgs/{org}/rulesets/{ruleset_id}
+  deviation: dropped
+  fields:
+  - rules[].parameters.dismissal_restriction
+  - rules[].parameters.required_reviewers
+  restore: 'blocked: oasgen-provider#563'
+  reason: pull_request's dismissal_restriction.allowed_actors and required_reviewers[].reviewer are actor unions
+    of their own (oneOf over actor types), which oasgen cannot render; a CR cannot express them, so the PUT that
+    re-sends the whole rules array would drop them from an adopted ruleset. Held for oasgen-provider#563. chart/assets/reporuleset.yaml
+- row: new
+  category: C
+  kind: RepoRuleset
+  method: POST
+  path: /repos/{owner}/{repo}/rulesets
+  deviation: dropped
+  fields:
+  - rules[].parameters.dismissal_restriction
+  - rules[].parameters.required_reviewers
+  restore: 'blocked: oasgen-provider#563'
+  reason: pull_request's dismissal_restriction.allowed_actors and required_reviewers[].reviewer are actor unions
+    of their own (oneOf over actor types), which oasgen cannot render; a CR cannot express them, so the PUT that
+    re-sends the whole rules array would drop them from an adopted ruleset. Held for oasgen-provider#563. chart/assets/reporuleset.yaml
+- row: new
+  category: C
+  kind: RepoRuleset
+  method: PUT
+  path: /repos/{owner}/{repo}/rulesets/{ruleset_id}
+  deviation: dropped
+  fields:
+  - rules[].parameters.dismissal_restriction
+  - rules[].parameters.required_reviewers
+  restore: 'blocked: oasgen-provider#563'
+  reason: pull_request's dismissal_restriction.allowed_actors and required_reviewers[].reviewer are actor unions
+    of their own (oneOf over actor types), which oasgen cannot render; a CR cannot express them, so the PUT that
+    re-sends the whole rules array would drop them from an adopted ruleset. Held for oasgen-provider#563. chart/assets/reporuleset.yaml
 defaults:
 - kind: Autolink
   method: POST

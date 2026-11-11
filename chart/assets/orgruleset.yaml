@@ -246,10 +246,6 @@ components:
     #                          (do_not_enforce_on_create is optional)
     #   update                 update_allows_fetch_and_merge
     #   required_deployments   required_deployment_environments
-    #   merge_queue            check_response_timeout_minutes, grouping_strategy,
-    #                          max_entries_to_build, max_entries_to_merge, merge_method,
-    #                          min_entries_to_merge, min_entries_to_merge_wait_minutes (all seven;
-    #                          GitHub requires the whole set together)
     #   *_pattern (the five)   operator, pattern (required pair); name, negate (optional)
     #   workflows              workflows[] (each: repository_id, path required; ref, sha optional);
     #                          do_not_enforce_on_create optional. Needs target: branch.
@@ -264,15 +260,20 @@ components:
     # The four file_*/max_* are PUSH-target rules: valid only on a ruleset whose target is `push`;
     # GitHub 422s them on a branch/tag ruleset.
     # The parameterless types — creation, deletion, non_fast_forward, required_linear_history,
-    # required_signatures, license_compliance_scanning — take no `parameters` key at all.
+    # required_signatures — take no `parameters` key at all.
     #
-    # MODELLED — all of GitHub's 23 rule types are now modelled:
+    # MODELLED — all 21 rule types GitHub's ORG-ruleset API accepts:
     #   creation, deletion, update, non_fast_forward, required_linear_history,
     #   required_signatures, pull_request, required_status_checks, required_deployments,
-    #   merge_queue, commit_message_pattern, commit_author_email_pattern,
+    #   commit_message_pattern, commit_author_email_pattern,
     #   committer_email_pattern, branch_name_pattern, tag_name_pattern,
-    #   workflows, code_scanning, copilot_code_review, license_compliance_scanning,
+    #   workflows, code_scanning, copilot_code_review,
     #   file_path_restriction, max_file_path_length, file_extension_restriction, max_file_size.
+    # NOT at org level: merge_queue and license_compliance_scanning are repository-ruleset rules
+    # (see reporuleset.yaml). GitHub's org-ruleset schema lists neither, and a live probe on
+    # 2026-11-11 (a disabled ruleset matching no repository, deleted afterwards) was refused for
+    # both with "Invalid property /rules/0: data matches no possible input", while a `deletion`
+    # control was accepted. They were removed from this kind.
     #
     # On the five *_pattern rules, and the "name/pattern would collide" note this comment used to
     # carry: there is NO collision, and it was removed after checking the generator source. Those
@@ -320,7 +321,6 @@ components:
               - pull_request
               - required_status_checks
               - required_deployments
-              - merge_queue
               - commit_message_pattern
               - commit_author_email_pattern
               - committer_email_pattern
@@ -329,7 +329,6 @@ components:
               - workflows
               - code_scanning
               - copilot_code_review
-              - license_compliance_scanning
               - file_path_restriction
               - max_file_path_length
               - file_extension_restriction
@@ -350,6 +349,11 @@ components:
               require_last_push_approval:
                 type: boolean
               required_review_thread_resolution:
+                type: boolean
+              # pull_request, optional (GitHub's description): when Copilot opens a pull request
+              # without a human collaborator, require one more approving review if a non-zero
+              # approval count is required.
+              require_extra_approval_for_unattributed_changes:
                 type: boolean
               allowed_merge_methods:
                 type: array
@@ -381,41 +385,6 @@ components:
                 type: array
                 items:
                   type: string
-              # type: merge_queue — all seven keys are required together by GitHub; the flattened
-              # union cannot enforce that, so a partial set is a 422 (loud), not a silent ignore.
-              # GitHub also range-checks the integers (timeouts 1-360 / 0-360, entry counts 0-100);
-              # those bounds are left to the API rather than duplicated as CRD constraints.
-              # CONSTRAINT (verified live 2026-11-03): a ruleset carrying a merge_queue rule must
-              # target a CONCRETE ref — its conditions.ref_name must NOT be a wildcard such as ~ALL,
-              # or GitHub 422s "Wildcard ref names are not supported when merge queue is enabled".
-              # Use refs/heads/<branch> or ~DEFAULT_BRANCH.
-              check_response_timeout_minutes:
-                type: integer
-                description: >-
-                  merge_queue parameter. All seven merge_queue keys are required together.
-                  A ruleset carrying a merge_queue rule must target a concrete ref: its
-                  conditions.ref_name must not be a wildcard such as ~ALL (GitHub returns 422
-                  "Wildcard ref names are not supported when merge queue is enabled"). Use
-                  refs/heads/<branch> or ~DEFAULT_BRANCH.
-              grouping_strategy:
-                type: string
-                enum:
-                  - ALLGREEN
-                  - HEADGREEN
-              max_entries_to_build:
-                type: integer
-              max_entries_to_merge:
-                type: integer
-              merge_method:
-                type: string
-                enum:
-                  - MERGE
-                  - SQUASH
-                  - REBASE
-              min_entries_to_merge:
-                type: integer
-              min_entries_to_merge_wait_minutes:
-                type: integer
               # types: commit_message_pattern, commit_author_email_pattern,
               # committer_email_pattern, branch_name_pattern, tag_name_pattern — the five share one
               # {name, negate, operator, pattern} shape. `operator` and `pattern` are the required

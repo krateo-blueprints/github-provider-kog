@@ -11,6 +11,22 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-11 — fix: ruleset rule types as GitHub accepts them; the adherence check sees inside unions
+
+`assert-oas-adherence.py` now compares a flattened union field by field with the merge of GitHub's
+members, so the ruleset `rules[]` model is checked rather than skipped. What it found:
+- **OrgRuleset carried `merge_queue` and `license_compliance_scanning`**, which GitHub's org-ruleset
+  schema lacks. Diego asked for a live test first. A disabled org ruleset matching no repository
+  (deleted afterwards, 0 left) was refused for both with "Invalid property /rules/0: data matches no
+  possible input", while a `deletion` control was accepted. Both types, and merge_queue's 7
+  parameters, are removed from OrgRuleset. No OrgRuleset CRs existed on 057.
+- **RepoRuleset lacked `code_coverage`** (`minimum_coverage`, `max_coverage_drop`) **and
+  `code_quality`** (`severity`). Both are added. oasgen turns `number` into `integer`, so coverage is
+  in whole percentages for now.
+- **`require_extra_approval_for_unattributed_changes`** (pull_request, boolean) is added to both kinds.
+- Kept as reasoned exceptions: `dismissal_restriction` and `required_reviewers` (nested actor unions,
+  held for oasgen-provider#563) and OrgRuleset's repository_id / repository_property targeting.
+
 ## 2026-11-11 — feat: enums as GitHub defines them (visibility, PR state, ruleset target)
 
 The three category-D enum differences found by the type/enum check (#69):
