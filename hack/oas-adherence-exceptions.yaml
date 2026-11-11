@@ -590,6 +590,553 @@ exceptions:
   reason: A query parameter declared on the findby list operation becomes a spec field (oasgen merges parameters
     from every verb into the spec), so an author could set a filter that makes findby miss the object it is looking
     for, and observe would then re-create it. The paginator sets page/per_page on the URL itself.
+- row: new
+  category: C
+  kind: Autolink
+  method: DELETE
+  path: /repos/{owner}/{repo}/autolinks/{autolink_id}
+  deviation: param-type
+  fields:
+  - autolink_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: Autolink
+  method: GET
+  path: /repos/{owner}/{repo}/autolinks/{autolink_id}
+  deviation: param-type
+  fields:
+  - autolink_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: CodeSecurityConfig
+  method: DELETE
+  path: /orgs/{org}/code-security/configurations/{configuration_id}
+  deviation: param-type
+  fields:
+  - configuration_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: CodeSecurityConfig
+  method: GET
+  path: /orgs/{org}/code-security/configurations/{configuration_id}
+  deviation: param-type
+  fields:
+  - configuration_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: CodeSecurityConfig
+  method: PATCH
+  path: /orgs/{org}/code-security/configurations/{configuration_id}
+  deviation: param-type
+  fields:
+  - configuration_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: CustomProperty
+  method: PUT
+  path: /orgs/{org}/properties/schema/{property_name}
+  deviation: type-narrowed
+  fields:
+  - default_value
+  restore: 'blocked: oasgen-provider#563'
+  reason: GitHub accepts a string, or an array for multi_select. A scalar oneOf renders as type object in oasgen
+    0.56.0, so only the string form is modelled. chart/assets/customproperty.yaml
+- row: new
+  category: C
+  kind: DeployKey
+  method: DELETE
+  path: /repos/{owner}/{repo}/keys/{key_id}
+  deviation: param-type
+  fields:
+  - key_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: DeployKey
+  method: GET
+  path: /repos/{owner}/{repo}/keys/{key_id}
+  deviation: param-type
+  fields:
+  - key_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: DeploymentBranchPolicy
+  method: DELETE
+  path: /repos/{owner}/{repo}/environments/{environment_name}/deployment-branch-policies/{branch_policy_id}
+  deviation: param-type
+  fields:
+  - branch_policy_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: DeploymentBranchPolicy
+  method: GET
+  path: /repos/{owner}/{repo}/environments/{environment_name}/deployment-branch-policies/{branch_policy_id}
+  deviation: param-type
+  fields:
+  - branch_policy_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: DeploymentBranchPolicy
+  method: PUT
+  path: /repos/{owner}/{repo}/environments/{environment_name}/deployment-branch-policies/{branch_policy_id}
+  deviation: param-type
+  fields:
+  - branch_policy_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: Issue
+  method: GET
+  path: /repos/{owner}/{repo}/issues/{issue_number}
+  deviation: param-type
+  fields:
+  - issue_number
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: Issue
+  method: PATCH
+  path: /repos/{owner}/{repo}/issues/{issue_number}
+  deviation: param-type
+  fields:
+  - issue_number
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: Issue
+  method: PATCH
+  path: /repos/{owner}/{repo}/issues/{issue_number}
+  deviation: type-narrowed
+  fields:
+  - title
+  restore: 'blocked: oasgen-provider#563'
+  reason: GitHub declares oneOf string|integer; an int-or-string union does not survive CRD generation, and a title
+    is a string in practice. chart/assets/issue.yaml
+- row: new
+  category: C
+  kind: Issue
+  method: POST
+  path: /repos/{owner}/{repo}/issues
+  deviation: type-narrowed
+  fields:
+  - labels[]
+  restore: 'blocked: oasgen-provider#563'
+  reason: GitHub items are oneOf string|object; the string form (label name) is modelled. A union does not render
+    in oasgen 0.56.0.
+- row: new
+  category: C
+  kind: Issue
+  method: POST
+  path: /repos/{owner}/{repo}/issues
+  deviation: type-narrowed
+  fields:
+  - milestone
+  restore: 'blocked: oasgen-provider#563'
+  reason: GitHub declares oneOf string|integer; the milestone NUMBER is modelled as an integer (a Milestone CR's
+    status.number). chart/assets/issue.yaml
+- row: new
+  category: C
+  kind: Issue
+  method: POST
+  path: /repos/{owner}/{repo}/issues
+  deviation: type-narrowed
+  fields:
+  - title
+  restore: 'blocked: oasgen-provider#563'
+  reason: GitHub declares oneOf string|integer; an int-or-string union does not survive CRD generation, and a title
+    is a string in practice. chart/assets/issue.yaml
+- row: new
+  category: C
+  kind: Milestone
+  method: DELETE
+  path: /repos/{owner}/{repo}/milestones/{milestone_number}
+  deviation: param-type
+  fields:
+  - milestone_number
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: Milestone
+  method: GET
+  path: /repos/{owner}/{repo}/milestones/{milestone_number}
+  deviation: param-type
+  fields:
+  - milestone_number
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: Milestone
+  method: PATCH
+  path: /repos/{owner}/{repo}/milestones/{milestone_number}
+  deviation: param-type
+  fields:
+  - milestone_number
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: OrgRuleset
+  method: DELETE
+  path: /orgs/{org}/rulesets/{ruleset_id}
+  deviation: param-type
+  fields:
+  - ruleset_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: OrgRuleset
+  method: GET
+  path: /orgs/{org}/rulesets/{ruleset_id}
+  deviation: param-type
+  fields:
+  - ruleset_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: D
+  kind: OrgRuleset
+  method: POST
+  path: /orgs/{org}/rulesets
+  deviation: enum-narrowed
+  fields:
+  - target
+  restore: todo
+  reason: GitHub also allows `repository`; restore it. GitHub's own org rule union carries no repository-only rule
+    types, so the flattened rules model is unaffected.
+- row: new
+  category: D
+  kind: OrgRuleset
+  method: PUT
+  path: /orgs/{org}/rulesets/{ruleset_id}
+  deviation: enum-narrowed
+  fields:
+  - target
+  restore: todo
+  reason: GitHub also allows `repository`; restore it. GitHub's own org rule union carries no repository-only rule
+    types, so the flattened rules model is unaffected.
+- row: new
+  category: C
+  kind: OrgRuleset
+  method: PUT
+  path: /orgs/{org}/rulesets/{ruleset_id}
+  deviation: param-type
+  fields:
+  - ruleset_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: OrgWebhook
+  method: DELETE
+  path: /orgs/{org}/hooks/{hook_id}
+  deviation: param-type
+  fields:
+  - hook_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: OrgWebhook
+  method: GET
+  path: /orgs/{org}/hooks/{hook_id}
+  deviation: param-type
+  fields:
+  - hook_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: OrgWebhook
+  method: PATCH
+  path: /orgs/{org}/hooks/{hook_id}
+  deviation: param-type
+  fields:
+  - hook_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: OrgWebhook
+  method: PATCH
+  path: /orgs/{org}/hooks/{hook_id}
+  deviation: type-narrowed
+  fields:
+  - config.insecure_ssl
+  reason: GitHub declares oneOf string|number; typed as the string form GET returns ("0"/"1"), so spec and response
+    compare string to string. A number spec value would read as drift. chart/assets/orgwebhook.yaml
+- row: new
+  category: C
+  kind: OrgWebhook
+  method: POST
+  path: /orgs/{org}/hooks
+  deviation: type-narrowed
+  fields:
+  - config.insecure_ssl
+  reason: GitHub declares oneOf string|number; typed as the string form GET returns ("0"/"1"), so spec and response
+    compare string to string. A number spec value would read as drift. chart/assets/orgwebhook.yaml
+- row: new
+  category: C
+  kind: PullRequest
+  method: GET
+  path: /repos/{owner}/{repo}/pulls/{pull_number}
+  deviation: param-type
+  fields:
+  - pull_number
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: D
+  kind: PullRequest
+  method: PATCH
+  path: /repos/{owner}/{repo}/pulls/{pull_number}
+  deviation: enum-dropped
+  fields:
+  - state
+  restore: todo
+  reason: GitHub enumerates open|closed; restore the enum (a PATCH-only field, so not settable from a CR yet).
+- row: new
+  category: C
+  kind: PullRequest
+  method: PATCH
+  path: /repos/{owner}/{repo}/pulls/{pull_number}
+  deviation: param-type
+  fields:
+  - pull_number
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: Release
+  method: DELETE
+  path: /repos/{owner}/{repo}/releases/{release_id}
+  deviation: param-type
+  fields:
+  - release_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: Release
+  method: GET
+  path: /repos/{owner}/{repo}/releases/{release_id}
+  deviation: param-type
+  fields:
+  - release_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: Release
+  method: PATCH
+  path: /repos/{owner}/{repo}/releases/{release_id}
+  deviation: param-type
+  fields:
+  - release_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: RepoDeployment
+  method: DELETE
+  path: /repos/{owner}/{repo}/deployments/{deployment_id}
+  deviation: param-type
+  fields:
+  - deployment_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: RepoDeployment
+  method: GET
+  path: /repos/{owner}/{repo}/deployments/{deployment_id}
+  deviation: param-type
+  fields:
+  - deployment_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: RepoRuleset
+  method: DELETE
+  path: /repos/{owner}/{repo}/rulesets/{ruleset_id}
+  deviation: param-type
+  fields:
+  - ruleset_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: RepoRuleset
+  method: GET
+  path: /repos/{owner}/{repo}/rulesets/{ruleset_id}
+  deviation: param-type
+  fields:
+  - ruleset_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: RepoRuleset
+  method: PUT
+  path: /repos/{owner}/{repo}/rulesets/{ruleset_id}
+  deviation: param-type
+  fields:
+  - ruleset_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: RepoWebhook
+  method: DELETE
+  path: /repos/{owner}/{repo}/hooks/{hook_id}
+  deviation: param-type
+  fields:
+  - hook_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: RepoWebhook
+  method: GET
+  path: /repos/{owner}/{repo}/hooks/{hook_id}
+  deviation: param-type
+  fields:
+  - hook_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: RepoWebhook
+  method: PATCH
+  path: /repos/{owner}/{repo}/hooks/{hook_id}
+  deviation: param-type
+  fields:
+  - hook_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: RepoWebhook
+  method: PATCH
+  path: /repos/{owner}/{repo}/hooks/{hook_id}
+  deviation: type-narrowed
+  fields:
+  - config.insecure_ssl
+  reason: GitHub declares oneOf string|number; typed as the string form GET returns ("0"/"1"), so spec and response
+    compare string to string. A number spec value would read as drift. chart/assets/orgwebhook.yaml
+- row: new
+  category: C
+  kind: RepoWebhook
+  method: POST
+  path: /repos/{owner}/{repo}/hooks
+  deviation: type-narrowed
+  fields:
+  - config.insecure_ssl
+  reason: GitHub declares oneOf string|number; typed as the string form GET returns ("0"/"1"), so spec and response
+    compare string to string. A number spec value would read as drift. chart/assets/orgwebhook.yaml
+- row: new
+  category: D
+  kind: Repository
+  method: POST
+  path: /orgs/{org}/repos
+  deviation: enum-dropped
+  fields:
+  - visibility
+  restore: todo
+  reason: GitHub enumerates public|private; restore the enum.
+- row: new
+  category: C
+  kind: RunnerGroup
+  method: DELETE
+  path: /orgs/{org}/actions/runner-groups/{runner_group_id}
+  deviation: param-type
+  fields:
+  - runner_group_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: RunnerGroup
+  method: GET
+  path: /orgs/{org}/actions/runner-groups/{runner_group_id}
+  deviation: param-type
+  fields:
+  - runner_group_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: RunnerGroup
+  method: PATCH
+  path: /orgs/{org}/actions/runner-groups/{runner_group_id}
+  deviation: param-type
+  fields:
+  - runner_group_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: B
+  kind: TeamRepo
+  method: PUT
+  path: /orgs/{org}/teams/{team_slug}/repos/{owner}/{repo}
+  deviation: enum-added
+  fields:
+  - permission
+  reason: 'Constrained to the five base levels on purpose: GitHub also accepts a custom repository-role name, but
+    the observe response reports only base levels, so a custom role would read as drift and PUT forever. chart/assets/teamrepo.yaml'
+- row: new
+  category: C
+  kind: Workflow
+  method: GET
+  path: /repos/{owner}/{repo}/actions/workflows/{workflow_id}
+  deviation: param-type
+  fields:
+  - workflow_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: Workflow
+  method: PUT
+  path: /repos/{owner}/{repo}/actions/workflows/{workflow_id}/disable
+  deviation: param-type
+  fields:
+  - workflow_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: Workflow
+  method: PUT
+  path: /repos/{owner}/{repo}/actions/workflows/{workflow_id}/enable
+  deviation: param-type
+  fields:
+  - workflow_id
+  reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
+    as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
 defaults:
 - kind: Autolink
   method: POST

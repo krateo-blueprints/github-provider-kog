@@ -531,7 +531,9 @@ is listed with its reason in `hack/oas-adherence-exceptions.yaml`, and
 kind against GitHub's operation: path and query parameters, and request-body properties and
 `required`, recursing into nested objects. A difference with no entry fails, and so does an
 entry that no longer matches one, so the file is always the complete list. Restoring a field
-means deleting its entry. Types and enums are not compared yet.
+means deleting its entry. Types (with `nullable` and a `null` member ignored, since oasgen does not
+carry them, and a scalar `oneOf` read as a union), enums and path/query parameter types are compared
+too; formats are not.
 
 Each entry has a category: **A** safety (restoring it would let drift damage live objects),
 **B** drift (GitHub does not echo it as sent, so a compared field would update forever),
