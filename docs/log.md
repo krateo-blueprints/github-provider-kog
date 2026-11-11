@@ -11,6 +11,26 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-11 — ci: the adherence check compares types and enums too
+
+Diego chose to extend `hack/assert-oas-adherence.py` beyond fields and `required`. It now also reports
+`type-narrowed`, `type-changed`, `enum-dropped`, `enum-added`, `enum-narrowed` and `param-type`.
+`nullable`/`null` are ignored (oasgen does not carry them), and a scalar `oneOf` counts as a union of types.
+
+On main it found 54 more differences, each now listed with a reason:
+- **40 C:** server-assigned ids (release_id, hook_id, pull_number, ...) declared as strings because they
+  are read from status, which the controller writes as text. `workflow_id` is the file-name handle.
+- **5 C, blocked on oasgen-provider#563:** narrowed `oneOf` unions: Issue `title`/`milestone`/`labels[]`,
+  CustomProperty `default_value`. Webhook `insecure_ssl` stays C on its own, because GitHub returns the
+  string form.
+- **1 B:** TeamRepo `permission` is limited to the five base levels; custom roles are not observable and
+  would PUT forever.
+- **3 D to restore:** Repository `visibility` enum, PullRequest PATCH `state` enum, OrgRuleset `target`
+  value `repository`.
+
+Negative controls: changing Release `tag_name` to integer fails as `type-changed`; dropping `closed`
+from Milestone `state` fails as `enum-narrowed`.
+
 ## 2026-11-10 — feat: GitHub Enterprise through `githubBaseUrl`
 
 Closes the GitHub Enterprise parity gap with the legacy github-provider. Diego's choices: one value

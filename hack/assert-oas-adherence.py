@@ -14,9 +14,16 @@ path, and compares what the asset declares with what GitHub declares:
   required-added    the asset requires a property GitHub does not
   required-dropped  the asset declares a property GitHub requires, without requiring it
   union-flattened   GitHub declares a oneOf/anyOf of objects where the asset declares one object
+  type-narrowed     the asset allows a strict subset of GitHub's types (e.g. string for string|integer)
+  type-changed      the asset's type is not a subset of GitHub's (e.g. string for integer)
+  enum-dropped      GitHub restricts the value to an enum the asset does not declare
+  enum-added        the asset declares an enum where GitHub has none, or values GitHub does not list
+  enum-narrowed     the asset's enum is a strict subset of GitHub's
+  param-type        a path or query parameter's type differs (narrowed or changed)
   default           the asset declares a `default` (see DEFAULTS below)
 
-Types, enums and formats are NOT compared yet.
+Types ignore `nullable` and a `null` member, which oasgen does not carry into the CRD; a oneOf/anyOf
+whose members are all bare types counts as the union of those types. Formats are NOT compared.
 
 Every difference must be covered by an entry in hack/oas-adherence-exceptions.yaml, and every
 entry must still match a difference: a restored field makes its entry stale, and the check fails
@@ -82,7 +89,43 @@ def join(path, key):
     return key if not path else path + "." + key
 
 
+def types_of(doc, node):
+    """The set of JSON types a schema admits, `null` excluded; None when it states none."""
+    node = flatten(doc, node)
+    if not isinstance(node, dict):
+        return None
+    t = node.get("type")
+    if t:
+        return frozenset([t] if isinstance(t, str) else t) - {"null"} or None
+    members = node.get("oneOf") or node.get("anyOf")
+    if members:
+        out = set()
+        for m in members:
+            mt = types_of(doc, m)
+            if mt is None:
+                return None
+            out |= mt
+        return frozenset(out) - {"null"} or None
+    return None
+
+
+def compare_type_enum(adoc, a, g, path, out):
+    ta, tg = types_of(adoc, a), types_of(github, g)
+    if ta is not None and tg is not None and ta != tg:
+        out.append(("type-narrowed" if ta < tg else "type-changed", path, None))
+    a, g = flatten(adoc, a), flatten(github, g)
+    ae = {json.dumps(v, sort_keys=True) for v in (a.get("enum") or []) if v is not None}
+    ge = {json.dumps(v, sort_keys=True) for v in (g.get("enum") or []) if v is not None}
+    if ge and not ae:
+        out.append(("enum-dropped", path, None))
+    elif ae and not ge:
+        out.append(("enum-added", path, None))
+    elif ae and ge and ae != ge:
+        out.append(("enum-narrowed" if ae < ge else "enum-added", path, None))
+
+
 def compare(adoc, a, g, path, out, gdefaults):
+    compare_type_enum(adoc, a, g, path, out)
     a, g = flatten(adoc, a), flatten(github, g)
     if "default" in a:
         out.append(("default", path, a["default"]))
@@ -108,9 +151,16 @@ def compare(adoc, a, g, path, out, gdefaults):
         compare(adoc, ap[k], gp[k], join(path, k), out, gdefaults)
 
 
-def parameters(doc, path_item, op):
+def parameters(doc, path_item, op, where="query"):
+    """{name: schema} of the operation's parameters in `where`, path-item ones included."""
     found = [resolve(doc, p) for p in (path_item.get("parameters") or []) + (op.get("parameters") or [])]
-    return {p["name"] for p in found if p.get("in") == "query"}
+    return {p["name"]: p.get("schema") or {} for p in found if p.get("in") == where}
+
+
+def param_type(adoc, aschema, gschema, label, out):
+    ta, tg = types_of(adoc, aschema), types_of(github, gschema)
+    if ta is not None and tg is not None and ta != tg:
+        out.append(("param-type", label, None))
 
 
 def body(op):
@@ -140,10 +190,17 @@ for rd in (d for d in docs if d.get("kind") == "RestDefinition"):
         for mine, theirs in zip(re.findall(r"\{([^}]+)\}", path), re.findall(r"\{([^}]+)\}", gpath)):
             if mine != theirs:
                 out.append(("param-renamed", "%s<-%s" % (mine, theirs), None))
+        ap_ = parameters(adoc, adoc["paths"][path], aop, "path")
+        gp_ = parameters(github, github["paths"][gpath], gop, "path")
+        for mine, theirs in zip(re.findall(r"\{([^}]+)\}", path), re.findall(r"\{([^}]+)\}", gpath)):
+            if mine in ap_ and theirs in gp_:
+                param_type(adoc, ap_[mine], gp_[theirs], mine, out)
         aq = parameters(adoc, adoc["paths"][path], aop)
         gq = parameters(github, github["paths"][gpath], gop)
-        out += [("query-dropped", q, None) for q in sorted(gq - aq)]
-        out += [("query-added", q, None) for q in sorted(aq - gq)]
+        out += [("query-dropped", q, None) for q in sorted(set(gq) - set(aq))]
+        out += [("query-added", q, None) for q in sorted(set(aq) - set(gq))]
+        for q in sorted(set(aq) & set(gq)):
+            param_type(adoc, aq[q], gq[q], "?" + q, out)
         ab, gb = body(aop), body(gop)
         if ab is not None and gb is None:
             out.append(("body-added", "", None))
