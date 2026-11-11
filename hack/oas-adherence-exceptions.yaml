@@ -816,28 +816,6 @@ exceptions:
   reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
     as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
 - row: new
-  category: D
-  kind: OrgRuleset
-  method: POST
-  path: /orgs/{org}/rulesets
-  deviation: enum-narrowed
-  fields:
-  - target
-  restore: todo
-  reason: GitHub also allows `repository`; restore it. GitHub's own org rule union carries no repository-only rule
-    types, so the flattened rules model is unaffected.
-- row: new
-  category: D
-  kind: OrgRuleset
-  method: PUT
-  path: /orgs/{org}/rulesets/{ruleset_id}
-  deviation: enum-narrowed
-  fields:
-  - target
-  restore: todo
-  reason: GitHub also allows `repository`; restore it. GitHub's own org rule union carries no repository-only rule
-    types, so the flattened rules model is unaffected.
-- row: new
   category: C
   kind: OrgRuleset
   method: PUT
@@ -907,16 +885,6 @@ exceptions:
   - pull_number
   reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
     as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
-- row: new
-  category: D
-  kind: PullRequest
-  method: PATCH
-  path: /repos/{owner}/{repo}/pulls/{pull_number}
-  deviation: enum-dropped
-  fields:
-  - state
-  restore: todo
-  reason: GitHub enumerates open|closed; restore the enum (a PATCH-only field, so not settable from a CR yet).
 - row: new
   category: C
   kind: PullRequest
@@ -1058,16 +1026,6 @@ exceptions:
   reason: GitHub declares oneOf string|number; typed as the string form GET returns ("0"/"1"), so spec and response
     compare string to string. A number spec value would read as drift. chart/assets/orgwebhook.yaml
 - row: new
-  category: D
-  kind: Repository
-  method: POST
-  path: /orgs/{org}/repos
-  deviation: enum-dropped
-  fields:
-  - visibility
-  restore: todo
-  reason: GitHub enumerates public|private; restore the enum.
-- row: new
   category: C
   kind: RunnerGroup
   method: DELETE
@@ -1137,6 +1095,17 @@ exceptions:
   - workflow_id
   reason: Server-assigned id read from status, which the controller writes as a string; a path parameter is substituted
     as text, so the types must match here (see the asset parameter comment, e.g. release.yaml release_id).
+- row: new
+  category: C
+  kind: Repository
+  method: POST
+  path: /orgs/{org}/repos
+  deviation: enum-added
+  fields:
+  - visibility
+  reason: 'internal is added to GitHub public|private on purpose (Diego, 2026-11-11): the GET schema documents it
+    (public, private, or internal) and Enterprise organizations create internal repositories, which githubBaseUrl
+    supports. chart/assets/repository.yaml'
 defaults:
 - kind: Autolink
   method: POST

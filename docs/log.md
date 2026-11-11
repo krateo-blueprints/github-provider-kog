@@ -11,6 +11,19 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-11 — feat: enums as GitHub defines them (visibility, PR state, ruleset target)
+
+The three category-D enum differences found by the type/enum check (#69):
+- **Repository `visibility`** gets an enum. It is `public`, `private` and `internal`: GitHub's create
+  body lists only the first two, but its GET schema documents `internal`, and Enterprise
+  organizations create internal repositories, which `githubBaseUrl` now supports (Diego's choice).
+  It is listed as a reasoned exception, `enum-added` (C).
+- **PullRequest PATCH `state`** gets GitHub's `open|closed`. It is update-only, so it is not yet
+  settable from a CR.
+- **OrgRuleset `target`** gains `repository` (POST and PUT), as GitHub allows.
+None of the 15 Repository CRs on 057 sets `visibility`, and adding an enum value cannot invalidate a
+ruleset.
+
 ## 2026-11-11 — ci: the adherence check compares types and enums too
 
 Diego chose to extend `hack/assert-oas-adherence.py` beyond fields and `required`. It now also reports
