@@ -487,14 +487,18 @@ above). The whole-value hazard and the sub-controls still left unmodelled are in
   compared element-by-element, in order — list them in a stable order. Extra keys GitHub
   fills into a rule's `parameters` (defaults such as `do_not_enforce_on_create`) are
   ignored, since the comparison walks only keys the CR declares, so a partially-specified
-  rule does not read as drift. **All 23 of GitHub's rule types are now modelled** — the nine
+  rule does not read as drift. **Every rule type GitHub accepts is modelled**: 25 on `RepoRuleset`, 21 on `OrgRuleset`
+  (GitHub's org-ruleset API lists neither `merge_queue` nor `license_compliance_scanning`, and refused both in a live
+  probe on 2026-11-11; `code_coverage` and `code_quality` exist only on repository rulesets). The nine
   branch-protection replacements (`creation`, `deletion`, `update`, `non_fast_forward`,
   `required_linear_history`, `required_signatures`, `pull_request`, `required_status_checks`,
   `required_deployments`), `merge_queue`, the five pattern rules (`commit_message_pattern`,
   `commit_author_email_pattern`, `committer_email_pattern`, `branch_name_pattern`,
   `tag_name_pattern`), and the remaining eight (`workflows`, `code_scanning`,
   `copilot_code_review`, `license_compliance_scanning`, `file_path_restriction`,
-  `max_file_path_length`, `file_extension_restriction`, `max_file_size`). Nothing is left to
+  `max_file_path_length`, `file_extension_restriction`, `max_file_size`), plus `code_coverage`
+  (`minimum_coverage`, `max_coverage_drop`; whole percentages only, because oasgen turns GitHub's `number` into
+  `integer`) and `code_quality` (`severity`) on `RepoRuleset`. Nothing is left to
   be configured only in the UI, so an out-of-band rule is now reverted to the CR's declared
   set rather than deleted-and-unrecoverable — ordinary declarative management.
   The branch-protection set, `merge_queue` and the pattern rules were **verified live**

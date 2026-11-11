@@ -13,7 +13,8 @@ path, and compares what the asset declares with what GitHub declares:
   added             a body property GitHub does not define is declared
   required-added    the asset requires a property GitHub does not
   required-dropped  the asset declares a property GitHub requires, without requiring it
-  union-flattened   GitHub declares a oneOf/anyOf of objects where the asset declares one object
+  union-flattened   GitHub declares a oneOf/anyOf of objects where the asset declares one object; the
+                    asset is then also compared, field by field, with the merge of GitHub's members
   type-narrowed     the asset allows a strict subset of GitHub's types (e.g. string for string|integer)
   type-changed      the asset's type is not a subset of GitHub's (e.g. string for integer)
   enum-dropped      GitHub restricts the value to an enum the asset does not declare
@@ -124,6 +125,38 @@ def compare_type_enum(adoc, a, g, path, out):
         out.append(("enum-narrowed" if ae < ge else "enum-added", path, None))
 
 
+def merge_union(node):
+    """One object schema standing for every member of a oneOf/anyOf of objects (GitHub's side only).
+
+    A flattened union in an asset is compared against this: a key any member defines is a key the
+    union defines; enums are the union of the members' values; a key is required only when every
+    member requires it. That is what an asset modelling the union as one object has to match.
+    """
+    members = [flatten(github, m) for m in (node.get("oneOf") or node.get("anyOf"))]
+    props, req = {}, None
+    for m in members:
+        mreq = set(m.get("required") or [])
+        req = mreq if req is None else (req & mreq)
+        for k, v in (m.get("properties") or {}).items():
+            props.setdefault(k, []).append(flatten(github, v))
+    merged = {}
+    for k, vs in props.items():
+        if len(vs) == 1:
+            merged[k] = vs[0]
+            continue
+        objs = [v for v in vs if v.get("properties")]
+        if objs:
+            merged[k] = merge_union({"oneOf": objs})
+        else:
+            base = dict(vs[0])
+            enums = [e for v in vs for e in (v.get("enum") or [])]
+            if enums and all(v.get("enum") for v in vs):
+                base["enum"] = sorted(set(json.dumps(e, sort_keys=True) for e in enums))
+                base["enum"] = [json.loads(e) for e in base["enum"]]
+            merged[k] = base
+    return {"type": "object", "properties": merged, "required": sorted(req or [])}
+
+
 def compare(adoc, a, g, path, out, gdefaults):
     compare_type_enum(adoc, a, g, path, out)
     a, g = flatten(adoc, a), flatten(github, g)
@@ -133,7 +166,10 @@ def compare(adoc, a, g, path, out, gdefaults):
     ap, gp = a.get("properties") or {}, g.get("properties") or {}
     if not gp and (g.get("oneOf") or g.get("anyOf")) and ap:
         out.append(("union-flattened", path, None))
-        return
+        g = merge_union(g)
+        gp = g["properties"]
+        if not gp:
+            return
     if not ap and not gp:
         if "items" in a and "items" in g:
             compare(adoc, a["items"], g["items"], path + "[]", out, gdefaults)

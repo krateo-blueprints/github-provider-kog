@@ -248,13 +248,15 @@ components:
     # The parameterless types — creation, deletion, non_fast_forward, required_linear_history,
     # required_signatures, license_compliance_scanning — take no `parameters` key at all.
     #
-    # MODELLED — all of GitHub's 23 rule types are now modelled:
+    # MODELLED — all 25 of GitHub's repository-ruleset rule types (code_coverage and code_quality
+    # added 2026-11-11; see their parameters below):
     #   creation, deletion, update, non_fast_forward, required_linear_history,
     #   required_signatures, pull_request, required_status_checks, required_deployments,
     #   merge_queue, commit_message_pattern, commit_author_email_pattern,
     #   committer_email_pattern, branch_name_pattern, tag_name_pattern,
     #   workflows, code_scanning, copilot_code_review, license_compliance_scanning,
-    #   file_path_restriction, max_file_path_length, file_extension_restriction, max_file_size.
+    #   file_path_restriction, max_file_path_length, file_extension_restriction, max_file_size,
+    #   code_coverage, code_quality.
     #
     # On the five *_pattern rules, and the "name/pattern would collide" note this comment used to
     # carry: there is NO collision, and it was removed after checking the generator source. Those
@@ -312,6 +314,8 @@ components:
               - code_scanning
               - copilot_code_review
               - license_compliance_scanning
+              - code_coverage
+              - code_quality
               - file_path_restriction
               - max_file_path_length
               - file_extension_restriction
@@ -332,6 +336,11 @@ components:
               require_last_push_approval:
                 type: boolean
               required_review_thread_resolution:
+                type: boolean
+              # pull_request, optional (GitHub's description): when Copilot opens a pull request
+              # without a human collaborator, require one more approving review if a non-zero
+              # approval count is required.
+              require_extra_approval_for_unattributed_changes:
                 type: boolean
               allowed_merge_methods:
                 type: array
@@ -398,6 +407,24 @@ components:
                 type: integer
               min_entries_to_merge_wait_minutes:
                 type: integer
+              # type: code_coverage — both optional (GitHub's schema). GitHub types them `number`
+              # (float, 0-100); oasgen converts `number` to `integer` when generating the CRD, so
+              # whole percentages only until it carries `number` through.
+              minimum_coverage:
+                type: number
+                description: The absolute minimum line coverage percentage required. Pull requests with line coverage below this threshold will be blocked.
+              max_coverage_drop:
+                type: number
+                description: The maximum percentage points that line coverage may drop relative to the default branch. Pull requests that reduce line coverage by more than this amount will be blocked.
+              # type: code_quality — `severity` required (GitHub's schema).
+              severity:
+                type: string
+                description: The lowest severity level at which code quality reviews need to be resolved before commits can be merged.
+                enum:
+                  - errors
+                  - warnings
+                  - notes
+                  - all
               # types: commit_message_pattern, commit_author_email_pattern,
               # committer_email_pattern, branch_name_pattern, tag_name_pattern — the five share one
               # {name, negate, operator, pattern} shape. `operator` and `pattern` are the required

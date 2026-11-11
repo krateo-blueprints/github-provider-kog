@@ -391,7 +391,9 @@ spec:
   GitHub's per-type `required` list, so the CRD cannot enforce it and a partial
   `pull_request` object is a `422`, not a silent ignore. Rules with no parameters are
   written as a bare `- type:` entry (e.g. `creation`, `non_fast_forward`,
-  `license_compliance_scanning`). **All 23 of GitHub's rule types are modelled.** The
+  `license_compliance_scanning`). **Every rule type GitHub accepts is modelled**: 25 on
+  `RepoRuleset` (including `code_coverage` and `code_quality`), 21 on `OrgRuleset`, where GitHub's
+  org API refuses `merge_queue` and `license_compliance_scanning` (live probe, 2026-11-11). The
   branch-protection set, `merge_queue` and the five pattern rules were round-trip-verified
   live on 2026-11-03, and `code_scanning`, `copilot_code_review` and the four push rules on
   2026-11-04 — all on a **Team-plan** org, order preserved and casing verbatim (the pattern
