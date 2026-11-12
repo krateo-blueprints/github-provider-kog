@@ -227,6 +227,23 @@ the CRD is uninstalled with its CRs, which are then marked for deletion. Measure
 the chart on a cluster with live CRs unless it runs oasgen-provider >= 0.61.0, and keep the
 `orphan` annotation on every repository you mean to keep.
 
+#### If the `Repository` CRD is stuck Terminating
+
+If `kubectl get crd repositories.github.krateo.io -o jsonpath='{.status.conditions[?(@.type=="Terminating")].reason}'`
+prints `InstanceDeletionInProgress`, every `Repository` CR is already marked for deletion, and the only
+thing missing is its controller. The deletion is **pending, not cancelled**: once the controller comes
+back (the RestDefinition re-created, or `helm upgrade` restoring the kind), it deletes every repository
+whose CR is not annotated. Before you restore anything:
+
+1. annotate every CR you want to keep with `krateo.io/deletion-policy: orphan`. This works on a CR that
+   already has a `deletionTimestamp`, because the policy is read when the controller reconciles it;
+2. check that none of them sets `krateo.io/management-policy: observe-delete`, which overrides it;
+3. only then restore the RestDefinition.
+
+Measured on kind with oasgen-provider 0.60.0, using a local fake API that logged every request it
+received. After the controller came back, the unannotated CR received 1 DELETE and the annotated one
+received 0. oasgen-provider 0.61.0 and later refuse the CRD uninstall that leads to this state.
+
 The status fields carry what the kinds that follow need: `full_name`, `clone_url`,
 `ssh_url`, `html_url` and the `default_branch` a ruleset or a branch protection binds to.
 
