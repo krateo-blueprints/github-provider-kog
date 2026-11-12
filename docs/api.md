@@ -152,7 +152,7 @@ authoring one are written out in full below the tables.
 | `spec.name` | string | the repository name — the identifier, and the only required create-body field |
 | `spec.description` / `spec.homepage` | string | repository metadata |
 | `spec.private` | boolean | **create-only** — honoured at create, never reconciled; see below |
-| `spec.visibility` | string | **create-only**, same reason; the asset declares no enum, so GitHub validates it |
+| `spec.visibility` | string | **create-only**, same reason; `public`, `private` or `internal` (a typo is rejected at apply). `UserRepository` accepts only `public` or `private`: a personal repository cannot be `internal` |
 | `spec.has_issues` / `spec.has_wiki` / `spec.has_projects` | boolean | feature toggles |
 | `spec.auto_init` | boolean | **default `true`** — create-only; see below |
 | `spec.gitignore_template` / `spec.license_template` | string | create-only |
