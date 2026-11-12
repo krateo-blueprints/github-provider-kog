@@ -11,17 +11,18 @@ timestamp: 2026-09-09T00:00:00Z
 
 ## Prerequisite
 
-A Krateo cluster with `oasgen-provider` **≥ 0.52.0** running (it provides
+A Krateo cluster with `oasgen-provider` **≥ 0.61.0** running (it provides
 `restdefinitions.ogen.krateo.io` and generates the CRDs + a controller per kind).
 
-0.9.x carried the four kinds the chart started with, but the floor is now **0.52.0**:
-0.52.0 adds `RestDefinition.spec.serverURL`, which `githubBaseUrl` sets for GitHub Enterprise
+0.9.x carried the four kinds the chart started with, but the floor is now **0.61.0**.
+0.61.0 is where oasgen-provider refuses to uninstall a generated CRD whose instances it cannot count when a RestDefinition is removed ([#576](https://github.com/krateo-platformops/oasgen-provider/issues/576)); below it, narrowing `kinds` or uninstalling the chart can cascade-delete live CRs ([below](#keeping-a-repository-when-its-cr-is-deleted)).
+Before that the floor was 0.52.0, which adds `RestDefinition.spec.serverURL`, which `githubBaseUrl` sets for GitHub Enterprise
 (below it the field would be dropped silently and requests would reach api.github.com). Before
 that the floor was 0.38.0, where the `GitRef` pattern admission guard reaches the generated CRD. `GitRef`'s
 create resolves its base sha with `dependentLookups`, a primitive that landed in 0.36.0.
 25 of the 32 kinds also set `compareScope: updatable`, a value
 `RestDefinition` CRDs below 0.23.0 reject on apply so their kinds never appear — the
-earlier floor, now subsumed by 0.52.0.
+earlier floor, now subsumed by 0.61.0.
 
 Nothing else is required. The chart renders 32 ConfigMaps and 32 RestDefinitions and
 nothing more: there is no Deployment, no Service and no image of its own to pull. Every

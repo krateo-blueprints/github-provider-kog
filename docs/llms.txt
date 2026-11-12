@@ -1,6 +1,6 @@
 # github-provider-kog — LLM doc index
 # One line per file (the 31 kinds other than Repository pair their RestDefinition with its
-# OpenAPI spec on one line — they are 1:1). A Krateo KOG provider (oasgen-provider ≥ 0.52.0)
+# OpenAPI spec on one line — they are 1:1). A Krateo KOG provider (oasgen-provider ≥ 0.61.0)
 # exposing 32 GitHub REST resources as github.krateo.io Kubernetes kinds: repositories,
 # access, repository configuration, CI/CD, work tracking and governance. The chart ships
 # RestDefinitions + trimmed OpenAPI specs and NOTHING else — no Deployment, no Service, no

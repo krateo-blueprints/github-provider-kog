@@ -45,12 +45,12 @@ oasgen-provider watches the **32** `RestDefinition`s and generates the CRDs belo
 (added by oasgen from the OpenAPI `securityScheme`) naming the `<Kind>Configuration` that
 holds its token wiring.
 
-**oasgen-provider ≥ 0.52.0 is required.** 0.52.0 adds `RestDefinition.spec.serverURL`, which
-`githubBaseUrl` sets for GitHub Enterprise ([configuration](./configuration.md)). Earlier floors: 0.38.0 is where the `GitRef` pattern admission
+**oasgen-provider ≥ 0.61.0 is required.** 0.61.0 is where oasgen-provider refuses to uninstall a generated CRD whose instances it cannot count when a RestDefinition is removed ([#576](https://github.com/krateo-platformops/oasgen-provider/issues/576)); below it, narrowing `kinds` or uninstalling the chart can cascade-delete live CRs ([usage](./usage.md#keeping-a-repository-when-its-cr-is-deleted)). Earlier floors: 0.52.0 adds `RestDefinition.spec.serverURL`, which
+`githubBaseUrl` sets for GitHub Enterprise ([configuration](./configuration.md)). 0.38.0 is where the `GitRef` pattern admission
 guard reaches the generated CRD ([#249](https://github.com/krateo-platformops/oasgen-provider/issues/249)/#250);
 `GitRef`'s create resolves its base sha with a `dependentLookups` chain that landed in
 0.36.0; the `compareScope: updatable` that 25 of the 32 kinds declare needs ≥ 0.23.0, a
-floor now subsumed by 0.52.0 ([configuration](./configuration.md)).
+floor now subsumed by 0.61.0 ([configuration](./configuration.md)).
 
 **All 32 kinds are native.** Every verb goes straight to `api.github.com`, and the
 normalizations GitHub's REST inconsistencies demand are expressed in the RestDefinition

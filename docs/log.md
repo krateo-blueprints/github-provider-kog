@@ -11,6 +11,16 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-12 — chore: oasgen-provider floor raised to 0.61.0
+
+The documented floor goes from 0.52.0 to **0.61.0**. 0.61.0 is where oasgen-provider refuses to
+uninstall a generated CRD whose instances it cannot count when a RestDefinition is removed (#576).
+Below it, narrowing `kinds` or uninstalling the chart can cascade-delete live CRs (measured on
+0.60.0; see the 2026-11-12 docs entries below). 0.52.0's `spec.serverURL` is still why
+`githubBaseUrl` needs that version, and the earlier floors are now subsumed. Diego chose to raise it
+in the release after 0.10.0, tagged once demo runs oasgen ≥ 0.61.0. 057 runs 0.61.0 since installer
+0.3.603.
+
 ## 2026-11-12 — docs: recovering from a Repository CRD stuck Terminating
 
 usage.md now explains how to recover from a CRD left `Terminating` / `InstanceDeletionInProgress` by

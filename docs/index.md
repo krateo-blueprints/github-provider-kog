@@ -54,8 +54,8 @@ Four facts hold across the whole set:
   ships 31 of the 32 under `github-blueprints-config` (`UserRepository` creates repos in the
   token's own account, so it gets its own). The rights that token needs do differ by kind
   ([usage](./usage.md)).
-- **oasgen-provider ≥ 0.52.0 is required.** 0.52.0 adds `RestDefinition.spec.serverURL`,
-  which `githubBaseUrl` sets for GitHub Enterprise. Earlier floors are subsumed: 0.38.0 is where the `GitRef` pattern
+- **oasgen-provider ≥ 0.61.0 is required.** 0.61.0 is where oasgen-provider refuses to uninstall a generated CRD whose instances it cannot count when a RestDefinition is removed ([#576](https://github.com/krateo-platformops/oasgen-provider/issues/576)); below it, narrowing `kinds` or uninstalling the chart can cascade-delete live CRs ([usage](./usage.md#keeping-a-repository-when-its-cr-is-deleted)).
+  Earlier floors are subsumed: 0.52.0 adds `RestDefinition.spec.serverURL`, which `githubBaseUrl` sets for GitHub Enterprise; 0.38.0 is where the `GitRef` pattern
   admission guard reaches the generated CRD; `GitRef`'s create resolves its base sha with
   a dependent-lookup chain that landed in 0.36.0; the
   `compareScope: updatable` that 25 of the 32 declare needs ≥ 0.23.0, now subsumed.

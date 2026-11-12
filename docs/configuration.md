@@ -577,15 +577,15 @@ What each did, and what a native return takes, is written down per kind:
 
 ## Invariants
 
-- **oasgen-provider must be ≥ 0.52.0.** 0.52.0 adds `RestDefinition.spec.serverURL`, which
+- **oasgen-provider must be ≥ 0.61.0.** 0.61.0 is where oasgen-provider refuses to uninstall a generated CRD whose instances it cannot count when a RestDefinition is removed ([#576](https://github.com/krateo-platformops/oasgen-provider/issues/576)); below it, narrowing `kinds` or uninstalling the chart can cascade-delete live CRs ([usage](./usage.md#keeping-a-repository-when-its-cr-is-deleted)). Earlier floors: 0.52.0 adds `RestDefinition.spec.serverURL`, which
   `githubBaseUrl` sets on every RestDefinition for GitHub Enterprise; below it the field would be
-  dropped silently and requests would reach api.github.com. Earlier floors: 0.38.0 is where the `GitRef` pattern admission
+  dropped silently and requests would reach api.github.com. 0.38.0 is where the `GitRef` pattern admission
   guard reaches the generated CRD — the fix that makes the OpenAPI validation keywords
   land on the CRD ([#249](https://github.com/krateo-platformops/oasgen-provider/issues/249),
   merged as #250). `GitRef`'s create resolves its base sha with **dependent lookups**, a
   primitive that landed in 0.36.0 ([#120](https://github.com/krateo-platformops/oasgen-provider/issues/120),
   merged as #239), and the `compareScope: updatable` that 25 kinds declare does not exist
-  below 0.23.0 — all still hold, now subsumed by 0.52.0.
+  below 0.23.0 — all still hold, now subsumed by 0.61.0.
 - **The chart stays free of a runtime component.** It renders one ConfigMap and one
   RestDefinition per selected kind, 32 of each by default, and nothing else; every kind reaches `api.github.com` directly, no
   asset overrides `servers`, and every ConfigMap is a plain `.Files.Get` with nothing for
