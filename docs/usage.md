@@ -208,17 +208,24 @@ metadata:
 rest-dynamic-controller then releases the CR's finalizer without calling GitHub, and the
 repository stays. It reads the annotation through unstructured-runtime (`pkg/meta`
 `ShouldDelete`): `krateo.io/deletion-policy: orphan` keeps the external object, and so does
-`krateo.io/management-policy: observe-create-update` or `observe`. The annotation must be on the
-CR **before** it is deleted. The portal's builder-publish chart sets it on the `Repository` it
+`krateo.io/management-policy: observe-create-update` or `observe`. One combination defeats it:
+`krateo.io/management-policy: observe-delete` deletes the external object **whatever the
+deletion policy says**, so never set that management policy on a CR you protect with `orphan`.
+The annotation must be on the CR **before** it is deleted. The portal's builder-publish chart sets it on the `Repository` it
 renders, so uninstalling a publish never removes the published repository.
 
 A `UserRepository` can **adopt** a repository that already exists in the token's account (its
 findby matches by name). Deleting that CR deletes the adopted repository too, although Krateo
 never created it, so annotate it if you adopt an existing repository.
 
-Nothing else deletes repositories: removing the `Repository` RestDefinition or uninstalling the
-chart does not cascade to the CRs, because oasgen-provider refuses to drop a CRD that still has
-instances.
+Removing the `Repository` RestDefinition (narrowing `kinds`) or uninstalling the chart normally
+does not cascade to the CRs, because oasgen-provider refuses to drop a CRD that still has
+instances. **Before oasgen-provider 0.61.0 that refusal has a hole**: if the kind cannot be listed
+at that moment (its CRD version not served, for example), the instance count reads as zero and
+the CRD is uninstalled with its CRs, which are then marked for deletion. Measured on oasgen
+0.60.0 (oasgen-provider#576 and #609, fixed in 0.61.0). So do not narrow `kinds` or uninstall
+the chart on a cluster with live CRs unless it runs oasgen-provider >= 0.61.0, and keep the
+`orphan` annotation on every repository you mean to keep.
 
 The status fields carry what the kinds that follow need: `full_name`, `clone_url`,
 `ssh_url`, `html_url` and the `default_branch` a ruleset or a branch protection binds to.

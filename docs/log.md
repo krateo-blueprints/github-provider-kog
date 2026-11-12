@@ -11,6 +11,19 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-12 — docs: the orphan annotation's one override, and the RestDefinition-delete hole before oasgen 0.61.0
+
+- `krateo.io/management-policy: observe-delete` overrides `deletion-policy: orphan`
+  (unstructured-runtime `ShouldDelete`). Pointed out by oasgen-provider; on 057 no github kind sets
+  a management policy.
+- usage.md said removing the `Repository` RestDefinition never cascades to the CRs. On kind with
+  oasgen 0.60.0, deleting a RestDefinition while its kind could not be listed (CRD `served: false`)
+  uninstalled the CRD with 1 live CR. The apiserver marked the CR for deletion
+  (`InstanceDeletionInProgress`), and Undeploy had already removed its controller. oasgen 0.61.0
+  refuses the same input (#576), and so does #611 (#609). The rule is now in the docs: do not
+  narrow `kinds` or uninstall on a cluster with live CRs below oasgen 0.61.0. The chart floor
+  stays 0.52.0 for now and moves to 0.61.0 in the next release (Diego, 2026-11-12).
+
 ## 2026-11-12 — feat: UserRepository `visibility` limited to public|private
 
 GitHub's `POST /user/repos` declares no `visibility`. The field is kept so it can be set at creation
