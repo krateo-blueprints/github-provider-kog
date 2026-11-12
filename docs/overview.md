@@ -130,12 +130,12 @@ reconciles. With `kinds: [Repository, PullRequest]` the provider needs 3 pods.
 3. **auto-deploys a `rest-dynamic-controller` Deployment per kind**, which reconciles
    each CR by calling the mapped HTTP verbs (create/get/update/delete).
 
-The required version is **≥ 0.52.0**: 0.52.0 adds `RestDefinition.spec.serverURL`, which
+The required version is **≥ 0.61.0**. 0.61.0 is where oasgen-provider refuses to uninstall a generated CRD whose instances it cannot count when a RestDefinition is removed ([#576](https://github.com/krateo-platformops/oasgen-provider/issues/576)); below it, narrowing `kinds` or uninstalling the chart can cascade-delete live CRs ([usage](./usage.md#keeping-a-repository-when-its-cr-is-deleted)). Before that the floor was 0.52.0, which adds `RestDefinition.spec.serverURL`, which
 `githubBaseUrl` sets for GitHub Enterprise. Before that the floor was 0.38.0, where the `GitRef` pattern admission guard
 reaches the generated CRD. `GitRef`'s create resolves its base sha with a
 `dependentLookups` chain, a primitive that landed in 0.36.0. The earlier
 floor was 0.23.0 — 25 of the 32 RestDefinitions declare `compareScope: updatable`, the
-field 0.23.0 added — and that requirement still holds, now subsumed by 0.52.0.
+field 0.23.0 added — and that requirement still holds, now subsumed by 0.61.0.
 
 Because every RestDefinition's OpenAPI declares a bearer `securityScheme`,
 oasgen-provider also generates a per-kind **`<Kind>Configuration`** CRD — 32 of them,
