@@ -11,6 +11,14 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-12 — docs: recovering from a Repository CRD stuck Terminating
+
+usage.md now explains how to recover from a CRD left `Terminating` / `InstanceDeletionInProgress` by
+the pre-0.61.0 RestDefinition-delete hole. The deletions are pending: when the controller comes back,
+it runs them. Measured on kind (oasgen 0.60.0, in-cluster fake API that logged every request): once
+the RestDefinition was re-applied, the unannotated CR received 1 DELETE and the orphan-annotated one
+received 0. The remedy is to annotate before restoring. Diego asked for the section.
+
 ## 2026-11-12 — docs: the orphan annotation's one override, and the RestDefinition-delete hole before oasgen 0.61.0
 
 - `krateo.io/management-policy: observe-delete` overrides `deletion-policy: orphan`
