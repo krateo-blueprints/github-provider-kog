@@ -11,6 +11,15 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-12 — feat: UserRepository `visibility` limited to public|private
+
+GitHub's `POST /user/repos` declares no `visibility`. The field is kept so it can be set at creation
+(oas-adherence-exceptions row 38b), and it was a free string. Diego chose to enumerate the two values
+a personal repository can have, `public` and `private`. `internal` exists only in organizations, so,
+unlike `Repository`, UserRepository does not accept it. A typo is now rejected at apply instead of
+reaching GitHub. No UserRepository CRs exist on 057 or demo. Found during the 0.10.0 post-roll check
+on 057, which also corrected docs/api.md: it still said Repository `visibility` had no enum.
+
 ## 2026-11-11 — fix: ruleset rule types as GitHub accepts them; the adherence check sees inside unions
 
 `assert-oas-adherence.py` now compares a flattened union field by field with the merge of GitHub's

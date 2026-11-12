@@ -575,7 +575,8 @@ exceptions:
   fields:
   - visibility
   reason: GitHub's POST /user/repos has no `visibility`, but the org endpoint does; kept so the field can be set
-    at creation (hack/assert-drift-invariants.py requires it).
+    at creation (hack/assert-drift-invariants.py requires it). Enumerated public|private, the values a personal
+    repository can have (`internal` is organization-only); Repository also allows internal.
 - row: '39'
   category: D
   kind: UserRepository
