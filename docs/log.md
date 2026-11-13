@@ -29,6 +29,10 @@ assignees).
   all rejected.
 - **Drift:** a CR that omits the fields compares nothing new. A CR that sets them has
   `allowed_actors` and `required_reviewers` compared by index, like `rules`.
+- **Live, approved by Diego:** a throwaway repo and team on the Team-plan org, both deleted
+  afterwards. GitHub accepted all three actor types and returned both arrays in submit order, on
+  POST, two GETs and a re-PUT. Only the key order inside a reviewer entry changed, and that is a
+  map, so it doesn't count as drift.
 
 ## 2026-11-13 — docs: why the three findby query rows stay held
 

@@ -61,8 +61,11 @@ spec:
     # is a map, compared key-by-key, so order there does not matter.)
     # Since 2026-11-13 pull_request's `dismissal_restriction` and `required_reviewers` are modelled,
     # so a CR that sets them has them compared: `allowed_actors` and `required_reviewers` are arrays,
-    # walked by index like `rules`, so list them in a stable order. A CR that omits them compares
-    # nothing new.
+    # walked by index like `rules`. Verified live 2026-11-13 on a throwaway repo and team (since
+    # deleted, Team-plan org): GitHub returned `allowed_actors` (User, Team, RepositoryRole,
+    # deliberately unsorted) and `required_reviewers` in the exact submit order on POST, two GETs
+    # and a re-PUT; only the key order inside a reviewer entry changed (a map, compared key-by-key).
+    # A CR that omits them compares nothing new.
     #
     # Ownership note: the PUT re-sends the WHOLE `rules` array, so a UI-added rule of one of the 8
     # still-unmodelled rule types on this CR-managed ruleset is DELETED on the next reconcile (the
