@@ -11,6 +11,23 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-13 — ci: no `default` in a response schema
+
+The OpenAPI adherence check now refuses a `default` anywhere in an asset's response schemas. Until
+now it refused new defaults only in request bodies.
+
+Why it matters: oasgen carries a response-schema `default` into the generated CRD's status. Measured
+with oasgen-render 0.63.1: Label `node_id` rendered as `{"type":"string","default":...}`, with no
+warning. Normally, a null that GitHub returns is written by rest-dynamic-controller and then pruned by
+the apiserver, because oasgen does not carry `nullable`. On 057, open PRs have no `merged_at` key at
+all. But the apiserver does not prune a null on a field that has a default; it stores the default
+instead. So status would show a value GitHub never sent.
+
+Today the chart has 0 such defaults across 1,419 response nodes. GitHub's own response schemas for
+the same 123 operations carry about 600, so copying one verbatim brings them along. A negative control
+(the probe default injected into a scratch copy) fails the check on all three Label operations. The
+mechanism was raised by the openstack-nova-operator-kog session.
+
 ## 2026-11-12 — chore: oasgen-provider floor raised to 0.61.0
 
 The documented floor goes from 0.52.0 to **0.61.0**. 0.61.0 is where oasgen-provider refuses to

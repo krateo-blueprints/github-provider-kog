@@ -37,6 +37,13 @@ that omits the field, so leaving the field out is what keeps GitHub's behaviour.
 are frozen, each listed under `defaults:` with its value and GitHub's own (checked here, so the
 file cannot misstate either).
 
+RESPONSE DEFAULTS. A `default` in a RESPONSE schema is refused outright, with no exceptions list.
+oasgen carries it into the generated CRD's status (measured with oasgen-render 0.63.1, 2026-11-13),
+and there the apiserver's null pruning skips a defaulted field: a null that GitHub returns (for
+example `merged_at` on an open pull request) would be stored as the default, so status would show a
+value GitHub never sent. GitHub's own response schemas for these operations carry hundreds of
+defaults, so copying one verbatim brings them along.
+
 Usage: assert-oas-adherence.py <repo root> [exceptions file]
 """
 import json
@@ -253,6 +260,49 @@ for rd in (d for d in docs if d.get("kind") == "RestDefinition"):
 if examined == 0:
     sys.exit("examined 0 operations: the render or the RestDefinition walk is broken, not the chart clean")
 
+
+def response_defaults(doc, node, path, out, seen, counter):
+    """Every `default` under a response schema node; counter[0] counts the nodes visited."""
+    if isinstance(node, dict) and "$ref" in node:
+        if node["$ref"] in seen:
+            return
+        seen = seen | {node["$ref"]}
+        node = resolve(doc, node)
+    if not isinstance(node, dict):
+        return
+    counter[0] += 1
+    if "default" in node:
+        out.append((path or ".", node["default"]))
+    for k, v in (node.get("properties") or {}).items():
+        response_defaults(doc, v, join(path, k), out, seen, counter)
+    for key in ("items", "additionalProperties"):
+        if isinstance(node.get(key), dict):
+            response_defaults(doc, node[key], path + ("[]" if key == "items" else ".*"), out, seen, counter)
+    for key in ("allOf", "anyOf", "oneOf"):
+        for member in node.get(key) or []:
+            response_defaults(doc, member, path, out, seen, counter)
+
+
+response_nodes = [0]
+for rd in (d for d in docs if d.get("kind") == "RestDefinition"):
+    kind = rd["spec"]["resource"]["kind"]
+    for verb in rd["spec"]["resource"]["verbsDescription"]:
+        oas_path = verb.get("oasPath") or rd["spec"]["oasPath"]
+        _, cm, key = oas_path[len("configmap://"):].split("/", 2)
+        adoc = yaml.safe_load(configmaps[cm][key])
+        aop = adoc["paths"][verb["path"]][verb["method"].lower()]
+        for code, resp in sorted((aop.get("responses") or {}).items()):
+            schema = ((resolve(adoc, resp).get("content") or {}).get("application/json") or {}).get("schema")
+            hits = []
+            if schema is not None:
+                response_defaults(adoc, schema, "", hits, frozenset(), response_nodes)
+            for field, value in hits:
+                errors.append("DEFAULT IN RESPONSE %s %s %s %s %s = %s: oasgen carries it into status, where a null "
+                              "from GitHub would be stored as this value; remove it (see RESPONSE DEFAULTS in this "
+                              "script's docstring)" % (kind, verb["method"].upper(), verb["path"], code, field, json.dumps(value)))
+if response_nodes[0] == 0:
+    sys.exit("walked 0 response schema nodes: the response walk is broken, not the chart clean")
+
 # Every difference must be covered exactly once, and every exception must still match one.
 covered = {}
 for i, e in enumerate(exc.get("exceptions") or []):
@@ -290,5 +340,5 @@ for k in sorted(set(found) - set(covered)):
 if errors:
     print("\n".join(errors))
     sys.exit(1)
-print("ok: %d operations, %d deviations, every one covered by a reasoned exception (GitHub OpenAPI %s)"
-      % (examined, len(found), GITHUB_OAS_COMMIT[:12]))
+print("ok: %d operations, %d deviations, every one covered by a reasoned exception; %d response schema nodes, "
+      "none with a default (GitHub OpenAPI %s)" % (examined, len(found), response_nodes[0], GITHUB_OAS_COMMIT[:12]))
