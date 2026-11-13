@@ -55,10 +55,17 @@ spec:
     # (merge_method SQUASH, grouping_strategy HEADGREEN, the operators, and pattern strings
     # including regex escapes), the GitHub-added keys were skipped by the comparator (a pattern
     # rule's `negate: false` and empty `name` where the CR omitted them; pull_request's
-    # response-only `required_reviewers`/`dismissal_restriction`), and a second PUT+GET was
-    # byte-identical — 0 drift across all modelled types, merge_queue and the five *_pattern rules
-    # included. (The merge_queue `parameters` object came back with its keys reordered, but it is a
-    # map, compared key-by-key, so order there does not matter.)
+    # `required_reviewers`/`dismissal_restriction`, response-only at the time), and a second PUT+GET
+    # was byte-identical — 0 drift across all modelled types, merge_queue and the five *_pattern
+    # rules included. (The merge_queue `parameters` object came back with its keys reordered, but it
+    # is a map, compared key-by-key, so order there does not matter.)
+    # Since 2026-11-13 pull_request's `dismissal_restriction` and `required_reviewers` are modelled,
+    # so a CR that sets them has them compared: `allowed_actors` and `required_reviewers` are arrays,
+    # walked by index like `rules`. Verified live 2026-11-13 on a throwaway repo and team (since
+    # deleted, Team-plan org): GitHub returned `allowed_actors` (User, Team, RepositoryRole,
+    # deliberately unsorted) and `required_reviewers` in the exact submit order on POST, two GETs
+    # and a re-PUT; only the key order inside a reviewer entry changed (a map, compared key-by-key).
+    # A CR that omits them compares nothing new.
     #
     # Ownership note: the PUT re-sends the WHOLE `rules` array, so a UI-added rule of one of the 8
     # still-unmodelled rule types on this CR-managed ruleset is DELETED on the next reconcile (the
