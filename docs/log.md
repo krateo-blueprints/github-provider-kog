@@ -11,6 +11,22 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-13 — docs: why the three findby query rows stay held
+
+Rows 8b (Collaborator), 21b (PullRequest) and 39 (UserRepository) of the adherence exceptions are
+dropped list-query parameters. Their reason said a declared query parameter "becomes a spec field".
+That was incomplete: `excludedSpecFields` keeps a parameter off the spec, and Collaborator already
+uses it that way. The rows now state the two real blockers, both measured:
+
+- **Name collisions.** `permission`, `head`/`base` and `visibility` are already spec fields, so the
+  spec value would be sent as the list filter. No exclusion can separate one name's two meanings.
+- **excludedSpecFields is immutable.** The other five (`direction`, `sort`, `before`, `since`,
+  `type`) would need new `excludedSpecFields` entries. All three live RestDefinitions already declare
+  that list, and the RestDefinition CRD refuses any change to it (`self == oldSelf`). Adding entries
+  means deleting and recreating the RestDefinition.
+
+Each row also gains a `restore:` note. The deviation count is unchanged at 193.
+
 ## 2026-11-13 — ci: no `default` in a response schema
 
 The OpenAPI adherence check now refuses a `default` anywhere in an asset's response schemas. Until

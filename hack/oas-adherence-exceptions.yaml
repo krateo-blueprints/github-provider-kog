@@ -153,9 +153,13 @@ exceptions:
   deviation: query-dropped
   fields:
   - permission
-  reason: A query parameter declared on the findby list operation becomes a spec field (oasgen merges parameters
-    from every verb into the spec), so an author could set a filter that makes findby miss the object it is looking
-    for, and observe would then re-create it. The paginator sets page/per_page on the URL itself.
+  reason: oasgen merges a verb's query parameters into the spec, and `permission` is already a spec field (the
+    grant the PUT asks for). Declared on the findby list, the requested grant would be sent as a filter on the
+    permissions GitHub reports, which it computes across repo, team and org grants and which can differ from the
+    grant asked for; a filter that excludes the collaborator makes findby miss, and observe re-creates.
+    excludedSpecFields cannot separate the two meanings of one name. The paginator sets page/per_page on the URL
+    itself.
+  restore: 'held: name collides with spec.permission; not restorable without renaming one of them'
 - row: 9b
   category: C
   kind: CustomProperty
@@ -424,9 +428,16 @@ exceptions:
   - direction
   - head
   - sort
-  reason: A query parameter declared on the findby list operation becomes a spec field (oasgen merges parameters
-    from every verb into the spec), so an author could set a filter that makes findby miss the object it is looking
-    for, and observe would then re-create it. The paginator sets page/per_page on the URL itself.
+  reason: oasgen merges a verb's query parameters into the spec. `head` and `base` are already spec fields (the
+    branches), so declaring them on the findby list would send them as filters. GitHub documents the list `head`
+    filter as user:ref-name, which a bare branch is not, so the filter's effect is undocumented; one that excludes
+    the PR makes findby miss, and observe would re-create it into GitHub's 422. `direction` and `sort` collide
+    with nothing, but keeping them off the spec needs new excludedSpecFields entries, and the live RestDefinition
+    refuses any change to that list (CRD rule
+    self == oldSelf), so only a delete-and-recreate of the RestDefinition could add them. The paginator sets
+    page/per_page on the URL itself.
+  restore: 'held: head/base collide with spec fields; direction/sort need an excludedSpecFields change, which is
+    immutable on a live RestDefinition'
 - row: '22'
   category: B
   kind: PullRequest
@@ -588,9 +599,15 @@ exceptions:
   - since
   - type
   - visibility
-  reason: A query parameter declared on the findby list operation becomes a spec field (oasgen merges parameters
-    from every verb into the spec), so an author could set a filter that makes findby miss the object it is looking
-    for, and observe would then re-create it. The paginator sets page/per_page on the URL itself.
+  reason: oasgen merges a verb's query parameters into the spec. `visibility` is already a spec field (the create
+    body's), so declaring it on the findby list would send the requested visibility as a filter, and a repository
+    whose visibility was changed on GitHub would be filtered out, so findby misses and observe re-creates into GitHub's
+    422. `before`, `since` and `type` collide with nothing, but keeping them off the spec needs new
+    excludedSpecFields entries, and the live RestDefinition refuses any change to that list (CRD rule
+    self == oldSelf), so only a delete-and-recreate of the RestDefinition could add them. The paginator sets
+    page/per_page on the URL itself.
+  restore: 'held: visibility collides with a spec field; before/since/type need an excludedSpecFields change,
+    which is immutable on a live RestDefinition'
 - row: new
   category: C
   kind: Autolink
