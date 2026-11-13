@@ -11,6 +11,25 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-13 — feat(rulesets): pull_request dismissal_restriction and required_reviewers
+
+`RepoRuleset` and `OrgRuleset` now model the `pull_request` rule's `dismissal_restriction` and
+`required_reviewers`, as GitHub's description defines them. They were held as "nested actor unions,
+waiting for oasgen-provider#563". That premise was wrong. In the pinned description (fa8d7bfb),
+`repository-rule-params-actor` and `repository-rule-params-reviewer` are plain `{id, type}`
+objects, and no union appears anywhere under either field. A union detector confirmed it, controlled
+by fields that are unions (Issue title, labels, issue_field_values) and fields that are not (body,
+assignees).
+
+- **Adherence:** 193 deviations go down to 185 (8 entries removed).
+- **Render:** with oasgen 0.64.0, both fields appear in both CRDs, and every other parameter is
+  unchanged.
+- **Apiserver (kind v1.36.4):** a valid CR is accepted and stored as sent. A missing `enabled`, an
+  actor type outside the enum, a reviewer without `id`, and a reviewer type other than `Team` are
+  all rejected.
+- **Drift:** a CR that omits the fields compares nothing new. A CR that sets them has
+  `allowed_actors` and `required_reviewers` compared by index, like `rules`.
+
 ## 2026-11-13 — docs: why the three findby query rows stay held
 
 Rows 8b (Collaborator), 21b (PullRequest) and 39 (UserRepository) of the adherence exceptions are

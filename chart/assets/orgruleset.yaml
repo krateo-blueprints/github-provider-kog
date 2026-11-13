@@ -225,9 +225,9 @@ components:
     #
     #   1. oasgen-provider has no oneOf/anyOf handling at all (only allOf is merged), so a oneOf
     #      item schema reaches the generated CRD with no usable shape.
-    #   2. Even flattened, several variants nest further unions — pull_request's
-    #      `dismissal_restriction.allowed_actors` and `required_reviewers[].reviewer` are both
-    #      actor unions of their own.
+    #   2. (Withdrawn 2026-11-13.) This said pull_request's `dismissal_restriction.allowed_actors`
+    #      and `required_reviewers[].reviewer` nest actor unions. In GitHub's description they are
+    #      plain {id, type} objects, so both are now modelled below.
     #
     # So an item here is a flat {type, parameters} pair, and `parameters` is the UNION of the
     # parameter sets of the rule types below, every key optional. Which keys are legal depends on
@@ -300,8 +300,8 @@ components:
     #     loud Synced=False, not a silent drop, and they are in GitHub's REST schema. Not checked on
     #     Enterprise or at org level.
     #
-    #   Within pull_request, dismissal_restriction and required_reviewers are still dropped for
-    #   reason (2) above; required_reviewers is additionally still in beta upstream.
+    #   Within pull_request, dismissal_restriction and required_reviewers are modelled since
+    #   2026-11-13 (required_reviewers is beta upstream).
     Rules:
       type: array
       items:
@@ -363,6 +363,62 @@ components:
                     - merge
                     - squash
                     - rebase
+              # pull_request, optional: who may dismiss reviews, and teams that must approve changes to
+              # matching files. GitHub's repository-rule-params-dismissal-restriction and
+              # repository-rule-params-required-reviewer-configuration, inlined: both are plain
+              # objects (actor/reviewer are {id, type}), so they survive generation. required_reviewers
+              # is marked beta in GitHub's docs.
+              dismissal_restriction:
+                type: object
+                required:
+                  - enabled
+                properties:
+                  allowed_actors:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - type
+                      properties:
+                        id:
+                          type: integer
+                        type:
+                          type: string
+                          enum:
+                            - User
+                            - Team
+                            - IntegrationInstallation
+                            - RepositoryRole
+                  enabled:
+                    type: boolean
+              required_reviewers:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - file_patterns
+                    - minimum_approvals
+                    - reviewer
+                  properties:
+                    file_patterns:
+                      type: array
+                      items:
+                        type: string
+                    minimum_approvals:
+                      type: integer
+                    reviewer:
+                      type: object
+                      required:
+                        - id
+                        - type
+                      properties:
+                        id:
+                          type: integer
+                        type:
+                          type: string
+                          enum:
+                            - Team
               # type: required_status_checks
               strict_required_status_checks_policy:
                 type: boolean
