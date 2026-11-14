@@ -585,6 +585,17 @@ spec:
 - **Numbers are server-assigned.** `Issue` and `Milestone` get theirs from GitHub on
   create, and get/update/delete address the resource through `status.number` — there is
   no `issue_number` or `milestone_number` field to set.
+- **`Issue`, `RepoDeployment` and a draft `Release` can be created twice on oasgen-provider
+  below 0.68.0.** GitHub assigns their identifier and accepts an identical second create.
+  Measured 2026-11-14, sending the same body twice gave two issues, two deployments, and two
+  drafts with the same `tag_name`. A published `Release` is refused by `tag_name`, and every
+  other POST kind in the chart refused its duplicate. Before 0.68.0, a create that reached
+  GitHub but then lost the status write that follows it was sent again
+  (oasgen-provider#676). For these three kinds that leaves an object on GitHub that no CR
+  tracks. **Use oasgen-provider 0.68.0 or later.** On 0.68.0 the create is no longer
+  repeated. The CR can instead be left `Ready=True` with no identifier: the query under
+  [Verify](#verify) finds it (oasgen-provider#682). Compare such a CR against GitHub before
+  acting on it.
 - **`PullRequest` has no delete verb and no close-from-spec.** `state` is PATCH-body-only,
   so it never becomes a spec field. Merge or close the PR on GitHub, then delete the CR.
 - **`Issue` has no delete verb**, because GitHub's REST API cannot delete an issue.

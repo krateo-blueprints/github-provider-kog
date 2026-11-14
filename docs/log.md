@@ -11,6 +11,31 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-14 — docs: duplicate creates on oasgen-provider < 0.68.0 (#676)
+
+oasgen-provider 0.68.0 stops re-sending a create that reached the vendor but then lost the
+status write that follows it (handler #681, runtime #683). Before it, the retry duplicated
+any object GitHub accepts twice. To find which kinds those are, I measured it live on a
+throwaway public repo in krateo-blueprints (deleted, 404 verified). For each kind I sent an
+identical POST twice and then counted the objects through the list endpoint:
+
+- **Duplicated:** `Issue`, `RepoDeployment`, and a `Release` with `draft: true`. Each gave
+  201, 201 and 2 objects. A draft does not create the tag that the uniqueness check is on.
+- **Refused:** `Label`, `Milestone`, `GitRef`, `ActionsVariableRepo` and
+  `EnvironmentVariable` (409), `Autolink`, `RepoRuleset` ("Name must be unique"),
+  `RepoWebhook`, `PullRequest` while open, and a published `Release`. Each held 1 object.
+  `DeploymentBranchPolicy` answers 303 (see the #682 entry below).
+- **Not measured:** `DeployKey` (deploy keys are disabled in krateo-blueprints, so both
+  attempts got 422) and the six org-level kinds (repo-level writes only).
+- The ten PUT kinds are idempotent.
+
+Docs now tell users to run 0.68.0 or later. 0.68.0 trades the duplicate for the #682 latch
+on kinds without `findby`, which includes all three that duplicate. The Verify query finds
+such a CR. Render check: 0.67.0 and 0.68.0 produce identical CRDs for this chart (32 CRDs,
+positive control passed). oasgen-provider 0.66.0 is retracted, so the `rules`-by-type floor
+in the docs now reads 0.67.0. The chart's own comments still say `>= 0.66.0`, which stays
+true.
+
 ## 2026-11-14 — docs: `DeploymentBranchPolicy` does not adopt an existing pattern (oasgen-provider#682)
 
 Measured live (kind, oasgen-provider and rest-dynamic-controller 0.67.0, chart main 9d0d18d,
