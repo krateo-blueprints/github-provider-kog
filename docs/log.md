@@ -11,6 +11,30 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-14 — docs: `DeploymentBranchPolicy` does not adopt an existing pattern (oasgen-provider#682)
+
+Measured live (kind, oasgen-provider and rest-dynamic-controller 0.67.0, chart main 9d0d18d,
+real GitHub, throwaway public repo in krateo-blueprints, deleted and 404 verified):
+
+- **`dup`**, a CR for a pattern pre-created on GitHub: `POST` → `303 See Other` to
+  `…/deployment-branch-policies` (the list) → the controller follows it → `200` with
+  `{"total_count":2,"branch_policies":[…]}`. The create was recorded as successful, with no
+  `status.id`. Over 5 minutes Observe made **no HTTP request** for it and set
+  `Ready=True/Available` with the message *"Resource is assumed to be up-to-date. API call not
+  found for FindBy."* No second create was sent, and GitHub still held exactly 2 policies.
+- **`ctrl`**, a CR for a new pattern (positive control): `POST` → `200`, `status.id` set,
+  `Observed=True`. This shows the setup can fill in the identifier, so `dup`'s missing one is
+  a real result.
+
+oasgen-provider traced the short-circuit in source, in Observe's findby branch of `restResources.go`. With no
+resolvable identifier, no `findby` verb and a previous reconcile that did not error, Observe
+assumes up to date. So the trigger is generic to the 29 kinds without `findby`, and the 303
+is one way in. Upstream decided to stop assuming: such a CR will report a condition naming
+the cause instead of `Ready=True`. Docs now warn in the CI/CD caveats and the overview table.
+The Verify section gives a query for the message prefix *"Resource is assumed to be
+up-to-date"*, which also catches the sibling *"Returned body is nil."* (a `204`/`304` read,
+never compared). On 2026-11-14 that query found 0 of 32 CRs on krateo-057.
+
 ## 2026-11-14 — feat(rulesets): `rules` matched by `type`, not by position
 
 `RepoRuleset` and `OrgRuleset` declare `rules` as `x-kubernetes-list-type: map` keyed by `type`.
