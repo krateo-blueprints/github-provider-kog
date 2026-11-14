@@ -287,6 +287,14 @@ components:
     #   2026-11-13 (required_reviewers is beta upstream).
     Rules:
       type: array
+      # Keyed by `type` (oasgen-provider >= 0.66.0 compares by key, #669; the CRD gets the same
+      # extension, #658). GitHub enforces the uniqueness itself: two rules of one type are a 422
+      # "Invalid rule '<type>'" (measured live 2026-11-14), so the key rejects nothing GitHub
+      # accepts. Needed because GitHub keeps a ruleset's STORED rule order on update: a PUT that
+      # reorders the rules returns the old order, which a by-index comparison reads as drift forever.
+      x-kubernetes-list-type: map
+      x-kubernetes-list-map-keys:
+        - type
       items:
         type: object
         required:

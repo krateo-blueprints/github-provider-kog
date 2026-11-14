@@ -11,6 +11,37 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-14 — feat(rulesets): `rules` matched by `type`, not by position
+
+`RepoRuleset` and `OrgRuleset` declare `rules` as `x-kubernetes-list-type: map` keyed by `type`.
+oasgen-provider 0.66.0 carries the extension into the CRD (#658) and compares the array by key
+(#669). Earlier versions drop it, and nothing else changes.
+
+Why, measured live on a throwaway public repo in krateo-blueprints (deleted, 404 verified):
+
+- **GitHub reorders `rules` on update.** Create kept an unsorted 5-rule order. A PUT with the
+  exact reverse returned the ORIGINAL order, in the PUT response and on the next GET. Compared by
+  index, a CR that reorders its rules re-sends a PUT that changes nothing, and drifts forever.
+- **GitHub rejects duplicate types**: `[deletion, deletion]` and two differently-parameterized
+  `pull_request` rules are both `422 Invalid rule '<type>'`, while a single rule is `201`. So the
+  key's uniqueness check at admission rejects nothing GitHub accepts.
+
+Checked before the change:
+
+- **Apiserver (kind v1.36.4):** the keyed CRD is accepted. A CR with distinct types is accepted,
+  and one with a duplicate type is rejected (`Duplicate value`). A CR stored with duplicates under
+  the old CRD stays updatable (spec, status, finalizer), because ratcheting holds.
+- **No new `required`:** `type` was already required on every rule.
+- **No live CRs touched:** krateo-057 has 0 RepoRuleset and 0 OrgRuleset CRs.
+
+Measured on the same run, not fixable here: GitHub returns `bypass_actors` in its **own** order
+whatever was sent (`[RepositoryRole 5, OrganizationAdmin, RepositoryRole 2, DeployKey]` came back
+as `[OrganizationAdmin, DeployKey, RepositoryRole 2, RepositoryRole 5]`, on create and update). It
+stays compared by index. It cannot be keyed, because the apiserver requires a list-map key to be
+required or defaulted (oasgen refuses the CRD otherwise), and `actor_id` is absent by GitHub's design
+for `OrganizationAdmin` and `DeployKey`. The docs now say to list it in GitHub's order. The real fix
+is order-insensitive comparison of such arrays, oasgen-provider#617.
+
 ## 2026-11-13 — feat(rulesets): pull_request dismissal_restriction and required_reviewers
 
 `RepoRuleset` and `OrgRuleset` now model the `pull_request` rule's `dismissal_restriction` and
