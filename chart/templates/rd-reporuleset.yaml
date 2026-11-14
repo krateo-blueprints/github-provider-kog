@@ -41,11 +41,24 @@ spec:
     # defensive — it states the intent, and stays correct if a field the PUT cannot express is
     # added to this OAS later.
     #
-    # The genuine drift risk is the other kind, and no scope filters it out: `rules`,
-    # `bypass_actors` and `conditions.ref_name.include`/`exclude` are arrays the response DOES
-    # carry, and the comparator walks them BY INDEX. The same set returned in GitHub's own
-    # order reads as drift, and the PUT re-sends the CR's order without settling it — so list
-    # them in a stable order. Extra keys GitHub adds inside a rule's `parameters` (defaults it
+    # The genuine drift risk is the other kind, and no scope filters it out: arrays the response
+    # DOES carry, returned in an order other than the CR's. Measured live 2026-11-14 (throwaway
+    # public repo, since deleted):
+    #  - `rules`: kept in submit order on create, but a PUT that REORDERS them returns the stored
+    #    order. So `rules` is declared `x-kubernetes-list-type: map` keyed by `type` in the asset,
+    #    and oasgen-provider >= 0.66.0 compares it by key (#669). GitHub rejects duplicate types
+    #    with a 422, so the key admits everything GitHub does. Below 0.66.0 the extension is
+    #    dropped and `rules` is compared by index: keep the order the ruleset was created with.
+    #  - `bypass_actors`: GitHub returns its OWN order on create and on every update, whatever was
+    #    sent: [RepositoryRole 5, OrganizationAdmin, RepositoryRole 2, DeployKey] came back as
+    #    [OrganizationAdmin, DeployKey, RepositoryRole 2, RepositoryRole 5]. It is compared by
+    #    index, so a CR listing it in any other order never converges. It cannot be keyed: the
+    #    apiserver requires a list-map key to be required or defaulted, and `actor_id` is absent
+    #    by GitHub's design for OrganizationAdmin and DeployKey. Order-insensitive comparison of
+    #    such arrays is oasgen-provider#617.
+    #  - `conditions.ref_name.include`/`exclude` are string arrays, compared as multisets since
+    #    oasgen-provider 0.64.0 (#618), so their order does not matter.
+    # Extra keys GitHub adds inside a rule's `parameters` (defaults it
     # fills in, e.g. do_not_enforce_on_create) are ignored — the comparison only walks keys the
     # CR declares — so a partially-specified rule does not read as drift. That "walks only the
     # CR's keys" guarantee is the comparator ranging over the CR map: krateo-rest-dynamic-controller
