@@ -616,6 +616,10 @@ spec:
   **0.71.0 sends the create once** (oasgen-provider#696, measured on
   `DeploymentBranchPolicy`), so use 0.71.0 or later. The query under [Verify](#verify)
   finds such a CR on every version. Compare it against GitHub before acting on it.
+  **Upgrading does not remove a duplicate an earlier version already created**, and no CR
+  mentions it. The CR ends up tracking one of the objects, and the other is left on GitHub.
+  If these kinds ran on a version below 0.68.0, or on 0.69.0 or 0.70.0, compare the issues,
+  deployments and draft releases on GitHub against your CRs.
 - **`PullRequest` has no delete verb and no close-from-spec.** `state` is PATCH-body-only,
   so it never becomes a spec field. Merge or close the PR on GitHub, then delete the CR.
 - **`Issue` has no delete verb**, because GitHub's REST API cannot delete an issue.
