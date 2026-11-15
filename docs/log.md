@@ -11,6 +11,20 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-15 — docs: duplicates possible on every version below 0.71.0, not below 0.68.0
+
+The docs said `Issue`, `RepoDeployment` and draft `Release` could be created twice below
+0.68.0, and that on 0.68.0 the create is no longer repeated. That was wrong: an inference
+from #676's fix title, not from oasgen-provider's own 0.68.0 notes, which said the repeats
+were not that fix's doing. A second route, a lost status write that leaves the CR with no
+record of the create (#692), runs on the same guard code in every tag through 0.69.0. That
+is checked at the tags: the condition-based guard is present in 0.67.0, 0.68.0 and 0.69.0
+and replaced in 0.70.0. azuredevops-provider-kog measured duplicates from it on 0.69.0;
+their 0.68.0 trial was void, so 0.68.0 rests on the code being identical. With the refusal
+route on 0.69.0 and 0.70.0 (#696), the window is every version below 0.71.0. The usage
+caveat now lists the three routes with their evidence, and the configuration table says
+`< 0.71.0`.
+
 ## 2026-11-15 — docs: oasgen-provider 0.71.0 sends the create once
 
 oasgen-provider 0.71.0 (#696, #697) was measured live on the same `DeploymentBranchPolicy`
