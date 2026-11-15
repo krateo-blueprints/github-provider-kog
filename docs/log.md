@@ -11,6 +11,17 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-15 — docs: oasgen-provider 0.71.0 sends the create once
+
+oasgen-provider 0.71.0 (#696, #697) was measured live on the same `DeploymentBranchPolicy`
+setup, from the published charts and images (kind, real GitHub, throwaway repo deleted, a
+fresh-policy control). The `dup` pattern was POSTed **once** in 5 minutes (0.70.0: 3), with
+no list read and one redirect `Warning`. The CR held `Ready=False/NoIdentifierRecorded` and
+`Synced=False/ReconcileError` steadily. The control reached `Ready=True` with its id. The
+same code, built locally from the PR before the tag, gave the same result. The Verify query
+matches the stuck CR on 0.71.0 and never the control. Rendered CRDs are byte-identical from
+0.64.0 to 0.71.0.
+
 ## 2026-11-15 — docs: oasgen-provider 0.70.0, and a corrected Verify check
 
 oasgen-provider 0.70.0 (#693, #694) was measured live the same day, on the same

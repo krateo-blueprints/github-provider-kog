@@ -543,7 +543,7 @@ spec:
   the environment already has, GitHub answers the create with `303 See Other` pointing at
   the policy *list*. The CR never gets a `status.id`, so the controller never reads or
   writes that policy: later spec edits are not applied. What the CR reports depends on the
-  oasgen-provider version (measured against real GitHub on 0.67.0, 0.69.0 and 0.70.0):
+  oasgen-provider version (measured against real GitHub on 0.67.0, 0.69.0, 0.70.0 and 0.71.0):
   - **Below 0.70.0** the controller follows the redirect, reads the list as the created
     policy, and the CR reports `Ready=True` with no `status.id` and no error
     (oasgen-provider#682).
@@ -551,8 +551,14 @@ spec:
     `Ready=False/NoIdentifierRecorded`, with a `Warning` event naming the redirect. The
     controller still sends the create again on every resync, about every 3 minutes. GitHub
     refuses each repeat the same way, so no duplicate appears, but the `Warning` repeats and
-    `Synced` flips between `ReconcileError` and `ReconcileSuccess`. The repeat is reported
-    to oasgen-provider and not yet fixed.
+    `Synced` flips between `ReconcileError` and `ReconcileSuccess` (oasgen-provider#696).
+  - **From 0.71.0** the create is sent once. The CR stays `Ready=False/NoIdentifierRecorded`
+    and `Synced=False/ReconcileError`. The controller re-checks it a few times after each
+    resync and logs *"Cannot observe external resource"* each time, without calling GitHub.
+    The state does not clear by itself, because the CR cannot be attached to the existing
+    policy. What deleting such a CR does has not been measured. The condition's own message
+    warns that the policy on GitHub may then be left unreferenced, so decide which side owns
+    the policy before you delete anything.
 
   Check that `status.id` is set after applying. If it is not, see [Verify](#verify) for the
   query that finds such CRs on every version.
@@ -607,8 +613,9 @@ spec:
   is sent again on every resync. That repeat is measured on `DeploymentBranchPolicy`, where
   GitHub refuses it. For these three kinds GitHub would accept it, so each repeat would
   leave another object (derived from the controller's code, not measured on these kinds).
-  The query under [Verify](#verify) finds such a CR on every version. Compare it against
-  GitHub before acting on it.
+  **0.71.0 sends the create once** (oasgen-provider#696, measured on
+  `DeploymentBranchPolicy`), so use 0.71.0 or later. The query under [Verify](#verify)
+  finds such a CR on every version. Compare it against GitHub before acting on it.
 - **`PullRequest` has no delete verb and no close-from-spec.** `state` is PATCH-body-only,
   so it never becomes a spec field. Merge or close the PR on GitHub, then delete the CR.
 - **`Issue` has no delete verb**, because GitHub's REST API cannot delete an issue.
@@ -724,9 +731,10 @@ An empty result means no CR shows that message. From oasgen-provider 0.69.0 the 
 longer appears. Those releases report `Ready=False/NoIdentifierRecorded` for such a CR
 instead and send the create again on every resync, about every 3 minutes. On 0.69.0 each
 repeat overwrites the reason with `Creating` within about 2 seconds. On 0.70.0 the reason
-stays. So the query above misses both. This check works on every version measured, 0.67.0
-to 0.70.0: it lists CRs that were created more than 10 minutes ago, whose create was
-recorded as successful, and which have never been observed.
+stays. From 0.71.0 the create is sent once and the reason stays. The query above misses all
+three. This check works on every version measured, 0.67.0 to 0.71.0: it lists CRs that were
+created more than 10 minutes ago, whose create was recorded as successful, and which have
+never been observed.
 
 ```console
 $ kubectl get $(kubectl api-resources --api-group=github.krateo.io -o name \
