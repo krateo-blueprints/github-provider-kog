@@ -11,6 +11,27 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-15 — docs: oasgen-provider 0.70.0, and a corrected Verify check
+
+oasgen-provider 0.70.0 (#693, #694) was measured live the same day, on the same
+`DeploymentBranchPolicy` setup as the entries below (kind, real GitHub, throwaway repo
+deleted, a fresh-policy control). #694 works: the 303 is refused rather than followed, no
+list is read, a `Warning` event names the redirect, and the CR keeps
+`Ready=False/NoIdentifierRecorded`. The create is still repeated every resync: the `dup`
+pattern was POSTed 3 times in 5 minutes, as on 0.69.0. The control reached `Ready=True` with
+its id.
+
+**Two corrections to the entry below.** First, the repeat is not the runtime's doing.
+0.70.0's new log lines show it. The refusal returns an error, which the runtime records as
+`Synced=ReconcileError`. On the requeue about 1 s later, Observe's branch for "the last
+reconcile errored", which exists to retry a create the vendor refused, reports the resource
+as absent, and the runtime creates. It is reported to oasgen-provider. Second, the Verify
+check added below keyed on the age of `external-create-succeeded`. Every repeated create
+re-stamps that annotation, so the check could never fire for a CR stuck in the repeat. On
+the saved dumps it misses the reproduced CR on 0.69.0 (two runs) and on 0.70.0, and matches
+only on 0.67.0. The check now keys on the CR's own `creationTimestamp`. On the same dumps it
+matches the reproduced CR on all four runs and never the control.
+
 ## 2026-11-15 — docs: a Verify check that also catches the oasgen-provider 0.69.0 shape
 
 oasgen-provider 0.69.0 (#687) stops a CR with no identifier from reporting `Ready=True`. Its

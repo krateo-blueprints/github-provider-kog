@@ -541,12 +541,21 @@ spec:
   `Environment` first.
 - **`DeploymentBranchPolicy` does not adopt a pattern that already exists.** For a `name`
   the environment already has, GitHub answers the create with `303 See Other` pointing at
-  the policy *list*. The controller follows the redirect, finds no `id` in the list body, and
-  records the create as successful anyway. The CR then reports `Ready=True` with no
-  `status.id`, and the controller never reads or writes that policy again: later spec edits
-  are not applied and nothing reports an error (oasgen-provider#682, measured on 0.67.0).
-  Check that `status.id` is set after applying; if it is not, see
-  [Verify](#verify) for the condition that marks it.
+  the policy *list*. The CR never gets a `status.id`, so the controller never reads or
+  writes that policy: later spec edits are not applied. What the CR reports depends on the
+  oasgen-provider version (measured against real GitHub on 0.67.0, 0.69.0 and 0.70.0):
+  - **Below 0.70.0** the controller follows the redirect, reads the list as the created
+    policy, and the CR reports `Ready=True` with no `status.id` and no error
+    (oasgen-provider#682).
+  - **On 0.70.0** the redirect is refused and the CR reports
+    `Ready=False/NoIdentifierRecorded`, with a `Warning` event naming the redirect. The
+    controller still sends the create again on every resync, about every 3 minutes. GitHub
+    refuses each repeat the same way, so no duplicate appears, but the `Warning` repeats and
+    `Synced` flips between `ReconcileError` and `ReconcileSuccess`. The repeat is reported
+    to oasgen-provider and not yet fixed.
+
+  Check that `status.id` is set after applying. If it is not, see [Verify](#verify) for the
+  query that finds such CRs on every version.
 - **`Workflow` does not create a workflow.** No kind in this chart writes files, so
   `.github/workflows/…` has to be committed by whatever else pushes into the repository;
   name it in `workflow_id` once it is there. What the CR owns is the enabled state:
@@ -593,9 +602,13 @@ spec:
   GitHub but then lost the status write that follows it was sent again
   (oasgen-provider#676). For these three kinds that leaves an object on GitHub that no CR
   tracks. **Use oasgen-provider 0.68.0 or later.** On 0.68.0 the create is no longer
-  repeated. The CR can instead be left `Ready=True` with no identifier: the query under
-  [Verify](#verify) finds it (oasgen-provider#682). Compare such a CR against GitHub before
-  acting on it.
+  repeated. The CR can instead be left without an identifier: `Ready=True` on 0.68.0
+  (oasgen-provider#682). On 0.69.0 and 0.70.0 such a CR reports `Ready=False` and the create
+  is sent again on every resync. That repeat is measured on `DeploymentBranchPolicy`, where
+  GitHub refuses it. For these three kinds GitHub would accept it, so each repeat would
+  leave another object (derived from the controller's code, not measured on these kinds).
+  The query under [Verify](#verify) finds such a CR on every version. Compare it against
+  GitHub before acting on it.
 - **`PullRequest` has no delete verb and no close-from-spec.** `state` is PATCH-body-only,
   so it never becomes a spec field. Merge or close the PR on GitHub, then delete the CR.
 - **`Issue` has no delete verb**, because GitHub's REST API cannot delete an issue.
@@ -707,13 +720,13 @@ $ kubectl get $(kubectl api-resources --api-group=github.krateo.io -o name \
       | "\(.kind)/\(.metadata.namespace)/\(.metadata.name)"'
 ```
 
-An empty result means no CR shows that message. On oasgen-provider 0.69.0 the message no longer
-appears. That release reports `Ready=False` for such a CR instead, but then sends the create
-again on every resync, about every 3 minutes, and each repeat overwrites the new reason with
-`Creating` (measured 2026-11-15; reported upstream against oasgen-provider#687). So the query
-above misses it. This check works on every version measured, 0.67.0 to 0.69.0: it lists CRs
-whose create was recorded as successful more than 10 minutes ago and which have never been
-observed.
+An empty result means no CR shows that message. From oasgen-provider 0.69.0 the message no
+longer appears. Those releases report `Ready=False/NoIdentifierRecorded` for such a CR
+instead and send the create again on every resync, about every 3 minutes. On 0.69.0 each
+repeat overwrites the reason with `Creating` within about 2 seconds. On 0.70.0 the reason
+stays. So the query above misses both. This check works on every version measured, 0.67.0
+to 0.70.0: it lists CRs that were created more than 10 minutes ago, whose create was
+recorded as successful, and which have never been observed.
 
 ```console
 $ kubectl get $(kubectl api-resources --api-group=github.krateo.io -o name \
@@ -721,14 +734,16 @@ $ kubectl get $(kubectl api-resources --api-group=github.krateo.io -o name \
   | jq -r --argjson min 10 '.items[]
       | select((.metadata.annotations["krateo.io/external-create-succeeded"] // null) != null
           and (any(.status.conditions[]?; .type == "Observed") | not)
-          and ((now - (.metadata.annotations["krateo.io/external-create-succeeded"]
-                       | fromdateiso8601)) > ($min * 60)))
+          and ((now - (.metadata.creationTimestamp | fromdateiso8601)) > ($min * 60)))
       | "\(.kind)/\(.metadata.namespace)/\(.metadata.name)"'
 ```
 
 The 10-minute gate leaves out healthy new CRs, which have no `Observed` condition until
-their first observe, about 2 minutes in. Measured cause so far: a `DeploymentBranchPolicy`
-whose pattern already existed (see the CI/CD caveats above).
+their first observe, about 2 minutes in. The age is the CR's own: each repeated create
+re-stamps `external-create-succeeded`, so a check on that annotation's age never fires for
+a CR stuck in the repeat. The previous version of this check had exactly that flaw.
+Measured cause so far: a `DeploymentBranchPolicy` whose pattern already existed (see the
+CI/CD caveats above).
 
 To trace what a kind's controller does against GitHub, set the opt-in
 `krateo.io/connector-verbose: "true"` annotation on a single CR and read that kind's own
