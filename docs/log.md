@@ -11,6 +11,24 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-15 — docs: a CR can stop at Creating when its create result is unknown
+
+Verify now describes a state its checks cannot list. The create is still marked pending,
+and the runtime cannot tell whether the object exists. The controller then refuses to
+create again and logs "cannot determine creation result - remove the
+krateo.io/external-create-pending annotation if it is safe to proceed".
+azuredevops-provider-kog observed this once, in 1 of 15 forced races on oasgen-provider
+0.71.0, but did not capture the CR's annotations, so no cluster query is published for it.
+The doc gives only the observed log line. The rest comes from reading the source of
+unstructured-runtime v1.18.0 (`worker.go`) and rest-dynamic-controller 0.71.0
+(`existence.go`, `restResources.go`):
+- Kinds whose existence can be checked recover by themselves.
+- Kinds with a GitHub-assigned identifier and no `findby` cannot be checked, so they stay
+  stuck. Among them, `Issue`, `RepoDeployment` and a draft `Release` would duplicate on a
+  second create.
+- Removing the annotation leads to a `NoIdentifierRecorded` refusal, not a second create,
+  while the `Creating` condition is set. That has not been measured.
+
 ## 2026-11-15 — docs: mapped-parameter `excludedSpecFields` entries keep a warning out; immutability was not the reason
 
 Comments on 14 RestDefinitions, two OAS assets and four docs said each `excludedSpecFields`
