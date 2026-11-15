@@ -601,25 +601,30 @@ spec:
   create, and get/update/delete address the resource through `status.number` — there is
   no `issue_number` or `milestone_number` field to set.
 - **`Issue`, `RepoDeployment` and a draft `Release` can be created twice on oasgen-provider
-  below 0.68.0.** GitHub assigns their identifier and accepts an identical second create.
+  below 0.71.0.** GitHub assigns their identifier and accepts an identical second create.
   Measured 2026-11-14, sending the same body twice gave two issues, two deployments, and two
   drafts with the same `tag_name`. A published `Release` is refused by `tag_name`, and every
-  other POST kind in the chart refused its duplicate. Before 0.68.0, a create that reached
-  GitHub but then lost the status write that follows it was sent again
-  (oasgen-provider#676). For these three kinds that leaves an object on GitHub that no CR
-  tracks. **Use oasgen-provider 0.68.0 or later.** On 0.68.0 the create is no longer
-  repeated. The CR can instead be left without an identifier: `Ready=True` on 0.68.0
-  (oasgen-provider#682). On 0.69.0 and 0.70.0 such a CR reports `Ready=False` and the create
-  is sent again on every resync. That repeat is measured on `DeploymentBranchPolicy`, where
-  GitHub refuses it. For these three kinds GitHub would accept it, so each repeat would
-  leave another object (derived from the controller's code, not measured on these kinds).
-  **0.71.0 sends the create once** (oasgen-provider#696, measured on
-  `DeploymentBranchPolicy`), so use 0.71.0 or later. The query under [Verify](#verify)
-  finds such a CR on every version. Compare it against GitHub before acting on it.
+  other POST kind in the chart refused its duplicate. Three routes made the controller send a
+  create again, each closed in a different release:
+  - **Below 0.68.0:** a create that reached GitHub but then lost the status write after it
+    (oasgen-provider#676).
+  - **Below 0.70.0, 0.68.0 included:** a lost status write left the CR with no record that a
+    create had started, so the next pass created again (oasgen-provider#692). Another
+    provider measured duplicates from this on 0.69.0. 0.68.0 and earlier run the same code
+    but were not measured separately.
+  - **0.69.0 and 0.70.0:** a CR left without an identifier is refused by the controller, and
+    that refusal triggers a fresh create on every resync (oasgen-provider#696). Measured on
+    `DeploymentBranchPolicy`, where GitHub refuses the repeat. For these three kinds each
+    repeat would leave another object (derived from the controller's code, not measured on
+    these kinds).
+
+  **Use oasgen-provider 0.71.0 or later**, the first release with all three closed. A CR can
+  still be left without an identifier; the query under [Verify](#verify) finds such a CR on
+  every version, and it should be compared against GitHub before acting on it.
   **Upgrading does not remove a duplicate an earlier version already created**, and no CR
   mentions it. The CR ends up tracking one of the objects, and the other is left on GitHub.
-  If these kinds ran on a version below 0.68.0, or on 0.69.0 or 0.70.0, compare the issues,
-  deployments and draft releases on GitHub against your CRs.
+  If these kinds ran on any version below 0.71.0, compare the issues, deployments and draft
+  releases on GitHub against your CRs.
 - **`PullRequest` has no delete verb and no close-from-spec.** `state` is PATCH-body-only,
   so it never becomes a spec field. Merge or close the PR on GitHub, then delete the CR.
 - **`Issue` has no delete verb**, because GitHub's REST API cannot delete an issue.
