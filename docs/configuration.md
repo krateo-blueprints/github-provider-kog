@@ -123,8 +123,11 @@ Three patterns recur across the set and are worth reading once:
 - **Server-assigned identifiers.** When GitHub assigns the item key on create, that key is a
   path parameter on the item verbs only, and each item verb sources it from status via
   `requestFieldMapping`. oasgen omits a mapped parameter from the spec entirely, so the matching
-  `excludedSpecFields` entry is a redundant no-op, kept because `excludedSpecFields` is immutable
-  (#290) and it records that the key is never author-supplied. That is
+  `excludedSpecFields` entry is redundant for the schema but not inert. Rendered with and without
+  each entry on oasgen 0.71.0, the CRD is identical, but without the entry oasgen warns on every
+  generation that the mapping omits the parameter (`status.schemaWarnings` plus a `SchemaWarnings`
+  event). So the entry is kept: it keeps that warning out, and it records that the key is never
+  author-supplied. That is
   `Release`'s `release_id` / `status.id` shape, shared by `Milestone`, `Issue`,
   `RepoWebhook`, `OrgWebhook`, `DeployKey`, `Autolink`, `RunnerGroup`,
   `DeploymentBranchPolicy`, `RepoRuleset`, `OrgRuleset`, `CodeSecurityConfig` and

@@ -11,6 +11,28 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-15 — docs: mapped-parameter `excludedSpecFields` entries keep a warning out; immutability was not the reason
+
+Comments on 14 RestDefinitions, two OAS assets and four docs said each `excludedSpecFields`
+entry for a parameter a mapping supplies was "a redundant no-op (oasgen warns it is not in the
+schema), kept because `excludedSpecFields` is immutable (#290)". oasgen-provider #701 makes the
+list editable, so we tested each entry before relying on that reason. On oasgen 0.71.0, chart main 2353b78, every one of
+the 24 entries was rendered with and without itself through `oasgen-render`:
+
+- The 17 mapped-parameter entries are redundant for the schema: the CRD is identical without them,
+  because the `requestFieldMapping` already keeps the parameter off the spec.
+- They are not inert. With the entry, generation is silent. Without it, oasgen warns that the
+  mapping omits the parameter, which lands in `status.schemaWarnings` and a `SchemaWarnings`
+  event on every generation. So the old claim had it backwards.
+- The 7 findby query-parameter entries (`Collaborator` affiliation/per_page, `UserRepository`
+  affiliation/sort/direction/per_page/page) are load-bearing: without each, the CRD gains that
+  field. This also proves the test can see a difference.
+
+All 24 entries stay. The comments now give the measured reason. Two of the edited comments are in
+OAS assets (`repocontent.yaml`, `userrepository.yaml`), and oasgen hashes the raw OAS bytes, so
+the `RepoContent` and `UserRepository` RestDefinitions regenerate their CRD (identical) and
+redeploy once on the first upgrade to a chart that carries this change.
+
 ## 2026-11-15 — docs: duplicates possible on every version below 0.71.0, not below 0.68.0
 
 The docs said `Issue`, `RepoDeployment` and draft `Release` could be created twice below

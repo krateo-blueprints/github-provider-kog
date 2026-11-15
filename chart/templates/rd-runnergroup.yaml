@@ -28,11 +28,13 @@ spec:
       - selected_repositories_url
     # runner_group_id is a path parameter on get/update/delete only. oasgen merges parameters from
     # every verb into the spec, but omits one that a mapping supplies, and the requestFieldMapping
-    # below supplies this one, so it is not a spec field. The excludedSpecFields entry below is a
-    # redundant no-op (oasgen warns it is not in the schema), kept because excludedSpecFields is
-    # oasgen-immutable (#290) and it records the intent that the id is never author-supplied;
-    # get/update/delete source the path parameter from status.id via the requestFieldMapping below.
-    # Same shape as rd-pullrequest.yaml's pull_number/status.number.
+    # below supplies this one, so it is not a spec field. The excludedSpecFields entry below is
+    # redundant for the schema (on oasgen 0.71.0 the CRD renders identically without it) but not
+    # inert: without it, oasgen warns on every generation that the mapping omits the parameter,
+    # which lands in status.schemaWarnings and a Warning event. It is kept because it keeps that
+    # warning out, and it records the intent that the id is never author-supplied; get/update/delete
+    # source the path parameter from status.id via the requestFieldMapping below. Same shape as
+    # rd-pullrequest.yaml's pull_number/status.number.
     #
     # This is deliberately NOT the upstream approach, which adds a
     # `findby` verb over /orgs/{org}/actions/runner-groups to recover the id by name. It does not

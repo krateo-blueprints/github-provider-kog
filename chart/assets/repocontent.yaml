@@ -85,7 +85,8 @@ paths:
         - $ref: '#/components/parameters/path'
         # GitHub's own query-parameter name for the branch on this verb. oasgen merges parameters
         # from every verb into the spec, but omits one that a mapping supplies, so this is not a spec
-        # field and `excludedSpecFields: [ref]` is a redundant no-op kept only for immutability.
+        # field. `excludedSpecFields: [ref]` is redundant for the schema but keeps oasgen's
+        # mapping-omits-the-parameter warning out (measured on 0.71.0), so it is kept.
         # What makes the branch work is the get verb's `fieldMapping`
         # (inQuery: ref <- spec.branch). The CR expresses the branch ONCE, as spec.branch (which
         # the PUT/DELETE bodies genuinely take). Without the relocation observe reads the DEFAULT

@@ -260,7 +260,8 @@ spec:
       - state
     # pull_number is a path parameter on get/update only. oasgen merges parameters from every verb
     # into the spec, but omits one that a mapping supplies, so it is not a spec field and the
-    # excludedSpecFields entry below is a redundant no-op kept for immutability. get/update
+    # excludedSpecFields entry below is redundant for the schema but keeps oasgen's
+    # mapping-omits-the-parameter warning out, so it is kept. get/update
     # source the path parameter from status.number via the requestFieldMapping below.
     excludedSpecFields:
       - pull_number

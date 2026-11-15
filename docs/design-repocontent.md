@@ -212,7 +212,8 @@ path (`builder/builder.go:348-356`, `default: continue`).
         - $ref: '#/components/parameters/repo'
         - $ref: '#/components/parameters/path'
         # GitHub's own name. A mapped parameter, which oasgen omits from the spec, so
-        # excludedSpecFields: [ref] is a redundant no-op kept for immutability. The CR
+        # excludedSpecFields: [ref] is redundant for the schema but keeps oasgen's
+        # mapping-omits-the-parameter warning out, so it is kept. The CR
         # expresses the branch once, as spec.branch, and the get verb's fieldMapping relocates it here.
         - name: ref
           in: query
@@ -407,9 +408,9 @@ spec:
     # `ref` is GitHub's query-parameter name for the branch on the get verb. The CR expresses
     # the branch ONCE, as spec.branch (which the PUT/DELETE bodies genuinely take), and the get
     # verb's fieldMapping relocates it. oasgen omits a mapped parameter from the spec, so this
-    # excludedSpecFields entry is a redundant no-op kept for immutability; it records the intent
-    # that authors never face a ref/branch pair to keep in sync.
-    # IMMUTABLE once the CRD is generated.
+    # excludedSpecFields entry is redundant for the schema but keeps oasgen's
+    # mapping-omits-the-parameter warning out, and it records the intent that authors never face
+    # a ref/branch pair to keep in sync. Before oasgen-provider #701 it cannot be edited (#290).
     excludedSpecFields:
       - ref
     # Default fullSpec, deliberately. Walking the spec, the response carries only `path`,
