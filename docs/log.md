@@ -11,6 +11,21 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-15 — docs: a Verify check that also catches the oasgen-provider 0.69.0 shape
+
+oasgen-provider 0.69.0 (#687) stops a CR with no identifier from reporting `Ready=True`. Its
+Observe refuses and writes `Ready=False/NoIdentifierRecorded`. Measured live on the same
+`DeploymentBranchPolicy` setup as the #682 entry below (kind, 0.69.0, real GitHub, throwaway
+repo deleted), the runtime then queues a Create about 1 s after the refusal, with nothing
+changed on the object, on every resync. The `dup` pattern was POSTed 3 times in 5 minutes,
+and a streaming watch showed the new reason held for only about 1.9 s each cycle before
+`Creating` replaced it. GitHub refuses this kind's repeat with a 303, so no duplicate
+appeared here. On a kind where GitHub assigns the id, the same path would create one. The
+#682 entry's message query cannot see this shape, so Verify adds a check that does not
+depend on wording: create recorded as succeeded more than 10 minutes ago, and never
+observed. On saved dumps it matches the reproduced CR on 0.67.0 and 0.69.0 (two runs) and
+never the healthy control. On 2026-11-15 it found 0 of 32 CRs on krateo-057.
+
 ## 2026-11-14 — docs: duplicate creates on oasgen-provider < 0.68.0 (#676)
 
 oasgen-provider 0.68.0 stops re-sending a create that reached the vendor but then lost the

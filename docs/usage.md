@@ -707,10 +707,28 @@ $ kubectl get $(kubectl api-resources --api-group=github.krateo.io -o name \
       | "\(.kind)/\(.metadata.namespace)/\(.metadata.name)"'
 ```
 
-An empty result means no CR is in this state. Measured cause so far: a
-`DeploymentBranchPolicy` whose pattern already existed (see the CI/CD caveats above).
-Upstream has decided that such a CR will report a condition naming the cause instead of
-`Ready=True`.
+An empty result means no CR shows that message. On oasgen-provider 0.69.0 the message no longer
+appears. That release reports `Ready=False` for such a CR instead, but then sends the create
+again on every resync, about every 3 minutes, and each repeat overwrites the new reason with
+`Creating` (measured 2026-11-15; reported upstream against oasgen-provider#687). So the query
+above misses it. This check works on every version measured, 0.67.0 to 0.69.0: it lists CRs
+whose create was recorded as successful more than 10 minutes ago and which have never been
+observed.
+
+```console
+$ kubectl get $(kubectl api-resources --api-group=github.krateo.io -o name \
+      | grep -v configurations | paste -sd, -) -A -o json \
+  | jq -r --argjson min 10 '.items[]
+      | select((.metadata.annotations["krateo.io/external-create-succeeded"] // null) != null
+          and (any(.status.conditions[]?; .type == "Observed") | not)
+          and ((now - (.metadata.annotations["krateo.io/external-create-succeeded"]
+                       | fromdateiso8601)) > ($min * 60)))
+      | "\(.kind)/\(.metadata.namespace)/\(.metadata.name)"'
+```
+
+The 10-minute gate leaves out healthy new CRs, which have no `Observed` condition until
+their first observe, about 2 minutes in. Measured cause so far: a `DeploymentBranchPolicy`
+whose pattern already existed (see the CI/CD caveats above).
 
 To trace what a kind's controller does against GitHub, set the opt-in
 `krateo.io/connector-verbose: "true"` annotation on a single CR and read that kind's own
