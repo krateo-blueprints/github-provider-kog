@@ -35,8 +35,8 @@ spec:
     # rendering without the entries on oasgen 0.43.0 and 0.51.0). They keep a dead field off the CRD:
     # the verb's static query wins over spec, so a spec.affiliation would be silently ignored, and
     # that static affiliation=direct is what prevents the false-exists bug, see below.
-    # hack/assert-drift-invariants.py guards the entries, and excludedSpecFields is oasgen-immutable
-    # (#290) besides.
+    # Re-measured on oasgen 0.71.0: still load-bearing. hack/assert-drift-invariants.py guards the
+    # entries, and before oasgen-provider #701 excludedSpecFields cannot be edited at all (#290).
     excludedSpecFields:
       - affiliation
       - per_page

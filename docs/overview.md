@@ -217,8 +217,9 @@ need a proxy are handled at the mapping layer:
   verbs only, and `requestFieldMapping` sources it from status. oasgen omits a mapped parameter
   from the spec entirely —
   `hook_id`, `ruleset_id`, `release_id`, `runner_group_id`, `branch_policy_id`,
-  `milestone_number`, `issue_number`, `team_slug`. The matching `excludedSpecFields` entry is a
-  redundant no-op kept for immutability (#290).
+  `milestone_number`, `issue_number`, `team_slug`. The matching `excludedSpecFields` entry is
+  redundant for the schema but not inert: without it oasgen warns on every generation that the
+  mapping omits the parameter (measured on 0.71.0), so it is kept.
 - **Static per-verb headers and queries.** `TeamRepo`'s observe sends
   `Accept: application/vnd.github.v3.repository+json`; without it GitHub answers 204 and
   there is nothing to observe. `Collaborator`'s observe pins `affiliation=direct`, the

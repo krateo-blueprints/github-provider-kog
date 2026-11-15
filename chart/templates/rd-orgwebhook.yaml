@@ -23,11 +23,13 @@ spec:
       - updated_at
     # hook_id is a path parameter on get/update/delete only. oasgen merges parameters from every
     # verb into the spec, but omits one that a mapping supplies, and the requestFieldMapping below
-    # supplies this one, so it is not a spec field. The excludedSpecFields entry below is therefore
-    # a redundant no-op (oasgen warns it is not in the schema), kept because excludedSpecFields is
-    # oasgen-immutable (#290) and it records the intent that the id is never author-supplied. What
-    # actually fills the path parameter is the requestFieldMapping below, which sources it from
-    # status.id. Same pattern as PullRequest's pull_number.
+    # supplies this one, so it is not a spec field. The excludedSpecFields entry below is redundant
+    # for the schema (on oasgen 0.71.0 the CRD renders identically without it) but not inert:
+    # without it, oasgen warns on every generation that the mapping omits the parameter, which lands
+    # in status.schemaWarnings and a Warning event. It is kept because it keeps that warning out,
+    # and it records the intent that the id is never author-supplied. What actually fills the path
+    # parameter is the requestFieldMapping below, which sources it from status.id. Same pattern as
+    # PullRequest's pull_number.
     excludedSpecFields:
       - hook_id
     # DELIBERATE, for the same reason as RepoWebhook — see rd-repowebhook.yaml for the full

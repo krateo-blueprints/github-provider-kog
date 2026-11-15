@@ -179,7 +179,8 @@ paths:
                 items:
                   $ref: '#/components/schemas/Repository'
   # GET/PATCH address the repo as /repos/{owner}/{name}. `owner` is NOT a spec field — oasgen omits
-  # a parameter that a mapping supplies (so its excludedSpecFields entry is a redundant no-op), and
+  # a parameter that a mapping supplies (its excludedSpecFields entry is redundant for the schema but
+  # keeps oasgen's mapping-omits-the-parameter warning out, measured on 0.71.0), and
   # both verbs source it from status.owner.login,
   # which GitHub reports on the create, get and findby responses. `name` is sourced from
   # status.name (the name GitHub assigned) on both verbs too — the oasgen-provider #386 fix — so a
