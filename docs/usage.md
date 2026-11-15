@@ -762,6 +762,38 @@ a CR stuck in the repeat. The previous version of this check had exactly that fl
 Measured cause so far: a `DeploymentBranchPolicy` whose pattern already existed (see the
 CI/CD caveats above).
 
+A CR can also stop at `Ready=False/Creating` and never move on, and the check above does
+not list it, because no create was ever recorded as successful. The controller found the
+CR's create still marked pending (`krateo.io/external-create-pending` is newer than any
+succeeded or failed marker). Before creating again it asks whether the object already
+exists. When it gets no answer, it refuses rather than risk a second create, and on every
+attempt it logs this warning, with an `error` field giving the reason:
+
+```
+cannot determine creation result - remove the krateo.io/external-create-pending annotation if it is safe to proceed
+```
+
+From the runtime source (unstructured-runtime v1.18.0 `pkg/controller/worker.go`, which
+oasgen-provider 0.71.0 builds on), the same text and reason also become the `Synced`
+condition's message and a `CannotInitializeManagedResource` Warning event. That part has not
+been seen on a live CR. The log line was observed once, on another oasgen-generated
+provider (azuredevops-provider-kog), in 1 of 15 forced races on oasgen-provider 0.71.0. It
+has not been reproduced against GitHub.
+
+A kind whose identifier the author sets in the spec (a `Label`'s name, say), or which
+declares `findby` (`Collaborator`, `PullRequest`, `UserRepository`), gets out of this
+state without help. If the object is found, the create is recorded as successful. If it is
+reported absent, the runtime waits 2 minutes, clears the marker and creates. A kind whose
+identifier GitHub assigns and that has no `findby` cannot: until the identifier is on
+status, the question has no answer, so the CR waits indefinitely. [configuration](configuration.md)
+lists those kinds under *Server-assigned identifiers*; `Issue`, `RepoDeployment` and a draft `Release` are the ones where a
+second create would be a duplicate. Removing the annotation, as the message suggests, does
+not recover such a CR either. From the 0.71.0 source, the `Creating` condition still
+records that a create was attempted, so the controller then refuses with
+`NoIdentifierRecorded` instead of creating again. That outcome has not been measured. Look
+for the object on GitHub first: the CR cannot be linked to one that already exists. What
+deleting such a CR does has not been measured either.
+
 To trace what a kind's controller does against GitHub, set the opt-in
 `krateo.io/connector-verbose: "true"` annotation on a single CR and read that kind's own
 controller's logs. There is one log to check per kind and no second place to look: with all
