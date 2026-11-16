@@ -845,14 +845,42 @@ $ kubectl get $(kubectl api-resources --api-group=github.krateo.io -o name \
       | "\(.kind)/\(.metadata.namespace)/\(.metadata.name)"'
 ```
 
-A kind whose identifier the author sets in the spec (a `Label`'s name, say), or which
-declares `findby` (`Collaborator`, `PullRequest`, `UserRepository`), gets out of this
-state without help. If the object is found, the create is recorded as successful. If it is
-reported absent, the runtime waits 2 minutes, clears the marker and creates. A kind whose
-identifier GitHub assigns and that has no `findby` cannot: until the identifier is on
-status, the question has no answer, so the CR waits indefinitely. [configuration](configuration.md)
-lists those kinds under *Server-assigned identifiers*; `Issue`, `RepoDeployment` and a draft
-`Release` are the ones where a second create would be a duplicate.
+What happens next depends on how the kind is read:
+
+- **Read by a `get` keyed on spec fields** (a `Label`, keyed on its name): the kind gets out
+  of this state without help. If the object is found, the create is recorded as successful.
+  If GitHub answers `404`, the runtime waits 2 minutes, clears the marker and creates.
+- **Found through `findby`** (`Collaborator`, `PullRequest`, `UserRepository`; until the
+  first observe, their identifiers are not on status, so a `get` cannot address them): if
+  the list contains the object, the create is recorded as successful. A list in which
+  nothing matches is **not** taken as absence, so these kinds never create again on their
+  own. From the source (oasgen-provider `exists.go` and unstructured-runtime `worker.go`):
+  - up to 0.76.0: the CR stops at `CreateOutcomeUnknown` with the message above. Recover
+    it as below.
+  - **0.77.0: the CR shows `Ready=False/Creating`**, and `Synced` says *"a create is
+    pending: its outcome could not be determined on this pass and is checked again"*. It
+    retries forever and asks for no action. If the object was never created, nothing will
+    ever match, so the CR never moves on, and a parent composition counts it as still
+    converging. This is a defect
+    ([krateo-platformops/oasgen-provider#758](https://github.com/krateo-platformops/oasgen-provider/issues/758));
+    the fix (#759) restores `CreateOutcomeUnknown` and is not in a release yet. On 0.77.0,
+    look for these CRs with the second query below and recover them the same way.
+- **Server-assigned identifier and no `findby`:** until the identifier is on status, the
+  question has no answer, so the CR waits indefinitely at `CreateOutcomeUnknown`.
+  [configuration](configuration.md) lists those kinds under *Server-assigned identifiers*;
+  `Issue`, `RepoDeployment` and a draft `Release` are the ones where a second create would
+  be a duplicate.
+
+The second query, for 0.77.0. A CR with a create in flight shows this message briefly, so
+look at the ones that keep it across several resyncs:
+
+```console
+$ kubectl get $(kubectl api-resources --api-group=github.krateo.io -o name \
+      | grep -v configurations | paste -sd, -) -A -o json \
+  | jq -r '.items[] | select(any(.status.conditions[]?;
+      (.message // "") | startswith("a create is pending")))
+      | "\(.kind)/\(.metadata.namespace)/\(.metadata.name)"'
+```
 
 **To recover one, look on GitHub first, then do one of two things.** Both were measured on
 kind on 2026-11-16 with oasgen-provider 0.76.0, on two stuck `Issue` CRs, after creating

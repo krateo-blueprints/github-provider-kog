@@ -11,6 +11,22 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-16 — docs: findby kinds do not re-create on their own after an unknown create; 0.77.0 hides them
+
+The usage guide said `Collaborator`, `PullRequest` and `UserRepository` get out of a stuck
+create on their own: create again 2 minutes after the object is reported absent. That was
+wrong. Until the first observe these kinds are found only through `findby`, and a list in
+which nothing matches is refused as "not proof of absence", so the 2-minute grace, which
+needs a definite absence, never applies. Up to 0.76.0 such a CR stops at
+`CreateOutcomeUnknown` like the others. oasgen-provider 0.77.0 marks that refusal transient,
+so the CR instead shows `Ready=False/Creating` and retries forever with no prompt to act. When
+the object was never created this never ends, and a parent composition reads it as still
+converging. Reported to oasgen-provider from the source (no measurement: it needs a lost
+answer on a create that did not land). Upstream agreed: #758, with the marking reverted in
+#759 (not yet released). The guide now splits the three cases, gives the outcome per
+version, and adds a query for the 0.77.0 state. 0.77.0 renders all 32 CRDs identically
+to 0.76.0.
+
 ## 2026-11-16 — docs: the identifier fix for a stuck CR, measured after a real lost answer
 
 The usage guide's recovery for a CR stuck at `CreateOutcomeUnknown` was measured on GitHub
