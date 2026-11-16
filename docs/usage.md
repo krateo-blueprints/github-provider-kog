@@ -871,6 +871,12 @@ on GitHub an issue matching each CR:
   `external-create-pending`) and reports `Ready=True`, tracking that issue. No create is
   sent. `--subresource=status` is required: without it `kubectl` reports `patched` and the
   apiserver drops the status change.
+
+  **The patch does not start a pass of its own.** The CR keeps showing
+  `CreateOutcomeUnknown` until the next periodic one, up to
+  `REST_CONTROLLER_RESYNC_INTERVAL` (default 180 s). Wait that long before judging the
+  result. Above all, do not fall back to removing the annotation because the CR still looks
+  stuck: the object exists at that point, so the controller would create a second one.
 - **GitHub has no such object: remove the pending annotation.**
 
   ```console
