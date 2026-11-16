@@ -11,6 +11,19 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-16 — docs: the lost create answer is measured on 0.75.0
+
+The previous entry measured 0.75.0 with a create GitHub refused, which takes the same path as
+a lost answer but is not one. azuredevops-provider-kog has since measured the lost answer
+itself on oasgen-provider 0.75.0. Its controller's request timeout was set below the vendor's
+response time, so the create landed and the controller gave up waiting. 2 of 8 trials hit it.
+Both sent the create again about 2 s after the timeout, with no existence check in between,
+and left two objects for one CR. Each CR ended `Ready=True`, tracking only its last object,
+and none reached `CreateOutcomeUnknown`. On 0.74.0 the same setup hit 4 of 5 trials, and 3
+of them re-sent, leaving 2, 3 and 2 objects. In both versions the default-timeout control
+created exactly one object. The usage guide now cites the 0.75.0 result. The remedy for a
+stuck CR stays unmeasured, because no trial got stuck.
+
 ## 2026-11-16 — docs: oasgen-provider 0.75.0 does not close the fourth duplicate-create route
 
 0.75.0 ships unstructured-runtime v1.22.0, the fix the previous entry named, but the route
