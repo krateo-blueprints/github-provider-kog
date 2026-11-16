@@ -11,6 +11,17 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-16 — docs: the identifier fix for a stuck CR, measured after a real lost answer
+
+The usage guide's recovery for a CR stuck at `CreateOutcomeUnknown` was measured on GitHub
+through a `404`, which stands in for a lost answer. azuredevops-provider-kog has now measured
+it after a real one on oasgen-provider 0.76.0. Its controller timed out after the vendor had
+created the object, and the CR stopped at `CreateOutcomeUnknown` with only the pending
+annotation. Writing the identifier through the status subresource brought it to `Ready=True`
+on the next resync, about 3 minutes later. No annotation was touched, `NoIdentifierRecorded`
+never appeared, and the vendor held one object throughout (1 triggered trial of 8). The guide
+now cites it next to the GitHub measurement.
+
 ## 2026-11-16 — chore: oasgen-provider floor raised to 0.76.0
 
 The documented floor goes from 0.61.0 to **0.76.0**. 0.76.0 is the first release where a

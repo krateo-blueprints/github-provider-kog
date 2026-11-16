@@ -877,6 +877,14 @@ on GitHub an issue matching each CR:
   `REST_CONTROLLER_RESYNC_INTERVAL` (default 180 s). Wait that long before judging the
   result. Above all, do not fall back to removing the annotation because the CR still looks
   stuck: the object exists at that point, so the controller would create a second one.
+
+  The GitHub measurement reached this state through a `404`, which stands in for a lost
+  answer. Another oasgen-generated provider (azuredevops-provider-kog) measured the real
+  thing on 0.76.0: its create landed on the vendor, but the controller timed out before the
+  answer arrived. The CR stopped at `CreateOutcomeUnknown` with only the pending annotation.
+  Writing the identifier the same way, leaving the annotations alone, brought it to
+  `Ready=True` on the next resync, about 3 minutes later. The vendor held one object
+  throughout. That is one triggered trial in eight.
 - **GitHub has no such object: remove the pending annotation.**
 
   ```console
