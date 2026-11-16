@@ -11,6 +11,38 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-16 — docs: oasgen-provider 0.75.0 does not close the fourth duplicate-create route
+
+0.75.0 ships unstructured-runtime v1.22.0, the fix the previous entry named, but the route
+stays open. rest-dynamic-controller's `CreateWithResult` returns `CreateResult{}` on every
+vendor error (`restResources.go:1790` at 0.75.0). Its `Requested` field is false, and the
+runtime treats `!created.Requested` as "nothing was committed" (`worker.go:1322` at
+v1.22.0). It stamps `external-create-failed`, so the next pass sends the create again, and the
+existence check that would catch a create that landed is never reached. The oasgen-provider
+maintainers confirmed the reading and found the same zero value on the returns after a
+successful create: response parsing, status projection and the status write. So a create
+that landed and whose answer then failed to process is also sent again, with no network
+failure involved. I read those returns at the tag too.
+
+Measured on kind with released 0.75.0 (`rest-dynamic-controller:0.75.0`, chart main
+e4c9bad, `kinds=Issue`). Two `Issue` CRs pointed at a `krateo-blueprints` repository that did
+not exist yet, so GitHub refused each create with 404 and nothing was created. Every attempt
+stamped `external-create-failed` in the same second as `external-create-pending`. The CRs
+stayed `Ready=False/Creating`, and the create was sent again on backoff (about 4, 8 and 16 s
+apart, then in later bursts). Neither CR reached `CreateOutcomeUnknown`.
+
+Limits of the run:
+- the harness was killed with SIGKILL about 6 minutes in, from outside;
+- the controller-log capture failed, so there is no POST count from the log, only the
+  condition and annotation series sampled every 5 s;
+- the repository was never created, so nothing was duplicated on GitHub;
+- the two remedies the run was built to compare were not reached: writing `status.number`
+  on a stuck CR, and removing the `pending` annotation as the runtime's message advises.
+
+Fix: oasgen-provider#747 (issue #746), planned for 0.76.0. The usage guide now says 0.75.0
+does not close the route, and gives both triggers. The remedy for a stuck CR is still
+unmeasured, and stays out of the docs until a release that can reach that state is measured.
+
 ## 2026-11-16 — docs: the webhook-secret warning (oasgen-provider#725) is measured on 0.74.0
 
 oasgen-provider 0.74.0 adds the `UnmodelledKeysWouldBeRemoved` warning. It was measured on

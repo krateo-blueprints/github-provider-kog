@@ -627,10 +627,12 @@ spec:
   If these kinds ran on any version below 0.71.0, compare the issues, deployments and draft
   releases on GitHub against your CRs.
 
-  **A fourth route is still open on every oasgen-provider release so far.** It is in
-  unstructured-runtime, the library rest-dynamic-controller is built on, not in the three
-  fixes above. Sometimes GitHub creates the object but the controller never gets a success
-  back (a 5xx, a timeout or a reset connection). The controller then records the create as
+  **A fourth route is still open on every oasgen-provider release so far.** It is in how
+  rest-dynamic-controller and unstructured-runtime, the library it is built on, handle a
+  failed create, not in the three fixes above. Sometimes GitHub creates the object but the controller never gets a success
+  back (a 5xx, a timeout or a reset connection). The same happens when the success does
+  arrive but the controller then fails to process it: the body cannot be read, or the
+  identifier cannot be written to status. Either way the controller records the create as
   failed and sends it again. The check that would look for the object first does not run once
   a failure is recorded. The controller retries up to `REST_CONTROLLER_MAX_ERROR_RETRIES`
   times (default 5), so a single CR can send up to six POSTs. For these three kinds, each one
@@ -641,13 +643,21 @@ spec:
   - **Measured once, on another provider,** with oasgen-provider 0.73.0 and a test vendor
     that stored the create and then answered 500: six POSTs. **Not measured on a GitHub
     kind.**
-  - **When it happens:** only when GitHub commits the create and the answer is lost, so it is
-    rarer than a plain error.
+  - **When it happens:** only when GitHub commits the create and the controller then does not
+    get, or cannot process, the answer, so it is rarer than a plain error.
   - **Nothing on the CR shows it.** If a later attempt gets its answer, the CR tracks that
     object and reports healthy, and the earlier objects stay on GitHub with nothing pointing
     at them. If no attempt does, the CR has no identifier, and [Verify](#verify) finds it.
-  - **The fix** is unstructured-runtime v1.22.0 (unstructured-runtime#97). No
-    oasgen-provider release carries it yet (checked 2026-11-16).
+  - **oasgen-provider 0.75.0 does not close it.** 0.75.0 ships unstructured-runtime
+    v1.22.0, which checks whether the object exists before sending a create again. But
+    rest-dynamic-controller 0.75.0 reports every create error as "nothing was sent", and
+    the runtime takes that as safe to send again, so the check never runs. In source:
+    `restResources.go:1790` returns `CreateResult{}`, whose `Requested` is false, and
+    `worker.go:1322` then records the create as failed. Measured on kind on 2026-11-16 with
+    0.75.0 and an `Issue` whose create GitHub refused with 404, so nothing was created:
+    each attempt was recorded as failed in the same second it started and sent again, and
+    the CR never reached `CreateOutcomeUnknown`. The fix is oasgen-provider#747
+    (oasgen-provider#746), planned for 0.76.0, and covers both triggers above.
   - **To limit the repeats**, set `REST_CONTROLLER_MAX_ERROR_RETRIES` lower in the
     oasgen-provider chart's `rdc.env`. That setting reaches every generated controller, so
     each of them also gives up sooner on any other failing event.
