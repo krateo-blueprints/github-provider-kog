@@ -464,6 +464,28 @@ replaces `config` wholesale, the secret survives **only if the CR carries it**. 
   [krateo-platformops/oasgen-provider#734](https://github.com/krateo-platformops/oasgen-provider/issues/734).
   Treat the warning as a hint that can come too late, not a guard. Its absence does not
   mean the secret is safe.
+- **The chart does not use `partialFields` for `config`, and should not.** oasgen-provider
+  0.76.0 lets a verb declare `partialFields`. Before an update, the controller reads the
+  resource and lays the CR's keys over what the vendor holds, so a key the CR leaves out
+  survives. For a webhook that read returns `config.secret` as `********`, so the PATCH would
+  send `"secret": "********"`. GitHub stores that string as the new secret; it does not treat
+  it as "unchanged". This was measured on 2026-11-16 on a throwaway private repository in
+  `krateo-blueprints`. Each ping's `X-Hub-Signature-256` was read back from the deliveries API
+  and checked against HMAC-SHA256 over the recorded payload:
+
+  | step | `config.secret` sent in the PATCH | the next ping was signed with |
+  |---|---|---|
+  | control | none (hook created with secret S) | S |
+  | mask | `"********"` | `********`, the literal string |
+  | reset | S | S |
+  | omit | key absent | nothing: the signature header was gone |
+
+  With `partialFields`, an out-of-band secret would not survive. It would be replaced by
+  `********`, a key anyone can guess, so deliveries still look signed but a forged one would
+  verify. Clearing, which happens today, is the lesser harm: a receiver that checks signatures
+  rejects unsigned deliveries. When the CR does carry the secret, the CR's value wins either
+  way, so `partialFields` adds nothing. Only a repository webhook was measured; `OrgWebhook`
+  is inferred from the same API shape.
 
 Why it is not sourced from a Kubernetes `Secret` today: `rest-dynamic-controller`'s
 `secretRef` resolver *could* inject `config.secret` from a Secret (it is stripped from the
