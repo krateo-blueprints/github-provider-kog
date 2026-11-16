@@ -11,6 +11,42 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-16 — fix: webhook `events` is a set
+
+The assets said GitHub echoes a webhook's `events` as supplied, and told authors to keep the
+list in a stable order. That came from GitHub's response examples and was wrong. Measured on
+throwaway inactive repository hooks in `krateo-blueprints`:
+- **What GitHub stores:** across 8 writes (creates and PATCHes, 3 to 4 events in unsorted
+  order, some with duplicates), a GET always returned the events sorted alphabetically and
+  de-duplicated. A write's own response is not reliable: it usually echoes submission order,
+  but twice it gave neither submission nor sorted order.
+- **The loop it caused:** on oasgen-provider 0.74.0 with the chart as it was, a CR with
+  `events: [push, pull_request]` sent a PATCH at each of the two resyncs held (108 s and
+  288 s after create). The controller compared positionally against GitHub's
+  `[pull_request, push]`.
+
+The fix declares `uniqueItems: true` on `events` in the create and update bodies of
+`RepoWebhook` and `OrgWebhook`:
+- **Comparison:** oasgen-provider 0.62.0 and later read the update body's declaration and
+  compare the array as a set.
+- **CRD:** crdgen marks `spec.events` with `x-kubernetes-list-type: set`, so the apiserver
+  refuses a duplicate instead of GitHub silently dropping it. On 0.74.0, only those two
+  nodes change.
+
+The same kind run then upgraded the chart in place to the fix:
+- The CRD carried the set type within about 80 s.
+- The controller observed twice with zero PATCH, and GitHub was unchanged.
+- `[push, push]` was refused at admission (`Duplicate value: "push"`), where before the
+  upgrade it had been accepted.
+- The controller pod did not restart, so the new comparison was picked up from the
+  regenerated document alone.
+
+`OrgWebhook` is inferred from the same API shape (org-level writes are out of scope). GitHub's
+OpenAPI does not declare `uniqueItems` here, so `hack/assert-oas-adherence.py` now detects
+`uniqueItems` differences (`unique-added`, `unique-dropped`), and the four new deviations have
+category-B exceptions. On 0.61.0, the chart's floor, the comparison stays positional. No CR on
+057 used duplicate or unsorted events (0 `RepoWebhook`, 0 `OrgWebhook`).
+
 ## 2026-11-16 — docs: a fourth duplicate-create route is open on every release
 
 The usage guide said `Issue`, `RepoDeployment` and a draft `Release` duplicate only below

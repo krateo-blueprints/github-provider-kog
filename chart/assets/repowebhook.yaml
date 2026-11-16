@@ -73,15 +73,18 @@ paths:
                     # expressible. Treat the CR itself as sensitive instead.
                     secret:
                       type: string
-                # Which events GitHub delivers. NOTE FOR AUTHORS: this array is part of the
-                # update body, so it IS compared, and the comparison is positional (element
-                # order AND length matter, see compareSlices). GitHub echoes the array as
-                # supplied — its own response examples come back ["push","pull_request"], i.e.
-                # submission order rather than sorted — so keep the list in a stable order in
-                # the CR. Sorting it response-side instead was considered and rejected: it would
-                # manufacture drift for any author whose list is not already sorted.
+                # Which events GitHub delivers. GitHub keeps them as a SET: measured 2026-11-16
+                # (docs/log.md), a GET returns them sorted and de-duplicated whatever order was
+                # sent; only a write's own response sometimes echoes submission order. So the
+                # array is declared `uniqueItems: true` here AND on the update body below, which
+                # GitHub's OpenAPI does not say (hack/oas-adherence-exceptions.yaml). On
+                # oasgen-provider >= 0.62.0 that makes drift comparison ignore order (before it,
+                # a list not already in GitHub's order was PATCHed on every resync), and the CRD
+                # marks it `x-kubernetes-list-type: set`, so a duplicate is refused at admission
+                # rather than silently dropped by GitHub.
                 events:
                   type: array
+                  uniqueItems: true
                   default:
                     - push
                   items:
@@ -138,8 +141,10 @@ paths:
                       type: string
                     insecure_ssl:
                       type: string
+                # A set, as on create above.
                 events:
                   type: array
+                  uniqueItems: true
                   items:
                     type: string
                 active:
