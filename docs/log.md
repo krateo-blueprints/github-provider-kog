@@ -11,6 +11,25 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-16 — docs: the webhook-secret clearing is measured, not inferred
+
+The configuration guide had called the clearing of a webhook HMAC secret set outside the CR
+"MEDIUM-HIGH confidence … not live-verified". It is now measured, on a throwaway public
+repository in `krateo-blueprints` with two inactive repository webhooks, each created with a
+random secret:
+- A `PATCH` with `config` = `url`, `content_type`, `insecure_ssl` and no `secret` (the body
+  the controller sends when `spec.config.secret` is unset) removed the secret. The response
+  and a fresh GET both lacked `config.secret`.
+- The control `PATCH` touched only `active`, and the secret survived as `********`.
+
+So the guidance stands: the CR is authoritative for the secret. One claim is corrected: the
+loss can be seen. A set secret reads `********` and a cleared one is absent from the GET
+body. `OrgWebhook` was not measured (org-level writes are out of scope); it is inferred from
+the same API shape. oasgen-provider#725 (open) would make rest-dynamic-controller warn when
+an update is about to drop a vendor-held key the CR does not set. Whether it reports
+`secret` here is not yet known: it scopes the check to the update body, and our asset leaves
+`secret` out of the update schema so that the mask is never compared.
+
 ## 2026-11-15 — docs: a CR can stop at Creating when its create result is unknown
 
 Verify now describes a state its checks cannot list. The create is still marked pending,
