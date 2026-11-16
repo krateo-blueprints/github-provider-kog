@@ -11,6 +11,28 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-16 — docs: a fourth duplicate-create route is open on every release
+
+The usage guide said `Issue`, `RepoDeployment` and a draft `Release` duplicate only below
+oasgen-provider 0.71.0. That is true of the three routes 0.71.0 closed. A fourth route was
+reported by the oasgen-provider maintainers, and I read it in the source at
+unstructured-runtime v1.18.0, which oasgen-provider 0.71.0 and 0.73.0 ship.
+- **Mechanism:** when the external create returns an error, `handleCreate` stamps the
+  `failed` marker and returns the error, and the same Create event is requeued.
+  `ExternalCreateIncomplete`, the gate on the existence check that would catch a create that
+  landed, is true only while `pending` is newer than `failed`, so it is skipped.
+- **Retry count:** the requeue stops at `NumRequeues >= maxRetries`, and maxRetries comes
+  from `REST_CONTROLLER_MAX_ERROR_RETRIES`, default 5. So there are up to six POSTs.
+- **The setting reaches the controllers:** the oasgen-provider chart's `rdc.env` is
+  rendered into each generated controller's ConfigMap, so the variable can be set there.
+
+Measured once by another provider, on 0.73.0 against a test vendor that stored the create and
+then answered 500: six POSTs. Not measured on a GitHub kind. The fix is unstructured-runtime
+v1.22.0 (#97, tag verified). No oasgen-provider release carries it as of this entry. The
+three closed routes and their measurements are unchanged, and the "use 0.71.0 or later"
+advice still stands for them. The docs now add the open fourth route instead of saying only
+"below 0.71.0".
+
 ## 2026-11-16 — docs: the webhook-secret clearing is measured, not inferred
 
 The configuration guide had called the clearing of a webhook HMAC secret set outside the CR
