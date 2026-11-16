@@ -460,10 +460,12 @@ replaces `config` wholesale, the secret survives **only if the CR carries it**. 
   straight away, without a read first. So editing the CR before the next periodic read
   clears the secret with no warning at all. That was measured too: an `events` edit PATCHed
   the hook and removed the secret, and no warning was emitted for the new generation. This
-  is tracked upstream as
-  [krateo-platformops/oasgen-provider#734](https://github.com/krateo-platformops/oasgen-provider/issues/734).
-  Treat the warning as a hint that can come too late, not a guard. Its absence does not
-  mean the secret is safe.
+  will not change: upstream closed
+  [krateo-platformops/oasgen-provider#734](https://github.com/krateo-platformops/oasgen-provider/issues/734)
+  on 2026-11-16. Warning on an edit would need a read before every update of every kind,
+  and the read that 0.76.0 does add before an update happens only for a field declared in
+  `partialFields`, which keeps its keys anyway. Treat the warning as a hint that can come
+  too late, not a guard. Its absence does not mean the secret is safe.
 - **The chart does not use `partialFields` for `config`, and should not.** oasgen-provider
   0.76.0 lets a verb declare `partialFields`. Before an update, the controller reads the
   resource and lays the CR's keys over what the vendor holds, so a key the CR leaves out
