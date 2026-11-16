@@ -11,6 +11,17 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-16 — chore: oasgen-provider floor raised to 0.76.0
+
+The documented floor goes from 0.61.0 to **0.76.0**. 0.76.0 is the first release where a
+create whose outcome is unknown stops at `CreateOutcomeUnknown` instead of being sent again
+(oasgen-provider#746, fixed by #747). Below it, `Issue`, `RepoDeployment` and a draft
+`Release` can leave duplicate objects on GitHub with nothing tracking them (measured on 0.75.0
+and on 0.76.0; see the entry below). The 32 CRDs render identically on 0.75.0 and 0.76.0, so
+the raise changes no schema. 0.61.0's CRD-uninstall refusal and the earlier floors are now
+subsumed. Diego chose to raise it. Which installer tag pins oasgen-provider 0.76.0, and when
+each cluster rolls, are decided separately in the installer session.
+
 ## 2026-11-16 — docs: oasgen-provider 0.76.0 closes the fourth duplicate-create route; recovering a stuck CR, measured
 
 0.76.0 (oasgen-provider#747) makes a create whose outcome is unknown stop instead of being
