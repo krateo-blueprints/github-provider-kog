@@ -11,6 +11,25 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-16 — docs: the webhook-secret warning (oasgen-provider#725) is measured on 0.74.0
+
+oasgen-provider 0.74.0 adds the `UnmodelledKeysWouldBeRemoved` warning. It was measured on
+kind with released 0.74.0 and two inactive repository hooks in a throwaway `krateo-blueprints`
+repository. The CRs set `url`, `content_type` and `insecure_ssl` and no secret.
+- **Out-of-band secret:** a secret added out of band, with the same `url`, `content_type` and
+  `insecure_ssl`, produced one `Warning` per hook naming exactly `spec.config: secret` within
+  about 65 s. Zero PATCHes went out, the secret survived a further resync, and the event count
+  stayed flat. The control hook was never edited and kept its secret, with zero PATCHes for
+  the whole run.
+- **Edit:** editing `events` on the test CR sent the PATCH immediately, with no read before
+  it. The `config` went whole and without the secret, and GitHub then showed the secret
+  absent. No warning was emitted for the new generation, because the check runs only on a
+  read and an edit goes straight to the update (oasgen-provider#734).
+
+The configuration guide now says the warning is a hint from the periodic read, not a guard on
+the edit. The same run surfaced the webhook `events` ordering defect (entry below). Evidence:
+`durable/webhook725-kind` in the maintainer's session, not in the repository.
+
 ## 2026-11-16 — fix: webhook `events` is a set
 
 The assets said GitHub echoes a webhook's `events` as supplied, and told authors to keep the

@@ -448,6 +448,22 @@ replaces `config` wholesale, the secret survives **only if the CR carries it**. 
 - **Treat `RepoWebhook` / `OrgWebhook` CRs as sensitive:** RBAC on the kind, encryption at
   rest for etcd, and never the plaintext secret in Git. The value lives in the CR in clear
   text (see [usage](./usage.md)).
+- **On oasgen-provider 0.74.0 or later, a periodic read warns, but an edit does not.** When
+  the controller reads a hook that holds a secret the CR does not set, it emits a `Warning`
+  event `UnmodelledKeysWouldBeRemoved` naming `spec.config: secret`. It sends nothing to
+  GitHub, and it does this once per CR generation. This was measured live on 0.74.0
+  (2026-11-16): the warning came on the first read after the secret was set out of band,
+  nothing was PATCHed, and the secret survived.
+
+  The gap is that the warning comes **only from the periodic read**, every
+  `REST_CONTROLLER_RESYNC_INTERVAL` (default 180 s). An edit to the CR sends the update
+  straight away, without a read first. So editing the CR before the next periodic read
+  clears the secret with no warning at all. That was measured too: an `events` edit PATCHed
+  the hook and removed the secret, and no warning was emitted for the new generation. This
+  is tracked upstream as
+  [krateo-platformops/oasgen-provider#734](https://github.com/krateo-platformops/oasgen-provider/issues/734).
+  Treat the warning as a hint that can come too late, not a guard. Its absence does not
+  mean the secret is safe.
 
 Why it is not sourced from a Kubernetes `Secret` today: `rest-dynamic-controller`'s
 `secretRef` resolver *could* inject `config.secret` from a Secret (it is stripped from the
