@@ -600,8 +600,7 @@ spec:
 - **Numbers are server-assigned.** `Issue` and `Milestone` get theirs from GitHub on
   create, and get/update/delete address the resource through `status.number` — there is
   no `issue_number` or `milestone_number` field to set.
-- **`Issue`, `RepoDeployment` and a draft `Release` can be created twice on oasgen-provider
-  below 0.71.0.** GitHub assigns their identifier and accepts an identical second create.
+- **`Issue`, `RepoDeployment` and a draft `Release` can be created twice.** GitHub assigns their identifier and accepts an identical second create.
   Measured 2026-11-14, sending the same body twice gave two issues, two deployments, and two
   drafts with the same `tag_name`. A published `Release` is refused by `tag_name`, and every
   other POST kind in the chart refused its duplicate. Three routes made the controller send a
@@ -625,6 +624,34 @@ spec:
   mentions it. The CR ends up tracking one of the objects, and the other is left on GitHub.
   If these kinds ran on any version below 0.71.0, compare the issues, deployments and draft
   releases on GitHub against your CRs.
+
+  **A fourth route is still open on every oasgen-provider release so far.** It is in
+  unstructured-runtime, the library rest-dynamic-controller is built on, not in the three
+  fixes above. Sometimes GitHub creates the object but the controller never gets a success
+  back (a 5xx, a timeout or a reset connection). The controller then records the create as
+  failed and sends it again. The check that would look for the object first does not run once
+  a failure is recorded. The controller retries up to `REST_CONTROLLER_MAX_ERROR_RETRIES`
+  times (default 5), so a single CR can send up to six POSTs. For these three kinds, each one
+  GitHub accepts leaves another object.
+  - **Where this is established:** read in the source of unstructured-runtime v1.18.0, which
+    0.71.0 and 0.73.0 ship. The oasgen-provider maintainers read the same rule in every
+    runtime version back to v1.9.0 (oasgen-provider 0.60.0).
+  - **Measured once, on another provider,** with oasgen-provider 0.73.0 and a test vendor
+    that stored the create and then answered 500: six POSTs. **Not measured on a GitHub
+    kind.**
+  - **When it happens:** only when GitHub commits the create and the answer is lost, so it is
+    rarer than a plain error.
+  - **Nothing on the CR shows it.** If a later attempt gets its answer, the CR tracks that
+    object and reports healthy, and the earlier objects stay on GitHub with nothing pointing
+    at them. If no attempt does, the CR has no identifier, and [Verify](#verify) finds it.
+  - **The fix** is unstructured-runtime v1.22.0 (unstructured-runtime#97). No
+    oasgen-provider release carries it yet (checked 2026-11-16).
+  - **To limit the repeats**, set `REST_CONTROLLER_MAX_ERROR_RETRIES` lower in the
+    oasgen-provider chart's `rdc.env`. That setting reaches every generated controller, so
+    each of them also gives up sooner on any other failing event.
+
+  Until a release with the fix is out, compare these three kinds on GitHub against your CRs
+  on every version.
 - **`PullRequest` has no delete verb and no close-from-spec.** `state` is PATCH-body-only,
   so it never becomes a spec field. Merge or close the PR on GitHub, then delete the CR.
 - **`Issue` has no delete verb**, because GitHub's REST API cannot delete an issue.
