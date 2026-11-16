@@ -627,7 +627,7 @@ spec:
   If these kinds ran on any version below 0.71.0, compare the issues, deployments and draft
   releases on GitHub against your CRs.
 
-  **A fourth route is still open on every oasgen-provider release so far.** It is in how
+  **A fourth route is open on every oasgen-provider release before 0.76.0.** It is in how
   rest-dynamic-controller and unstructured-runtime, the library it is built on, handle a
   failed create, not in the three fixes above. Sometimes GitHub creates the object but the controller never gets a success
   back (a 5xx, a timeout or a reset connection). The same happens when the success does
@@ -660,14 +660,22 @@ spec:
     answer itself on 0.75.0 (azuredevops-provider-kog, a create that timed out on the
     controller's side): 2 of 8 trials hit it, and both sent the create again about 2 s
     later with no existence check in between, leaving two objects for one CR. The same
-    trial on 0.74.0 left 2, 3 and 2 objects. The fix is oasgen-provider#747
-    (oasgen-provider#746), planned for 0.76.0, and covers both triggers above.
-  - **To limit the repeats**, set `REST_CONTROLLER_MAX_ERROR_RETRIES` lower in the
-    oasgen-provider chart's `rdc.env`. That setting reaches every generated controller, so
-    each of them also gives up sooner on any other failing event.
+    trial on 0.74.0 left 2, 3 and 2 objects.
+  - **oasgen-provider 0.76.0 closes it** (oasgen-provider#747, fixing #746, for both
+    triggers above). A create whose outcome is unknown is no longer sent again. The CR stops
+    at `Ready=False/CreateOutcomeUnknown` and waits for a person instead. Measured on kind on
+    2026-11-16 with 0.76.0 and the same 404 `Issue` trial: each CR sent one POST and reached
+    `CreateOutcomeUnknown` within 5 s, and sent nothing more over the next 200 s, with the
+    repository by then in place. **Use oasgen-provider 0.76.0 or later for these three
+    kinds.** The cost is that a CR in this state needs you; see
+    [a CR stuck after an unknown create](#a-cr-stuck-after-an-unknown-create) under Verify.
+  - **On releases before 0.76.0, to limit the repeats**, set
+    `REST_CONTROLLER_MAX_ERROR_RETRIES` lower in the oasgen-provider chart's `rdc.env`. That
+    setting reaches every generated controller, so each of them also gives up sooner on any
+    other failing event.
 
-  Until a release with the fix is out, compare these three kinds on GitHub against your CRs
-  on every version.
+  If these kinds ran on any release before 0.76.0, compare the issues, deployments and draft
+  releases on GitHub against your CRs: upgrading does not remove a duplicate already made.
 - **`PullRequest` has no delete verb and no close-from-spec.** `state` is PATCH-body-only,
   so it never becomes a spec field. Merge or close the PR on GitHub, then delete the CR.
 - **`Issue` has no delete verb**, because GitHub's REST API cannot delete an issue.
@@ -805,23 +813,37 @@ a CR stuck in the repeat. The previous version of this check had exactly that fl
 Measured cause so far: a `DeploymentBranchPolicy` whose pattern already existed (see the
 CI/CD caveats above).
 
-A CR can also stop at `Ready=False/Creating` and never move on, and the check above does
-not list it, because no create was ever recorded as successful. The controller found the
-CR's create still marked pending (`krateo.io/external-create-pending` is newer than any
-succeeded or failed marker). Before creating again it asks whether the object already
-exists. When it gets no answer, it refuses rather than risk a second create, and on every
-attempt it logs this warning, with an `error` field giving the reason:
+### A CR stuck after an unknown create
+
+A CR can also stop before it is ever created, and the check above does not list it, because
+no create was ever recorded as successful. The controller found the CR's create still marked
+pending (`krateo.io/external-create-pending` is newer than any succeeded or failed marker).
+Before creating again it asks whether the object already exists. When it gets no answer, it
+refuses rather than risk a second create. The `Ready` condition (`CreateOutcomeUnknown` from
+oasgen-provider 0.76.0, `Creating` before it), the `Synced` message and a
+`CannotInitializeManagedResource` Warning event all carry this text:
 
 ```
-cannot determine creation result - remove the krateo.io/external-create-pending annotation if it is safe to proceed
+cannot determine creation result - remove the krateo.io/external-create-pending annotation if it is safe to proceed: existence check: this kind declares no findby verb, so existence cannot be read
 ```
 
-From the runtime source (unstructured-runtime v1.18.0 `pkg/controller/worker.go`, which
-oasgen-provider 0.71.0 builds on), the same text and reason also become the `Synced`
-condition's message and a `CannotInitializeManagedResource` Warning event. That part has not
-been seen on a live CR. The log line was observed once, on another oasgen-generated
-provider (azuredevops-provider-kog), in 1 of 15 forced races on oasgen-provider 0.71.0. It
-has not been reproduced against GitHub.
+On oasgen-provider 0.76.0 or later this is how a create whose outcome is unknown ends: a
+5xx, a timeout, a dropped connection, a success the controller could not process, or any
+refusal other than `400`/`422`. A `404` counts, so a create against a repository that does
+not exist yet stops here even though GitHub created nothing. Before 0.76.0 such a create was
+sent again instead (see the fourth duplicate-create route under
+[Work tracking](#work-tracking--issues-releases-deployments)), and this state was reached
+only through a rare race: azuredevops-provider-kog saw it in 1 of 15 forced races on 0.71.0.
+
+To list the CRs in this state:
+
+```console
+$ kubectl get $(kubectl api-resources --api-group=github.krateo.io -o name \
+      | grep -v configurations | paste -sd, -) -A -o json \
+  | jq -r '.items[] | select(any(.status.conditions[]?;
+      (.message // "") | startswith("cannot determine creation result")))
+      | "\(.kind)/\(.metadata.namespace)/\(.metadata.name)"'
+```
 
 A kind whose identifier the author sets in the spec (a `Label`'s name, say), or which
 declares `findby` (`Collaborator`, `PullRequest`, `UserRepository`), gets out of this
@@ -829,13 +851,48 @@ state without help. If the object is found, the create is recorded as successful
 reported absent, the runtime waits 2 minutes, clears the marker and creates. A kind whose
 identifier GitHub assigns and that has no `findby` cannot: until the identifier is on
 status, the question has no answer, so the CR waits indefinitely. [configuration](configuration.md)
-lists those kinds under *Server-assigned identifiers*; `Issue`, `RepoDeployment` and a draft `Release` are the ones where a
-second create would be a duplicate. Removing the annotation, as the message suggests, does
-not recover such a CR either. From the 0.71.0 source, the `Creating` condition still
-records that a create was attempted, so the controller then refuses with
-`NoIdentifierRecorded` instead of creating again. That outcome has not been measured. Look
-for the object on GitHub first: the CR cannot be linked to one that already exists. What
-deleting such a CR does has not been measured either.
+lists those kinds under *Server-assigned identifiers*; `Issue`, `RepoDeployment` and a draft
+`Release` are the ones where a second create would be a duplicate.
+
+**To recover one, look on GitHub first, then do one of two things.** Both were measured on
+kind on 2026-11-16 with oasgen-provider 0.76.0, on two stuck `Issue` CRs, after creating
+on GitHub an issue matching each CR:
+
+- **GitHub has the object: write its identifier to the CR's status.** For an `Issue` that
+  is the issue number:
+
+  ```console
+  $ kubectl patch issues.github.krateo.io <name> -n <namespace> \
+      --subresource=status --type=merge -p '{"status":{"number":42}}'
+  ```
+
+  Leave the annotations alone. The controller reads the issue on its next pass (76 s in the
+  measurement), records the create as successful (`external-create-succeeded` joins
+  `external-create-pending`) and reports `Ready=True`, tracking that issue. No create is
+  sent. `--subresource=status` is required: without it `kubectl` reports `patched` and the
+  apiserver drops the status change.
+
+  **The patch does not start a pass of its own.** The CR keeps showing
+  `CreateOutcomeUnknown` until the next periodic one, up to
+  `REST_CONTROLLER_RESYNC_INTERVAL` (default 180 s). Wait that long before judging the
+  result. Above all, do not fall back to removing the annotation because the CR still looks
+  stuck: the object exists at that point, so the controller would create a second one.
+- **GitHub has no such object: remove the pending annotation.**
+
+  ```console
+  $ kubectl annotate issues.github.krateo.io <name> -n <namespace> \
+      krateo.io/external-create-pending-
+  ```
+
+  The controller sends the create at once. **Do this only after checking GitHub**, because
+  it creates whether or not the object exists. In the measurement the issue already existed
+  and the CR was re-created anyway: GitHub then held two issues with that title, the CR
+  tracked the new one (`#3`), and the first (`#2`) was tracked by nothing. That is the
+  advice in the message above, followed without the check it asks for.
+
+The release notes of oasgen-provider 0.76.0 state that deleting a CR in this state orphans
+the object on GitHub; that has not been measured here. `Issue` has no delete verb in any
+case.
 
 To trace what a kind's controller does against GitHub, set the opt-in
 `krateo.io/connector-verbose: "true"` annotation on a single CR and read that kind's own

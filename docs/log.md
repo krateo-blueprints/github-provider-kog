@@ -11,6 +11,22 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-16 — docs: oasgen-provider 0.76.0 closes the fourth duplicate-create route; recovering a stuck CR, measured
+
+0.76.0 (oasgen-provider#747) makes a create whose outcome is unknown stop instead of being
+sent again. Measured on kind with two `Issue` CRs whose create GitHub refused with 404
+(repository not yet created): one POST each, `Ready=False/CreateOutcomeUnknown` within 5 s,
+only `external-create-pending` set and `external-create-failed` never, and no further POST
+over a 200 s hold after the repository existed. One issue per CR was then created by hand.
+Writing the issue number through the status subresource recovered the first CR in 76 s with
+no create (`pending` + `succeeded`, `Ready=True`, one issue). Removing only the pending
+annotation, the runtime message's advice, made the second CR create again at once: two issues
+with its title, the CR tracking the new one, the hand-made one tracked by nothing. Both
+outcomes match what oasgen-provider predicted before the run. The render of all 32 CRDs is
+identical between 0.75.0 and 0.76.0. The usage guide now recommends 0.76.0 for `Issue`,
+`RepoDeployment` and draft `Release`, documents both recovery steps with a query for stuck
+CRs, and the configuration guide records that oasgen-provider#734 was closed.
+
 ## 2026-11-16 — docs: why the webhook kinds do not use `partialFields`
 
 oasgen-provider 0.76.0 adds `partialFields`, which reads the resource before an update and
