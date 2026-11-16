@@ -11,6 +11,18 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-16 — docs: why the webhook kinds do not use `partialFields`
+
+oasgen-provider 0.76.0 adds `partialFields`, which reads the resource before an update and
+lays the CR's keys over the vendor's. On a webhook it would send back the `********` GitHub
+returns for `config.secret`. A probe on a throwaway private repository in `krateo-blueprints`
+showed that GitHub stores `********` as the new secret: the next ping was signed with that
+string. The probe read each ping's `X-Hub-Signature-256` from the deliveries API, and its
+control (the hook's original secret) matched first. The same probe confirmed that a PATCH
+without the secret removes signing. `RepoWebhook` and `OrgWebhook` keep sending `config`
+whole. The configuration guide records the measurement, and both RestDefinitions carry a
+comment against adopting `partialFields`.
+
 ## 2026-11-16 — docs: the lost create answer is measured on 0.75.0
 
 The previous entry measured 0.75.0 with a create GitHub refused, which takes the same path as

@@ -59,6 +59,11 @@ spec:
     # CLEARED on the next config PATCH, silently disabling HMAC signing (masked ******** on read).
     # Keep the secret in spec.config.secret and treat this CR as sensitive. See
     # docs/configuration.md "Updates send whole values — what a CR owns".
+    #
+    # NOT partialFields: [config] (oasgen 0.76.0). The pre-update read returns config.secret as
+    # "********" and GitHub stores that string as the new secret (measured 2026-11-16), so an
+    # out-of-band secret would become a key anyone can guess, which is worse than clearing it.
+    # See docs/configuration.md "The webhook secret: the CR is authoritative".
     compareScope: updatable
     configurationFields: []
     verbsDescription:

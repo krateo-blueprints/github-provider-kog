@@ -45,6 +45,9 @@ spec:
     # config.secret — a secret set out-of-band is CLEARED on the next config PATCH (and org hooks
     # also drop unmodelled config.username/password). See docs/configuration.md
     # "Updates send whole values — what a CR owns".
+    #
+    # NOT partialFields: [config], for the reason in rd-repowebhook.yaml: GitHub stores the
+    # masked "********" the pre-update read returns as the new secret.
     compareScope: updatable
     configurationFields: []
     verbsDescription:
