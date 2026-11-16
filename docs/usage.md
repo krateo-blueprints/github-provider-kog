@@ -656,7 +656,11 @@ spec:
     `worker.go:1322` then records the create as failed. Measured on kind on 2026-11-16 with
     0.75.0 and an `Issue` whose create GitHub refused with 404, so nothing was created:
     each attempt was recorded as failed in the same second it started and sent again, and
-    the CR never reached `CreateOutcomeUnknown`. The fix is oasgen-provider#747
+    the CR never reached `CreateOutcomeUnknown`. Another provider measured the lost
+    answer itself on 0.75.0 (azuredevops-provider-kog, a create that timed out on the
+    controller's side): 2 of 8 trials hit it, and both sent the create again about 2 s
+    later with no existence check in between, leaving two objects for one CR. The same
+    trial on 0.74.0 left 2, 3 and 2 objects. The fix is oasgen-provider#747
     (oasgen-provider#746), planned for 0.76.0, and covers both triggers above.
   - **To limit the repeats**, set `REST_CONTROLLER_MAX_ERROR_RETRIES` lower in the
     oasgen-provider chart's `rdc.env`. That setting reaches every generated controller, so
