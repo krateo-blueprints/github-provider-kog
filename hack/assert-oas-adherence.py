@@ -21,6 +21,9 @@ path, and compares what the asset declares with what GitHub declares:
   enum-added        the asset declares an enum where GitHub has none, or values GitHub does not list
   enum-narrowed     the asset's enum is a strict subset of GitHub's
   param-type        a path or query parameter's type differs (narrowed or changed)
+  unique-added      the asset declares `uniqueItems: true` on an array where GitHub does not. oasgen
+                    then compares the array as a set (ignores order) and crdgen marks it a set list
+  unique-dropped    GitHub declares `uniqueItems: true` and the asset does not
   default           the asset declares a `default` (see DEFAULTS below)
 
 Types ignore `nullable` and a `null` member, which oasgen does not carry into the CRD; a oneOf/anyOf
@@ -167,6 +170,11 @@ def merge_union(node):
 def compare(adoc, a, g, path, out, gdefaults):
     compare_type_enum(adoc, a, g, path, out)
     a, g = flatten(adoc, a), flatten(github, g)
+    au, gu = a.get("uniqueItems") is True, g.get("uniqueItems") is True
+    if au and not gu:
+        out.append(("unique-added", path, None))
+    elif gu and not au:
+        out.append(("unique-dropped", path, None))
     if "default" in a:
         out.append(("default", path, a["default"]))
         gdefaults[path] = g.get("default", None)

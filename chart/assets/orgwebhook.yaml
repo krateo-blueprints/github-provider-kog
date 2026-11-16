@@ -58,13 +58,20 @@ paths:
                     # sit in the CR in clear text like `secret`, and — unlike `secret` — the
                     # org-hook RESPONSE schema does not carry them at all, so they are write-only
                     # values with no observable counterpart to reconcile against.
-                # Which events GitHub delivers; ["*"] means every event. NOTE FOR AUTHORS: this
-                # array is part of the update body, so it IS compared, positionally (order AND
-                # length) — keep the list in a stable order. GitHub echoes it as supplied: its
-                # own response examples come back ["push","pull_request"], submission order
-                # rather than sorted.
+                # Which events GitHub delivers; ["*"] means every event. GitHub keeps them as a SET:
+                # measured 2026-11-16 on repository hooks (docs/log.md; org hooks are inferred
+                # from the same API shape, org-level writes being out of scope), a GET returns
+                # them sorted and de-duplicated whatever order was sent; only a write's own
+                # response sometimes echoes submission order. So the
+                # array is declared `uniqueItems: true` here AND on the update body below, which
+                # GitHub's OpenAPI does not say (hack/oas-adherence-exceptions.yaml). On
+                # oasgen-provider >= 0.62.0 that makes drift comparison ignore order (before it,
+                # a list not already in GitHub's order was PATCHed on every resync), and the CRD
+                # marks it `x-kubernetes-list-type: set`, so a duplicate is refused at admission
+                # rather than silently dropped by GitHub.
                 events:
                   type: array
+                  uniqueItems: true
                   default:
                     - push
                   items:
@@ -118,8 +125,10 @@ paths:
                       type: string
                     insecure_ssl:
                       type: string
+                # A set, as on create above.
                 events:
                   type: array
+                  uniqueItems: true
                   items:
                     type: string
                 active:

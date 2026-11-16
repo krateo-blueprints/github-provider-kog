@@ -19,7 +19,7 @@ spec:
     url: https://events.example.com/github
     content_type: json
     secret: "change-me-before-using-this-for-real"
-  # Compared positionally against what GitHub echoes — keep this list in a stable order.
+  # A set: order does not matter (oasgen-provider >= 0.62.0) and a duplicate is refused.
   events:
     - push
     - pull_request

@@ -1148,6 +1148,42 @@ exceptions:
   reason: GitHub's org conditions are a oneOf of repository_name / repository_id / repository_property targeting;
     flattened to repository_name alone (stable, human-authored). repository_id changes meaning if a repo is recreated.
     chart/assets/orgruleset.yaml (the reason given there for repository_property predates the CustomProperty kind).
+- row: new
+  category: B
+  kind: RepoWebhook
+  method: POST
+  path: /repos/{owner}/{repo}/hooks
+  deviation: unique-added
+  fields:
+  - events
+  reason: "GitHub keeps webhook events as a set: measured 2026-11-16, a GET returns them sorted and de-duplicated whatever order was sent (docs/log.md). Without the declaration a list not in GitHub's order is compared positionally and PATCHed again on resync; with it oasgen >= 0.62.0 compares it as a set and the CRD refuses duplicates. chart/assets/repowebhook.yaml"
+- row: new
+  category: B
+  kind: RepoWebhook
+  method: PATCH
+  path: /repos/{owner}/{repo}/hooks/{hook_id}
+  deviation: unique-added
+  fields:
+  - events
+  reason: "GitHub keeps webhook events as a set: measured 2026-11-16, a GET returns them sorted and de-duplicated whatever order was sent (docs/log.md). Without the declaration a list not in GitHub's order is compared positionally and PATCHed again on resync; with it oasgen >= 0.62.0 compares it as a set and the CRD refuses duplicates. chart/assets/repowebhook.yaml"
+- row: new
+  category: B
+  kind: OrgWebhook
+  method: POST
+  path: /orgs/{org}/hooks
+  deviation: unique-added
+  fields:
+  - events
+  reason: "GitHub keeps webhook events as a set: measured 2026-11-16, a GET returns them sorted and de-duplicated whatever order was sent (docs/log.md). Without the declaration a list not in GitHub's order is compared positionally and PATCHed again on resync; with it oasgen >= 0.62.0 compares it as a set and the CRD refuses duplicates. chart/assets/orgwebhook.yaml Org hooks are inferred from the same API shape (org-level writes are out of scope)."
+- row: new
+  category: B
+  kind: OrgWebhook
+  method: PATCH
+  path: /orgs/{org}/hooks/{hook_id}
+  deviation: unique-added
+  fields:
+  - events
+  reason: "GitHub keeps webhook events as a set: measured 2026-11-16, a GET returns them sorted and de-duplicated whatever order was sent (docs/log.md). Without the declaration a list not in GitHub's order is compared positionally and PATCHed again on resync; with it oasgen >= 0.62.0 compares it as a set and the CRD refuses duplicates. chart/assets/orgwebhook.yaml Org hooks are inferred from the same API shape (org-level writes are out of scope)."
 defaults:
 - kind: Autolink
   method: POST

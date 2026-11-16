@@ -298,8 +298,10 @@ run end to end against GitHub — no kind in this chart has ever reconciled agai
 so the first apply of a kind is the real test. Point them at a scratch org.
 
 One rule cuts across every group: **array order is part of the desired state.** Drift
-comparison walks arrays positionally, so a reshuffled `events`, `rules`, `bypass_actors`
-or `contexts` list reads as a change and is pushed back on the next reconcile.
+comparison walks arrays positionally, so a reshuffled `rules`, `bypass_actors` or
+`contexts` list reads as a change and is pushed back on the next reconcile. Webhook
+`events` is the exception: GitHub keeps it as a set and returns it sorted, so the chart
+declares it a set, and its order does not matter on oasgen-provider 0.62.0 or later.
 
 ### Access — who can reach what
 
