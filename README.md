@@ -3,7 +3,7 @@
 ## What is this
 
 A Krateo **KOG** (Krateo OpenAPI Generation) provider, built on
-[`oasgen-provider`](https://github.com/krateo-platformops/oasgen-provider) **≥ 0.76.0**,
+[`oasgen-provider`](https://github.com/krateo-platformops/oasgen-provider) **≥ 0.76.0, except 0.77.0**,
 that exposes 32 GitHub REST resources as Kubernetes kinds under the `github.krateo.io`
 group. Each kind is listed by its create endpoint; get/update/delete sit on the matching
 item path.
@@ -119,8 +119,8 @@ CRDs under `github.krateo.io`, and auto-deploys a `rest-dynamic-controller` per 
 
 ## Install
 
-Prerequisite: a Krateo cluster with `oasgen-provider` **≥ 0.76.0** — it provides
-`restdefinitions.ogen.krateo.io`. 0.76.0 is where a create whose outcome is unknown stops at `CreateOutcomeUnknown` instead of being sent again ([#746](https://github.com/krateo-platformops/oasgen-provider/issues/746)); below it, `Issue`, `RepoDeployment` and a draft `Release` can leave duplicates on GitHub ([usage](docs/usage.md#work-tracking--issues-releases-deployments)). The previous floor, 0.61.0, is where oasgen-provider refuses to uninstall a generated CRD whose instances it cannot count when a RestDefinition is removed ([#576](https://github.com/krateo-platformops/oasgen-provider/issues/576)); below it, narrowing `kinds` or uninstalling the chart can cascade-delete live CRs ([usage](docs/usage.md#keeping-a-repository-when-its-cr-is-deleted)). 0.52.0 is where `RestDefinition.spec.serverURL` arrives,
+Prerequisite: a Krateo cluster with `oasgen-provider` **≥ 0.76.0, except 0.77.0** — it provides
+`restdefinitions.ogen.krateo.io`. 0.76.0 is where a create whose outcome is unknown stops at `CreateOutcomeUnknown` instead of being sent again ([#746](https://github.com/krateo-platformops/oasgen-provider/issues/746)); below it, `Issue`, `RepoDeployment` and a draft `Release` can leave duplicates on GitHub ([usage](docs/usage.md#work-tracking--issues-releases-deployments)). 0.77.0 is excluded: on it a `PullRequest`, `Collaborator` or `UserRepository` whose create outcome is unknown shows `Creating` forever instead of `CreateOutcomeUnknown`, so nothing prompts anyone to act ([#758](https://github.com/krateo-platformops/oasgen-provider/issues/758), fixed in 0.78.0; [usage](docs/usage.md#a-cr-stuck-after-an-unknown-create)). The previous floor, 0.61.0, is where oasgen-provider refuses to uninstall a generated CRD whose instances it cannot count when a RestDefinition is removed ([#576](https://github.com/krateo-platformops/oasgen-provider/issues/576)); below it, narrowing `kinds` or uninstalling the chart can cascade-delete live CRs ([usage](docs/usage.md#keeping-a-repository-when-its-cr-is-deleted)). 0.52.0 is where `RestDefinition.spec.serverURL` arrives,
 which `githubBaseUrl` (GitHub Enterprise) sets. On an older oasgen that field would be dropped
 silently and requests would go to api.github.com. 0.38.0 is where the `GitRef` pattern admission
 guard reaches the CRD, a floor now subsumed. `GitRef`'s base-sha `dependentLookups` landed in 0.36.0; 0.23.0 is where

@@ -11,6 +11,32 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-17 — oasgen-provider 0.77.0 excluded; #758 measured on `PullRequest`, fixed in 0.78.0
+
+The requirement is now oasgen-provider ≥ 0.76.0, except 0.77.0. It is stated, not enforced:
+the chart has no version constraint on oasgen-provider, only prose in the README, the docs and
+`Chart.yaml`'s description, so the installer's pin is what selects the version. On 0.77.0 a
+`PullRequest`, `Collaborator` or `UserRepository` whose create outcome is unknown shows
+`Creating` forever and nothing prompts anyone to act (#758). 0.78.0 restores
+`CreateOutcomeUnknown` (#759).
+
+Measured on kind for `PullRequest` on both versions, without a proxy. A create against a
+repository that did not exist yet answered `404` and stayed pending. The repository and both
+head branches were then created with no pull request, so the list matched nothing. Over a
+6-minute hold, 4 minutes past the 2-minute grace, neither version sent a create.
+- 0.77.0 showed `Creating`, with `CreateOutcomePending` events.
+- 0.78.0 showed `CreateOutcomeUnknown` within 12 s, with `CannotInitializeManagedResource`
+  events.
+
+On both versions:
+- A pull request opened by hand was found and tracked after 94 s.
+- Removing the pending annotation, after checking GitHub, opened exactly one pull request.
+
+`Collaborator` and `UserRepository` take the same path by reading the code; they were not run.
+The usage guide gives the outcome per version and warns that an event filter keyed on
+`CreateOutcomePending` finds nothing outside 0.77.0. 0.78.0 renders all 32 CRDs and 32
+Configuration CRDs identically to 0.77.0: no new warnings, and the maxLength control holds.
+
 ## 2026-11-16 — docs: findby kinds do not re-create on their own after an unknown create; 0.77.0 hides them
 
 The usage guide said `Collaborator`, `PullRequest` and `UserRepository` get out of a stuck
