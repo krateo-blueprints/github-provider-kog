@@ -690,6 +690,35 @@ spec:
   releases on GitHub against your CRs: upgrading does not remove a duplicate already made.
 - **`PullRequest` has no delete verb and no close-from-spec.** `state` is PATCH-body-only,
   so it never becomes a spec field. Merge or close the PR on GitHub, then delete the CR.
+- **A `PullRequest` without `status.number` looks for an OPEN pull request only.** A new CR,
+  or one whose status was lost, finds its pull request by listing the repository's open
+  pull requests and matching `head` and `base`. GitHub allows one open pull request per
+  pair, so at most one can match. Closed and merged pull requests are not listed.
+  - Up to chart 0.14.0 the list included them, so a new CR for a pair that had an older
+    closed or merged pull request adopted that old one. It reported Ready with the old
+    number, and the pull request it was written for was never opened. A create that never
+    reached GitHub was recorded as succeeded. Reusing a branch name (for example
+    `builder/<repo>`) was enough to cause it.
+  - Measured on kind with oasgen-provider 0.80.0 on 2026-11-17, open-only against the
+    old listing, on one repository with branches that already had pull requests:
+
+    | case | listing all pull requests (≤ 0.14.0) | listing open ones (0.15.0) |
+    |---|---|---|
+    | new CR; the pair has a closed PR | adopted it, opened nothing | opened its own PR |
+    | new CR; the pair's only PR is merged | adopted the merged PR | GitHub refused the create (`422 No commits between main and …`) |
+    | create never reached GitHub; 2 closed PRs | adopted the newest, recorded the create as succeeded | `CreateOutcomeUnknown`, adopted nothing |
+    | own create landed; 1 closed PR besides | adopted its own open PR | adopted its own open PR |
+
+    After adopting a closed pull request, the controller sent `PATCH` requests to it.
+    GitHub refused every one (`422`: the base of a closed pull request cannot change), so
+    no pull request was edited, but the CR's request did include them.
+  - **The cost:** a CR that loses `status.number` after its pull request was merged can
+    no longer find it. It tries to open a new one, and GitHub refuses a pull request whose
+    head has no commits beyond base. The CR stays at `Ready=False` with `422` in its
+    `Synced` message and retries the create: 16 times in the first 4 minutes in the
+    measurement, then about once every 3 minutes. Nothing is created. If the branch has
+    gained commits since the merge, a new pull request does open, for those commits.
+    Delete such a CR, or keep its status (an in-place upgrade does).
 - **`Issue` has no delete verb**, because GitHub's REST API cannot delete an issue.
   Deleting the CR only stops Krateo tracking it, and like `PullRequest` it cannot be
   closed from its spec: `state` is update-body-only, so it is not a spec field. Close the

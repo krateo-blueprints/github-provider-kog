@@ -125,9 +125,10 @@ spec:
           # oasgen-provider#789 makes findby refuse when more than one item matches. With state=all
           # that refusal would leave such a CR stuck and undeletable; with state=open it cannot fire.
           #
-          # THE COST: a CR that loses status.number AFTER its PR merged or closed (status wiped, the CR
-          # recreated from a manifest) can no longer find that PR. It tries a create instead, and
-          # GitHub refuses a PR whose head has no commits beyond base (422). docs/usage.md says so.
+          # THE COST: a CR that loses status.number AFTER its PR merged (status wiped, the CR recreated
+          # from a manifest) can no longer find that PR. It tries a create instead. Measured on 0.80.0:
+          # GitHub refused it (422 "No commits between main and <head>"), nothing was created, and the
+          # create was retried (16 POSTs in 4 minutes, then every resync). docs/usage.md says so.
           - name: state
             value: open
         # Walk EVERY page. per_page is no longer a static query — the pageNumber paginator sets both
