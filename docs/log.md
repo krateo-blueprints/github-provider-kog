@@ -11,6 +11,18 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-17 — oasgen-provider 0.80.0: #758 behaviour measured, same as 0.78.0
+
+The `PullRequest` #758 run from 0.77.0 and 0.78.0 was repeated unchanged on 0.80.0. A create
+against a repository that did not exist yet answered `404` and stayed pending (2 POSTs). Once
+the repository and head branches existed with no pull request, both CRs reached
+`CreateOutcomeUnknown` 12 s later, as on 0.78.0. Over a 6-minute hold, POSTs stayed at 2 and
+GitHub showed 0 pull requests. A pull request opened by hand brought its CR to Ready, with
+`status.number` set, after 93 s (94 s on 0.78.0). Removing `external-create-pending` from the
+other CR, after checking it had no pull request, produced one POST and one pull request. This
+run does not exercise 0.80.0's retry-budget fix (oasgen-provider#769), because no retry backoff
+is in flight in it.
+
 ## 2026-11-17 — chore: the oasgen-provider requirement is declared, so the installer enforces it
 
 Until now the requirement (≥ 0.76.0, except 0.77.0) was prose only: in the README, the docs and
@@ -25,8 +37,9 @@ versions that carry it: a pin of 0.14.0 or earlier is not checked, and neither i
 description and the README disagree. Negative controls: raising only the annotation, or deleting
 it, both fail.
 
-0.77.0 is also being retracted by oasgen-provider itself (oasgen-provider#784, open), which
-would make the installer refuse it whichever chart is pinned beside it.
+0.77.0 is also retracted by oasgen-provider itself: oasgen-provider#784, merged 2026-11-17, lists
+it in `retracted-versions.yaml` for all three oasgen charts, with `use: 0.78.0`. The installer
+reads that list on every pin, so 0.77.0 is refused whichever chart is pinned beside it.
 
 ## 2026-11-17 — oasgen-provider 0.80.0: renders identically, and our RestDefinitions are admitted
 
