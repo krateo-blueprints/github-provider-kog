@@ -450,7 +450,9 @@ replaces `config` wholesale, the secret survives **only if the CR carries it**. 
   text (see [usage](./usage.md)).
 - **On oasgen-provider 0.74.0 or later, a periodic read warns, but an edit does not.** When
   the controller reads a hook that holds a secret the CR does not set, it emits a `Warning`
-  event `UnmodelledKeysWouldBeRemoved` naming `spec.config: secret`. It sends nothing to
+  event naming `spec.config: secret`. The event's reason is `UnmodelledKeysWouldBeRemoved` on
+  0.74.0 to 0.78.0, and `UnmodelledKeysPresent` from 0.79.0 (renamed per the 0.79.0
+  release notes; the new name was not measured here). It sends nothing to
   GitHub, and it does this once per CR generation. This was measured live on 0.74.0
   (2026-11-16): the warning came on the first read after the secret was set out of band,
   nothing was PATCHed, and the secret survived.
