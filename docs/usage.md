@@ -880,6 +880,16 @@ What happens next depends on how the kind is read:
     versions), recorded it as created and reported `Ready=True`, tracking that pull request.
   - Pending annotation removed on the other CR, after checking there was no pull request:
     the controller sent one create and opened exactly one pull request.
+
+  `Collaborator` was measured the same way on both versions, but only up to the stuck state.
+  Its `login` was the token's own account, so no invitation could reach anyone. The `PUT`
+  against the missing repository failed with `404` and stayed pending. Once the repository
+  existed, the `affiliation=direct` list matched nothing. Over a 6-minute hold neither
+  version sent another `PUT`, and GitHub showed no direct collaborator and no invitation.
+  0.77.0 showed `Creating`; 0.78.0 showed `CreateOutcomeUnknown` within 15 s. Neither
+  recovery step was tried for `Collaborator`. `UserRepository` was not measured: its create
+  (`POST /user/repos`) has no repository in the path to make fail, so the stuck state cannot
+  be produced without a proxy. It takes the same path in the code.
 - **Server-assigned identifier and no `findby`:** until the identifier is on status, the
   question has no answer, so the CR waits indefinitely at `CreateOutcomeUnknown`.
   [configuration](configuration.md) lists those kinds under *Server-assigned identifiers*;
