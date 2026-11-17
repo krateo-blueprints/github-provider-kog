@@ -11,6 +11,32 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-17 — chore: the oasgen-provider requirement is declared, so the installer enforces it
+
+Until now the requirement (≥ 0.76.0, except 0.77.0) was prose only: in the README, the docs and
+`Chart.yaml`'s description. From 0.15.0, `Chart.yaml` also carries
+`krateo.io/requires-oasgen-provider: ">= 0.76.0, != 0.77.0"`. The Krateo installer's floor gate
+(`check-chart-requires-floors.py`, pointed out by the installer session) reads that annotation
+from every pinned chart. It refuses a pin whose oasgen-provider version violates it, and it
+refuses an annotation it cannot parse. The gate's own parser evaluates the constraint as false on
+0.74.0 and 0.77.0, and true on 0.76.0, 0.78.0 and 0.80.0. The annotation applies only to chart
+versions that carry it: a pin of 0.14.0 or earlier is not checked, and neither is a plain
+`helm install`. `hack/assert-drift-invariants.py` now fails CI when the annotation, the
+description and the README disagree. Negative controls: raising only the annotation, or deleting
+it, both fail.
+
+0.77.0 is also being retracted by oasgen-provider itself (oasgen-provider#784, open), which
+would make the installer refuse it whichever chart is pinned beside it.
+
+## 2026-11-17 — oasgen-provider 0.80.0: renders identically, and our RestDefinitions are admitted
+
+0.80.0 renders all 32 CRDs and 32 Configuration CRDs identically to 0.79.0, with the same 5
+warnings and the maxLength control in both. The render does not cover the `RestDefinition` CRD
+our templates must pass, so that was checked separately on kind. Its 0.74.0 → 0.80.0 diff only
+adds lines: an optional `queries` on correlation and an optional `partialFields` on verbs. The
+32 RestDefinitions rendered from main pass a server-side dry run on both versions with empty
+stderr. A RestDefinition with an integer `method` is refused on both.
+
 ## 2026-11-17 — oasgen-provider 0.79.0: renders identically; webhook warning renamed
 
 0.79.0 renders all 32 CRDs and 32 Configuration CRDs identically to 0.78.0, with the same 5

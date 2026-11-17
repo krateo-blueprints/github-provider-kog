@@ -21,5 +21,14 @@ keywords:
   - github
   - blueprint-authoring
 home: https://github.com/krateo-blueprints/github-provider-kog
+# The oasgen-provider requirement, machine-readable. The Krateo installer's floor gate
+# (check-chart-requires-floors.py) reads krateo.io/requires-<COMPONENT> from every pinned chart and
+# refuses a pin whose oasgen-provider version violates it, failing closed on anything it cannot parse.
+# The key names the installer COMPONENT (oasgen-provider), not a chart. Keep it equal to the floor in
+# `description` and the README: hack/assert-drift-invariants.py fails CI when they disagree.
+# >= 0.76.0: below it Issue, RepoDeployment and a draft Release can duplicate on GitHub (#746).
+# != 0.77.0: a create whose outcome is unknown shows Creating forever instead of CreateOutcomeUnknown (#758).
+annotations:
+  krateo.io/requires-oasgen-provider: ">= 0.76.0, != 0.77.0"
 sources:
   - https://github.com/krateo-blueprints/github-provider-kog
