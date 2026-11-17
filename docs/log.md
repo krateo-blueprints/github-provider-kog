@@ -11,6 +11,22 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-17 — docs: #758 also measured on `Collaborator`
+
+The same no-proxy setup as for `PullRequest`, on oasgen-provider 0.77.0 and 0.78.0, with the
+CR's `login` set to the token's own account so that no invitation could reach anyone. The
+`PUT` against a repository that did not exist yet failed with `404` and stayed pending. Once
+the repository existed, the `affiliation=direct` list matched nothing. Over a 6-minute hold:
+- neither version sent another `PUT`, and GitHub showed 0 direct collaborators and 0
+  invitations;
+- 0.77.0 showed `Creating`, with `CreateOutcomePending` events;
+- 0.78.0 showed `CreateOutcomeUnknown` within 15 s, with `CannotInitializeManagedResource`
+  events.
+
+Only the stuck state was measured. The recovery steps would need a second organization
+member's account. `UserRepository` stays unmeasured: `POST /user/repos` has no repository in
+its path to make fail, so the stuck state cannot be produced without a proxy.
+
 ## 2026-11-17 — oasgen-provider 0.77.0 excluded; #758 measured on `PullRequest`, fixed in 0.78.0
 
 The requirement is now oasgen-provider ≥ 0.76.0, except 0.77.0. It is stated, not enforced:
