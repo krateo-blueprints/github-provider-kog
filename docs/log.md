@@ -36,6 +36,8 @@ On both versions:
 The usage guide gives the outcome per version and warns that an event filter keyed on
 `CreateOutcomePending` finds nothing outside 0.77.0. 0.78.0 renders all 32 CRDs and 32
 Configuration CRDs identically to 0.77.0: no new warnings, and the maxLength control holds.
+That does not argue against the exclusion: #758 is controller behaviour, not schema, and both
+tags build against the same plumbing (v1.60.0), so identical renders were expected.
 
 ## 2026-11-16 — docs: findby kinds do not re-create on their own after an unknown create; 0.77.0 hides them
 
