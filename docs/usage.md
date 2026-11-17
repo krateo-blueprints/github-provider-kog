@@ -91,6 +91,12 @@ on which one. The endpoint per kind is in [configuration](./configuration.md). E
 token that drives the repository-scoped kinds perfectly to `403` on the org-scoped ones
 until it is widened.
 
+`PullRequest` needs two repository permissions on a fine-grained token: **Pull requests:
+read & write** and **Contents: read**. Without Contents, GitHub refuses the create with
+`422` "not all refs are readable", because it must read the head and base branches. This
+was seen on 2026-11-17 by another Krateo provider session (keycloak-provider-kog), running
+this chart's `PullRequest` kind with a token scoped to a single repository.
+
 Then one Configuration per kind. They may all share a name — the kind is implied by the
 resource that references it — which is why `chart/samples/configurations.yaml` ships 31
 of the 32 under the same `github-blueprints-config` — all but `UserRepository`, whose
