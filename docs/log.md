@@ -11,6 +11,19 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-17 — oasgen-provider 0.79.0: renders identically; webhook warning renamed
+
+0.79.0 renders all 32 CRDs and 32 Configuration CRDs identically to 0.78.0, with the same 5
+warnings and the maxLength control in both. Its crdgen (plumbing v1.93.0) now keeps a `not`
+over `required` or `min/maxProperties` that older versions dropped with a `ConstraintDropped`
+warning, which can make a CRD stricter. None of the 5 warnings in this chart is that one, so
+nothing tightens here. The same holds for local builds of that dependency bump, rendered
+before the release (oasgen-provider#767).
+
+0.79.0 also renames the webhook-secret warning event from `UnmodelledKeysWouldBeRemoved` to
+`UnmodelledKeysPresent`. The configuration guide now gives the reason per version. That is
+taken from the release notes, not measured.
+
 ## 2026-11-17 — docs: a fine-grained token for `PullRequest` needs Contents: read
 
 The usage guide listed `PullRequest` under the repository-write kinds and left the
