@@ -546,7 +546,7 @@ declares:
 
 - `identifiers: [head, base]`, `identifiersMatchPolicy: AND` — a PR is identified by the branches it
   joins, both always present in spec, so a findby locates it from spec alone.
-- a `findby` verb (`GET /repos/{owner}/{repo}/pulls`, `state=all`, `pageNumber` pagination walking every page, [run past page 1 on a cluster](./log.md)) carrying the same
+- a `findby` verb (`GET /repos/{owner}/{repo}/pulls`, `state=open` since chart 0.15.0 — it was `state=all`, which adopted closed or merged pull requests on a reused head/base ([usage](./usage.md)) — `pageNumber` pagination walking every page, [run past page 1 on a cluster](./log.md)) carrying the same
   `head`/`base` object→string `responseTransform` as `get`; applied per item before matching, it
   makes the compare string-vs-string and selects the right PR.
 - that same `responseTransform` **on create, get, update AND findby** — status is written from all

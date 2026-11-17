@@ -121,6 +121,51 @@ COMPARESCOPE_INVARIANTS = [
 ]
 
 
+# (template, kind, query parameter, required value, why it is load-bearing)
+#
+# A findby must match AT MOST ONE item: the item it matches is adopted as this CR's resource, and its
+# identifiers then address every update. These static queries are what keep the listed set to one
+# candidate per identity. Checked by text, not YAML: these are Helm templates.
+FINDBY_QUERY_INVARIANTS = [
+    (
+        "chart/templates/rd-pullrequest.yaml",
+        "PullRequest",
+        "state",
+        "open",
+        "GitHub allows one OPEN pull request per head/base, but any number of closed or merged ones. "
+        "With state=all a fresh CR on a reused head/base adopted an old closed or merged PR and never "
+        "opened its own, and a create that never landed was recorded as succeeded (measured on "
+        "oasgen-provider 0.80.0, 2026-11-17)",
+    ),
+    (
+        "chart/templates/rd-userrepository.yaml",
+        "UserRepository",
+        "affiliation",
+        "owner",
+        "a repository name is unique only within its owner; /user/repos without affiliation=owner also "
+        "lists repositories the token can reach as a collaborator or org member, where the same name "
+        "can appear under several owners",
+    ),
+]
+
+
+def findby_query_value(path, name):
+    """The value of static query `name` in the template's findby verb, or None if absent."""
+    with open(path) as fh:
+        lines = [ln.split("#", 1)[0].rstrip() for ln in fh]
+    start = next((i for i, ln in enumerate(lines) if ln.strip() == "- action: findby"), None)
+    if start is None:
+        return None
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].strip().startswith("- action: ")),
+               len(lines))
+    for i in range(start, end):
+        if lines[i].strip() == "- name: %s" % name:
+            for j in range(i + 1, min(i + 3, end)):
+                if lines[j].strip().startswith("value:"):
+                    return lines[j].split(":", 1)[1].strip().strip('"\'')
+    return None
+
+
 # (template, kind, field, why it is load-bearing)
 #
 # oasgen takes the spec BODY from create but merges PARAMETERS from every verb, so a findby query
@@ -266,6 +311,13 @@ def main(root="."):
                 "%s: %s must declare exactly `compareScope: %s`, found %s.\n    %s\n"
                 "    Note the default IS fullSpec, so DELETING the line breaks this too."
                 % (template, kind, required, found or "none", why))
+
+    for template, kind, query, required, why in FINDBY_QUERY_INVARIANTS:
+        found = findby_query_value("%s/%s" % (root, template), query)
+        if found != required:
+            failures.append(
+                "%s: %s findby must send the static query `%s=%s`, found %s.\n    %s"
+                % (template, kind, query, required, found if found is not None else "none", why))
 
     if failures:
         print("drift-invariant check FAILED:\n")

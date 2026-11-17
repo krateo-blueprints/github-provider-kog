@@ -11,6 +11,32 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-17 — fix: `PullRequest` finds only open pull requests (state=open)
+
+`PullRequest`'s findby listed every pull request (`state=all`) and matched `head` and
+`base`. GitHub allows one open pull request per pair but any number of closed or merged
+ones, so on a pair with history the list matched more than one, and the controller took
+the first, which is the newest. Measured on kind with oasgen-provider 0.80.0, twice with the
+old listing and once with the new one, on one repository with hand-made history:
+
+- with `state=all`, a new CR adopted a closed pull request and opened nothing; a new CR
+  adopted a merged one; a CR whose create never reached GitHub had its existence check
+  satisfied by the newest closed pull request and was recorded as created. The controller
+  then sent `PATCH` requests to the adopted closed pull requests. GitHub refused all of
+  them (`422`), and that refusal is the only thing that kept them unedited.
+- with `state=open`, the new CR opened its own pull request; the CR on the merged pair
+  was refused by GitHub (`422 No commits between main and kog-d`) and created nothing,
+  retrying the create 16 times in 4 minutes and then every resync; the CR whose create
+  never landed stopped at `CreateOutcomeUnknown`; a CR whose own create landed still
+  found it. Token never in the logs; clusters and repositories deleted.
+
+Diego chose `state=open`. The cost is that a CR whose `status.number` is lost after its
+pull request merged cannot find it again (see the usage guide). oasgen-provider#789, still a
+draft, would make findby refuse when more than one item matches; with `state=all` that would
+have left such CRs stuck, and with `state=open` it cannot fire. `hack/assert-drift-invariants.py`
+now fails CI if the PullRequest findby stops sending `state=open`, or the UserRepository one
+stops sending `affiliation=owner`.
+
 ## 2026-11-17 — oasgen-provider 0.80.0: #758 behaviour measured, same as 0.78.0
 
 The `PullRequest` #758 run from 0.77.0 and 0.78.0 was repeated unchanged on 0.80.0. A create
