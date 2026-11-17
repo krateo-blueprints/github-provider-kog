@@ -108,10 +108,28 @@ spec:
         path: /repos/{owner}/{repo}/pulls
         identifiersMatchPolicy: AND
         queries:
-          # state=all so a merged/closed PR is still found (group B is reported precisely because the
-          # PR's state changed after creation).
+          # state=open, NOT all. GitHub allows at most ONE open PR per head/base, so an open-only list
+          # matches at most one item, and that item is this CR's PR (or the PR a group-B create was
+          # answered "already exists" for).
+          #
+          # state=all also lists closed and merged PRs on the same head/base, and those are common: a
+          # branch re-published, or work reopened after a close. Measured on oasgen-provider 0.80.0
+          # (2026-11-17, kind, no proxy, see docs/log.md):
+          #   - a FRESH CR for a pair with one closed PR adopted it (Ready, the old number, 0 POSTs),
+          #     so the PR it was written for was never opened;
+          #   - a CR whose create never reached GitHub had its existence check satisfied by the newest
+          #     closed PR, and it recorded the create as succeeded;
+          #   - the controller then PATCHed the adopted closed PRs. GitHub refused every PATCH (422,
+          #     the base of a closed PR cannot change), and that refusal is the only thing that kept a
+          #     PR this CR does not own from being edited.
+          # oasgen-provider#789 makes findby refuse when more than one item matches. With state=all
+          # that refusal would leave such a CR stuck and undeletable; with state=open it cannot fire.
+          #
+          # THE COST: a CR that loses status.number AFTER its PR merged or closed (status wiped, the CR
+          # recreated from a manifest) can no longer find that PR. It tries a create instead, and
+          # GitHub refuses a PR whose head has no commits beyond base (422). docs/usage.md says so.
           - name: state
-            value: all
+            value: open
         # Walk EVERY page. per_page is no longer a static query — the pageNumber paginator sets both
         # per_page (sizePath) and page (pagePath) on the URL, so a repo with more than 100 PRs is
         # observed in full. This closes the >100-PR wedge: a PR sitting on page 2 used to read as
@@ -134,7 +152,7 @@ spec:
         # added: the paginator sets both on the URL directly. That matters, because oasgen merges
         # the parameters of EVERY verb into the spec, findby included: a declared list query would
         # become a user-settable spec field unless excluded (Collaborator and UserRepository exclude
-        # theirs). `state=all` is a static `queries` entry, not an OAS parameter, so it never reaches
+        # theirs). `state=open` is a static `queries` entry, not an OAS parameter, so it never reaches
         # the spec either; and excludedSpecFields (oasgen-immutable, [pull_number]) stays unchanged.
         pagination:
           type: pageNumber
