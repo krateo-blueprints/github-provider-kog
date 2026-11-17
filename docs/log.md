@@ -16,8 +16,10 @@ Curated history; release notes live in GitHub Releases.
 The usage guide listed `PullRequest` under the repository-write kinds and left the
 fine-grained permission to GitHub's reference. keycloak-provider-kog ran this chart's
 `PullRequest` kind with a single-repository fine-grained token. With only Pull requests:
-read & write, GitHub refused the create with `422` "not all refs are readable". Adding
-Contents: read fixed it. The guide now states both permissions.
+read & write, reads succeeded but GitHub refused the create with `422` "not all refs are
+readable". The controller retried it on every resync (oasgen-provider#768). Adding Contents:
+read to the same token fixed it. The guide now states both permissions and how the failure
+shows.
 
 ## 2026-11-17 — docs: #758 also measured on `Collaborator`
 

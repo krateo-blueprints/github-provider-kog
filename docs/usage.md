@@ -92,10 +92,16 @@ token that drives the repository-scoped kinds perfectly to `403` on the org-scop
 until it is widened.
 
 `PullRequest` needs two repository permissions on a fine-grained token: **Pull requests:
-read & write** and **Contents: read**. Without Contents, GitHub refuses the create with
-`422` "not all refs are readable", because it must read the head and base branches. This
-was seen on 2026-11-17 by another Krateo provider session (keycloak-provider-kog), running
-this chart's `PullRequest` kind with a token scoped to a single repository.
+read & write** and **Contents: read**. Without Contents, reading pull requests still
+works, so a CR whose pull request already exists observes normally. Only the create fails:
+GitHub refuses it with `422` "not all refs are readable", because it must read the head and
+base branches. A refusal is permanent, but the controller keeps retrying it on every resync
+([krateo-platformops/oasgen-provider#768](https://github.com/krateo-platformops/oasgen-provider/issues/768)),
+so a token missing Contents shows up as a steady stream of `422` responses rather than one
+failure. Fine-grained permissions can be edited in place, so adding Contents: read fixes
+it without changing the Secret. This was seen on 2026-11-17 by another Krateo provider
+session (keycloak-provider-kog), running this chart's `PullRequest` kind with a token
+scoped to a single repository.
 
 Then one Configuration per kind. They may all share a name — the kind is implied by the
 resource that references it — which is why `chart/samples/configurations.yaml` ships 31
