@@ -41,6 +41,7 @@ fields out of its PATCH body, same load-bearing `compareScope: updatable`.
 
 Exit 1 if any invariant is broken.
 """
+import re
 import sys
 
 import yaml
@@ -173,8 +174,51 @@ def body_properties(asset, doc, path, method):
     return set((schema.get("properties") or {}).keys())
 
 
-def main(root="."):
+# The oasgen-provider requirement is stated in prose (Chart.yaml description, README) and declared as
+# krateo.io/requires-oasgen-provider, which the Krateo installer's floor gate enforces on a pin. Only the
+# annotation is a control, so a floor raised in the prose alone would read as enforced and not be. Keep
+# the three equal: the annotation must be ">= F" plus zero or more "!= X", the description must say
+# "oasgen-provider >= F" and "not X", and the README must say "≥ F, except X".
+OASGEN_ANNOTATION = "krateo.io/requires-oasgen-provider"
+
+
+def oasgen_floor_failures(root):
+    with open("%s/chart/Chart.yaml" % root) as fh:
+        meta = yaml.safe_load(fh)
+    raw = str((meta.get("annotations") or {}).get(OASGEN_ANNOTATION, "")).strip()
+    if not raw:
+        return ["chart/Chart.yaml: no `%s` annotation. It is the only thing the installer's floor "
+                "gate reads; without it the oasgen-provider floor is prose." % OASGEN_ANNOTATION]
+    floors, excluded, bad = [], [], []
+    for term in [t.strip() for t in raw.split(",") if t.strip()]:
+        m = re.match(r"^(>=|!=)\s*(\d+\.\d+\.\d+)$", term)
+        if not m:
+            bad.append(term)
+        elif m.group(1) == ">=":
+            floors.append(m.group(2))
+        else:
+            excluded.append(m.group(2))
+    if bad or len(floors) != 1:
+        return ["chart/Chart.yaml: `%s: %r` must be exactly one `>= X.Y.Z` plus optional "
+                "`!= X.Y.Z` terms (unparsed: %s)." % (OASGEN_ANNOTATION, raw, bad or "none")]
+    floor = floors[0]
     failures = []
+    desc = " ".join(str(meta.get("description", "")).split())
+    want_desc = "oasgen-provider >= %s" % floor + "".join(", not %s" % x for x in excluded)
+    if want_desc not in desc:
+        failures.append("chart/Chart.yaml: description does not state %r, which is what `%s: %r` "
+                        "enforces." % (want_desc, OASGEN_ANNOTATION, raw))
+    with open("%s/README.md" % root) as fh:
+        readme = " ".join(fh.read().split())
+    want_readme = "**\u2265 %s" % floor + "".join(", except %s" % x for x in excluded) + "**"
+    if want_readme not in readme:
+        failures.append("README.md: does not state %r, which is what `%s: %r` enforces."
+                        % (want_readme, OASGEN_ANNOTATION, raw))
+    return failures
+
+
+def main(root="."):
+    failures = oasgen_floor_failures(root)
 
     for asset, upd_path, upd_method, create_path, fields in ASSET_INVARIANTS:
         with open("%s/%s" % (root, asset)) as fh:
