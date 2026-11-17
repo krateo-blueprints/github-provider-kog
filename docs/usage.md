@@ -11,11 +11,11 @@ timestamp: 2026-09-09T00:00:00Z
 
 ## Prerequisite
 
-A Krateo cluster with `oasgen-provider` **≥ 0.76.0** running (it provides
+A Krateo cluster with `oasgen-provider` **≥ 0.76.0, except 0.77.0,** running (it provides
 `restdefinitions.ogen.krateo.io` and generates the CRDs + a controller per kind).
 
 0.9.x carried the four kinds the chart started with, but the floor is now **0.76.0**.
-0.76.0 is where a create whose outcome is unknown stops at `CreateOutcomeUnknown` instead of being sent again ([#746](https://github.com/krateo-platformops/oasgen-provider/issues/746)); below it, `Issue`, `RepoDeployment` and a draft `Release` can leave duplicates on GitHub ([below](#work-tracking--issues-releases-deployments)). The previous floor, 0.61.0, is where oasgen-provider refuses to uninstall a generated CRD whose instances it cannot count when a RestDefinition is removed ([#576](https://github.com/krateo-platformops/oasgen-provider/issues/576)); below it, narrowing `kinds` or uninstalling the chart can cascade-delete live CRs ([below](#keeping-a-repository-when-its-cr-is-deleted)).
+0.76.0 is where a create whose outcome is unknown stops at `CreateOutcomeUnknown` instead of being sent again ([#746](https://github.com/krateo-platformops/oasgen-provider/issues/746)); below it, `Issue`, `RepoDeployment` and a draft `Release` can leave duplicates on GitHub ([below](#work-tracking--issues-releases-deployments)). 0.77.0 is excluded: on it a `PullRequest`, `Collaborator` or `UserRepository` whose create outcome is unknown shows `Creating` forever instead of `CreateOutcomeUnknown`, so nothing prompts anyone to act ([#758](https://github.com/krateo-platformops/oasgen-provider/issues/758), fixed in 0.78.0; [below](#a-cr-stuck-after-an-unknown-create)). The previous floor, 0.61.0, is where oasgen-provider refuses to uninstall a generated CRD whose instances it cannot count when a RestDefinition is removed ([#576](https://github.com/krateo-platformops/oasgen-provider/issues/576)); below it, narrowing `kinds` or uninstalling the chart can cascade-delete live CRs ([below](#keeping-a-repository-when-its-cr-is-deleted)).
 Before that the floor was 0.52.0, which adds `RestDefinition.spec.serverURL`, which `githubBaseUrl` sets for GitHub Enterprise
 (below it the field would be dropped silently and requests would reach api.github.com). Before
 that the floor was 0.38.0, where the `GitRef` pattern admission guard reaches the generated CRD. `GitRef`'s
@@ -854,25 +854,40 @@ What happens next depends on how the kind is read:
   first observe, their identifiers are not on status, so a `get` cannot address them): if
   the list contains the object, the create is recorded as successful. A list in which
   nothing matches is **not** taken as absence, so these kinds never create again on their
-  own. From the source (oasgen-provider `exists.go` and unstructured-runtime `worker.go`):
-  - up to 0.76.0: the CR stops at `CreateOutcomeUnknown` with the message above. Recover
-    it as below.
-  - **0.77.0: the CR shows `Ready=False/Creating`**, and `Synced` says *"a create is
-    pending: its outcome could not be determined on this pass and is checked again"*. It
-    retries forever and asks for no action. If the object was never created, nothing will
-    ever match, so the CR never moves on, and a parent composition counts it as still
-    converging. This is a defect
-    ([krateo-platformops/oasgen-provider#758](https://github.com/krateo-platformops/oasgen-provider/issues/758));
-    the fix (#759) restores `CreateOutcomeUnknown` and is not in a release yet. On 0.77.0,
-    look for these CRs with the second query below and recover them the same way.
+  own. The outcome depends on the oasgen-provider version:
+  - **up to 0.76.0, and from 0.78.0:** the CR stops at `CreateOutcomeUnknown`. The message
+    starts as above and ends *"existence check: findby listed successfully but no item
+    matched the resource's identifiers…"*. The Warning event is
+    `CannotInitializeManagedResource`. Recover it as below.
+  - **0.77.0 only: the CR shows `Ready=False/Creating`**, and `Synced` says *"a create is
+    pending: its outcome could not be determined on this pass and is checked again"*, with a
+    `CreateOutcomePending` Warning event instead. It retries forever and asks for no action.
+    If the object was never created, nothing will ever match, so the CR never moves on, and a
+    parent composition counts it as still converging. This is a defect
+    ([krateo-platformops/oasgen-provider#758](https://github.com/krateo-platformops/oasgen-provider/issues/758)),
+    fixed in 0.78.0 (#759). Do not run these kinds on 0.77.0. On it, find these CRs with the
+    second query below and recover them the same way. An event filter keyed on
+    `CreateOutcomePending` finds nothing on any other version.
+
+  Measured on kind on 2026-11-17 with `PullRequest`, on 0.77.0 and on 0.78.0, without
+  a proxy. Two CRs were created against a repository that did not exist yet, so the create
+  failed with `404` and stayed pending. The repository and both head branches were then
+  created, with no pull request, so the list matched nothing. Over a 6-minute hold, 4
+  minutes past the 2-minute grace, both versions sent no create and opened no pull
+  request. 0.77.0 showed `Creating` throughout. 0.78.0 showed `CreateOutcomeUnknown` within
+  12 s. Recovery was the same on both versions:
+  - Pull request opened by hand for one CR: the CR found it on the next pass (94 s on both
+    versions), recorded it as created and reported `Ready=True`, tracking that pull request.
+  - Pending annotation removed on the other CR, after checking there was no pull request:
+    the controller sent one create and opened exactly one pull request.
 - **Server-assigned identifier and no `findby`:** until the identifier is on status, the
   question has no answer, so the CR waits indefinitely at `CreateOutcomeUnknown`.
   [configuration](configuration.md) lists those kinds under *Server-assigned identifiers*;
   `Issue`, `RepoDeployment` and a draft `Release` are the ones where a second create would
   be a duplicate.
 
-The second query, for 0.77.0. A CR with a create in flight shows this message briefly, so
-look at the ones that keep it across several resyncs:
+The second query, for 0.77.0 only. A CR with a create in flight shows this message briefly,
+so look at the ones that keep it across several resyncs:
 
 ```console
 $ kubectl get $(kubectl api-resources --api-group=github.krateo.io -o name \
