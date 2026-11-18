@@ -16,23 +16,29 @@ every chart is published twice, with the same bytes.
 
 ## What a tag ships
 
-1. **`preflight`** refuses the release before anything is published if the tag is not plain
-   semver, if the tagged commit has no successful `lint.yaml` run, or if
-   `CHARTS_PUBLISH_TOKEN` is not configured. A failure after the GHCR push would leave a
-   version in GHCR and missing from the index.
-2. **`release-oci`** (the canonical org workflow) stamps the `CHART_VERSION` (and
+1. **`preflight`** resolves the version (the tag, or `chart_version` on a manual run) and
+   refuses the release before anything is published if the tagged commit has no successful
+   `lint.yaml` run, or if `CHARTS_PUBLISH_TOKEN` is not configured. A failure after the GHCR
+   push would leave a version in GHCR and missing from the index.
+2. **`release-preflight`** is the organisation's shared check (PUBLISHING.md rule 12). It refuses
+   any version that is not a plain `X.Y.Z` with no `v`, no leading zeros, no pre-release and no
+   build suffix (rule 13). This is the same definition the publisher applies at index time, kept
+   identical by a test in krateo-blueprints/charts, so a version it would refuse never reaches GHCR.
+3. **`release-oci`** (the canonical org workflow) stamps the `CHART_VERSION` (and
    `SOURCE_REF`) placeholders in each `Chart.yaml` with the tag, discovers `chart/` and
    `config-chart/` as first-class charts, packages both, and pushes them to
    `oci://ghcr.io/krateo-blueprints/charts`. A collision guard refuses to push to a bare
    registry root, and a version already published with identical contents is skipped rather
    than re-pushed.
-3. **`collect`** pulls both charts back from GHCR and uploads them as the `charts-dist`
+4. **`collect`** pulls both charts back from GHCR and uploads them as the `charts-dist`
    artifact. Pulling is what guarantees the index gets the bytes GHCR holds: `helm package`
    writes fresh timestamps, and a skipped push means the local archive was never published.
    It asserts the artifact holds exactly the two charts at the tag version.
-4. **`publish-index`** calls the organisation's publisher,
+5. **`publish-index`** calls the organisation's publisher,
    `krateo-blueprints/charts/.github/workflows/publish-chart.yaml`, pinned by full
-   commit SHA (`# 1.4.2`, the same charts version as the `pinned-uses` check) and moved by Dependabot, with `channel: operators`. From 1.4.2 it refuses to index anything but a plain `X.Y.Z` with no leading zeros (PUBLISHING.md rule 13); `preflight` applies the same pattern before the GHCR push. Neither chart ships a CompositionDefinition, so neither is a
+   commit SHA with its charts release in a comment (one charts version for every pin in this
+   repository, `release-preflight` and `pinned-uses` included) and moved by Dependabot, with
+   `channel: operators`. Neither chart ships a CompositionDefinition, so neither is a
    blueprint. The publisher stores the archives, merges the index and succeeds only once
    `https://krateo-blueprints.github.io/charts/operators/index.yaml` lists both and
    `helm pull --repo` installs each anonymously.

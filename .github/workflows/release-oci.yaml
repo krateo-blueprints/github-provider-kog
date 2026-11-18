@@ -41,11 +41,11 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      # The version the index entry will carry, and the one pulled back from GHCR below. It must be plain
-      # semver: a workflow_dispatch from a branch with no chart_version would otherwise resolve to the
-      # branch name, push nothing pullable, and fail only after the push. The pattern is the publisher's
-      # own (PUBLISHING.md rule 13: no leading zeros), so a version publish-index would refuse after the
-      # GHCR push is refused here, before it.
+      # The version the index entry will carry, and the one pulled back from GHCR below: chart_version on a
+      # workflow_dispatch, else the tag. It is not checked here. The shared release-preflight job below checks
+      # it against PUBLISHING.md rule 13 before release-oci pushes anything, with the same definition
+      # publish-chart uses at index time (one pattern, kept identical by a test in krateo-blueprints/charts).
+      # A copy here could drift from it unnoticed.
       - name: Resolve the chart version
         id: version
         env:
@@ -54,10 +54,6 @@ jobs:
         run: |
           set -euo pipefail
           v="${INPUT_VERSION:-$REF_NAME}"
-          if ! [[ "$v" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "::error::chart version '$v' is not plain semver. Run on a release tag, or pass chart_version."
-            exit 1
-          fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "publishing version $v"
 
@@ -103,8 +99,20 @@ jobs:
             exit 1
           fi
 
-  release-oci:
+  # PUBLISHING.md rule 12: the org's release-preflight, before anything is pushed. It refuses a version that
+  # is not a plain X.Y.Z (rule 13: no `v`, no leading zeros, no -pre, no +build), which publish-chart would
+  # otherwise refuse only after GHCR holds it. It then runs hack/release-preflight if present; this repo has
+  # none, so that half passes and says so.
+  release-preflight:
     needs: preflight
+    uses: krateo-blueprints/charts/.github/workflows/release-preflight.yaml@70095ab05f1c5dc6c8dd39d0b1fdbbc7382a841c # 1.4.3
+    permissions:
+      contents: read
+    with:
+      version: ${{ needs.preflight.outputs.version }}
+
+  release-oci:
+    needs: [preflight, release-preflight]
     uses: krateo-platformops/.github/.github/workflows/release-oci.yaml@e1d3e99215e80ae56eca4a67e9e061b2c73168b8 # 1.0.0
     permissions:
       contents: read
@@ -166,17 +174,15 @@ jobs:
   # The org's one publisher, pinned by FULL COMMIT SHA with its version in a comment (PUBLISHING.md rule 9):
   # it receives CHARTS_PUBLISH_TOKEN, an org-wide write token, so a movable ref (a branch, or a tag like
   # `1`) would let whoever moves it run code with that token here. Dependabot (.github/dependabot.yml)
-  # moves the pin, as a reviewed PR. ae5e1997 is the commit refs/tags/1.0.3 peels to (tag object b4242d7e,
-  # checked 2026-11-09); the pin names the commit, never the tag object. 1.0.3 keeps everything 1.0.1 did
-  # (git auth through gh's credential helper, which fixed the 0.7.6 index publish; refusing a token with
-  # whitespace at its first step) and adds: 1.0.2 merges and pushes the index from a fresh clone and retries
-  # when another repository published at the same moment; 1.0.3 compares repository names
-  # case-insensitively. It refuses a wrong channel, another repository's name or an already-stored version
-  # before writing anything, and succeeds only once the served index lists both charts and `helm pull
-  # --repo` installs each anonymously (rule 8).
+  # moves the pin, as a reviewed PR. The pin names the commit a release tag peels to, never the tag object;
+  # the tags are annotated (and can be nested), so resolve one with
+  #   gh api repos/krateo-blueprints/charts/commits/<tag> -q .sha
+  # It refuses a wrong channel, another repository's name, an already-stored version or a version that is
+  # not plain X.Y.Z before writing anything, and succeeds only once the served index lists both charts and
+  # `helm pull --repo` installs each anonymously (rule 8).
   publish-index:
     needs: [preflight, collect]
-    uses: krateo-blueprints/charts/.github/workflows/publish-chart.yaml@aea92de356085f50ea45477a4e6ae2b026cd6b14 # 1.4.2
+    uses: krateo-blueprints/charts/.github/workflows/publish-chart.yaml@70095ab05f1c5dc6c8dd39d0b1fdbbc7382a841c # 1.4.3
     with:
       source_repo: ${{ github.repository }}
       git_tag: ${{ needs.preflight.outputs.version }}
