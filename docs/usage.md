@@ -892,7 +892,8 @@ repository that did not exist yet, held for 4 minutes; then the repository was c
 
 On 0.84.0 each series is one `POST` and 5 retries, backing off 1, 2, 4, 8 and 16 s, so it
 ends about 30 s after it starts. The next series starts on the controller's next resync,
-`REST_CONTROLLER_RESYNC_INTERVAL`, which defaults to 3 minutes and was not set in this test.
+`REST_CONTROLLER_RESYNC_INTERVAL`: 3 minutes by default, and the controller's startup line
+read `resyncInterval` 3m with `maxErrorRetry` 5 and a 1 s minimum retry interval.
 The series started 114 s and then 180.0 s apart. The first gap is shorter because the first
 series started when the CRs were applied, not on a resync. So a CR whose repository never
 appears sends 6 `POST`s every resync, indefinitely. `409` and 5xx stay out on every version: a `409` can mean the object already exists, and
