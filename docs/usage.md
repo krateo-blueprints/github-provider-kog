@@ -869,9 +869,20 @@ cannot determine creation result - remove the krateo.io/external-create-pending 
 ```
 
 On oasgen-provider 0.76.0 or later this is how a create whose outcome is unknown ends: a
-5xx, a timeout, a dropped connection, a success the controller could not process, or any
-refusal other than `400`/`422`. A `404` counts, so a create against a repository that does
-not exist yet stops here even though GitHub created nothing. Before 0.76.0 such a create was
+5xx, a timeout, a dropped connection, a success the controller could not process, or a
+refusal the controller does not read as "nothing was created". Which refusals it reads that
+way depends on the version:
+
+| oasgen-provider | a create refused with this is recorded as failed and sent again later | anything else stops here |
+|---|---|---|
+| 0.76.0 – 0.81.x | `400`, `422` | including `401` and `404` |
+| 0.82.0 – 0.83.x | `400`, `401`, `422` (oasgen-provider#793) | including `404` |
+| 0.84.0 and later | `400`, `401`, `404`, `422` (oasgen-provider#825) | `409`, 5xx, timeouts |
+
+So before 0.84.0 a create against a repository that does not exist yet stops here even
+though GitHub created nothing, and from 0.84.0 it is retried until the repository exists.
+`409` and 5xx stay out on every version: a `409` can mean the object already exists, and
+after a 5xx GitHub may have created it and lost the answer. Before 0.76.0 such a create was
 sent again instead (see the fourth duplicate-create route under
 [Work tracking](#work-tracking--issues-releases-deployments)), and this state was reached
 only through a rare race: azuredevops-provider-kog saw it in 1 of 15 forced races on 0.71.0.
@@ -912,7 +923,8 @@ What happens next depends on how the kind is read:
 
   Measured on kind on 2026-11-17 with `PullRequest`, on 0.77.0 and on 0.78.0, without
   a proxy. Two CRs were created against a repository that did not exist yet, so the create
-  failed with `404` and stayed pending. The repository and both head branches were then
+  failed with `404` and stayed pending. (From 0.84.0 a `404` create is retried instead, so
+  this way of reaching the state no longer works; a lost answer still reaches it.) The repository and both head branches were then
   created, with no pull request, so the list matched nothing. Over a 6-minute hold, 4
   minutes past the 2-minute grace, both versions sent no create and opened no pull
   request. 0.77.0 showed `Creating` throughout. 0.78.0 showed `CreateOutcomeUnknown` within
@@ -973,7 +985,7 @@ on GitHub an issue matching each CR:
   stuck: the object exists at that point, so the controller would create a second one.
 
   The GitHub measurement reached this state through a `404`, which stands in for a lost
-  answer. Another oasgen-generated provider (azuredevops-provider-kog) measured the real
+  answer (on 0.84.0 and later a `404` no longer leads here). Another oasgen-generated provider (azuredevops-provider-kog) measured the real
   thing on 0.76.0: its create landed on the vendor, but the controller timed out before the
   answer arrived. The CR stopped at `CreateOutcomeUnknown` with only the pending annotation.
   Writing the identifier the same way, leaving the annotations alone, brought it to
