@@ -103,7 +103,7 @@ jobs:
 
   release-oci:
     needs: preflight
-    uses: krateo-platformops/.github/.github/workflows/release-oci.yaml@e1d3e99215e80ae56eca4a67e9e061b2c73168b8 # main 2026-11-18
+    uses: krateo-platformops/.github/.github/workflows/release-oci.yaml@e1d3e99215e80ae56eca4a67e9e061b2c73168b8 # 1.0.0
     permissions:
       contents: read
       packages: write

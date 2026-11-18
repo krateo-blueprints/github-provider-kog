@@ -12,10 +12,10 @@ jobs:
   pinned-uses:
     permissions:
       contents: read
-    uses: krateo-blueprints/charts/.github/workflows/pinned-uses.yaml@ae27682c30cf6a005e03e77bc18a3f9a194db6ed # 1.4.0
+    uses: krateo-blueprints/charts/.github/workflows/pinned-uses.yaml@aea92de356085f50ea45477a4e6ae2b026cd6b14 # 1.4.2
 
   lint-docs:
-    uses: krateo-platformops/.github/.github/workflows/lint-docs.yaml@e1d3e99215e80ae56eca4a67e9e061b2c73168b8 # main 2026-11-18
+    uses: krateo-platformops/.github/.github/workflows/lint-docs.yaml@e1d3e99215e80ae56eca4a67e9e061b2c73168b8 # 1.0.0
 
   # Two fixes in this chart are ABSENCES — a field removed from an update body so drift can no
   # longer act on it (0.2.2 `name`, 0.3.1 `private`/`visibility`). Nothing in the generated CRD
