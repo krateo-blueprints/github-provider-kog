@@ -24,6 +24,12 @@ whole path: none of the internal calls is left at `@main`, and the next level do
 third-party actions, which are out of scope for the pinning rule. The `pinned-uses` check moves
 from 1.2.0 to 1.4.0.
 
+The same day the pins moved again, to `e1d3e99` (krateo-platformops/.github#64). `chart-push`
+at `0144434` put the registry password (`curl -u`) and then the registry's bearer token
+(`-H "Authorization: Bearer …"`) on curl's command line, where other processes in the job can
+read them. At `e1d3e99` both go to curl on stdin (`curl -K -`). The password is sent only to a
+token realm on the registry's own host.
+
 ## 2026-11-17 — fix: `PullRequest` finds only open pull requests (state=open)
 
 `PullRequest`'s findby listed every pull request (`state=all`) and matched `head` and
