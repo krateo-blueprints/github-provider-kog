@@ -890,9 +890,12 @@ repository that did not exist yet, held for 4 minutes; then the repository was c
 | while the repository is missing | `CreateOutcomeUnknown` within 5 s, 1 `POST` per CR, then none | `Ready=False/Creating`, `external-create-failed` stamped each time; 12 `POST`s per CR in 4 minutes |
 | after the repository is created | still stuck after 12 minutes, 0 issues | both `Ready=True` about 1 minute later, exactly 1 issue per title |
 
-The 0.84.0 retries back off (about 1, 2, 4, 8 and 16 s apart) and the series starts again
-about every 2 minutes, so a CR whose repository never appears keeps sending a `POST` every
-few seconds to every couple of minutes. `409` and 5xx stay out on every version: a `409` can mean the object already exists, and
+On 0.84.0 each series is one `POST` and 5 retries, backing off 1, 2, 4, 8 and 16 s, so it
+ends about 30 s after it starts. The next series starts on the controller's next resync,
+`REST_CONTROLLER_RESYNC_INTERVAL`, which defaults to 3 minutes and was not set in this test.
+The series started 114 s and then 180.0 s apart. The first gap is shorter because the first
+series started when the CRs were applied, not on a resync. So a CR whose repository never
+appears sends 6 `POST`s every resync, indefinitely. `409` and 5xx stay out on every version: a `409` can mean the object already exists, and
 after a 5xx GitHub may have created it and lost the answer. Before 0.76.0 such a create was
 sent again instead (see the fourth duplicate-create route under
 [Work tracking](#work-tracking--issues-releases-deployments)), and this state was reached
