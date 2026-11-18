@@ -11,6 +11,28 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-18 — oasgen-provider 0.84.0 checked against this chart
+
+Main at `e74d2a1` was checked against oasgen-provider 0.84.0:
+
+- **Generated CRDs:** byte-identical to 0.83.1. All 32 resource CRDs and 32 Configuration CRDs
+  match, the same 5 known warnings appear on both versions, and the positive control
+  (`maxLength: 7` injected into `Label`) shows on both.
+- **Admission:** all 32 RestDefinitions pass a server-side dry run against the 0.84.0
+  `oasgen-provider-crds` chart, and the negative control (an integer `method`) is refused.
+- **`configurationFields` changes** (#512, #828, #837) cannot reach this chart: every one of its
+  32 RestDefinitions has `configurationFields: []`.
+- **Required parameters with a GitHub default:** 0.84.0 now sends such a default itself
+  (#835). Among the parameters and body fields of the operations this chart uses, only
+  `OrgWebhook`'s `name: web` has one, and this chart's CRD already defaults that field, so the
+  request does not change.
+- **A create refused with `404`** is now recorded as failed and retried (#825), where before it
+  stopped at `CreateOutcomeUnknown`. Measured on kind with `Issue`, 0.84.0 against 0.83.1 as
+  the control. On 0.84.0 the CRs were retried and reached `Ready=True` with exactly 1 issue each
+  once the repository existed; on 0.83.1 they were stranded with 0 issues.
+  [Usage](usage.md#a-cr-stuck-after-an-unknown-create) has the per-version table and the
+  measurement.
+
 ## 2026-11-18 — ci: the shared release path is pinned end to end
 
 Since 2026-11-17 the four shared workflows from `krateo-platformops/.github`
