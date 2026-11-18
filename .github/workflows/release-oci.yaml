@@ -43,7 +43,9 @@ jobs:
     steps:
       # The version the index entry will carry, and the one pulled back from GHCR below. It must be plain
       # semver: a workflow_dispatch from a branch with no chart_version would otherwise resolve to the
-      # branch name, push nothing pullable, and fail only after the push.
+      # branch name, push nothing pullable, and fail only after the push. The pattern is the publisher's
+      # own (PUBLISHING.md rule 13: no leading zeros), so a version publish-index would refuse after the
+      # GHCR push is refused here, before it.
       - name: Resolve the chart version
         id: version
         env:
@@ -52,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           v="${INPUT_VERSION:-$REF_NAME}"
-          if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if ! [[ "$v" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
             echo "::error::chart version '$v' is not plain semver. Run on a release tag, or pass chart_version."
             exit 1
           fi
@@ -174,7 +176,7 @@ jobs:
   # --repo` installs each anonymously (rule 8).
   publish-index:
     needs: [preflight, collect]
-    uses: krateo-blueprints/charts/.github/workflows/publish-chart.yaml@1e6210ab2a8b66ff1a8d6da86287e671154f44a2 # 1.0.4
+    uses: krateo-blueprints/charts/.github/workflows/publish-chart.yaml@aea92de356085f50ea45477a4e6ae2b026cd6b14 # 1.4.2
     with:
       source_repo: ${{ github.repository }}
       git_tag: ${{ needs.preflight.outputs.version }}

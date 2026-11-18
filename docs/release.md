@@ -32,7 +32,7 @@ every chart is published twice, with the same bytes.
    It asserts the artifact holds exactly the two charts at the tag version.
 4. **`publish-index`** calls the organisation's publisher,
    `krateo-blueprints/charts/.github/workflows/publish-chart.yaml`, pinned by full
-   commit SHA (`# 1.0.1`) and moved by Dependabot, with `channel: operators`. Neither chart ships a CompositionDefinition, so neither is a
+   commit SHA (`# 1.4.2`, the same charts version as the `pinned-uses` check) and moved by Dependabot, with `channel: operators`. From 1.4.2 it refuses to index anything but a plain `X.Y.Z` with no leading zeros (PUBLISHING.md rule 13); `preflight` applies the same pattern before the GHCR push. Neither chart ships a CompositionDefinition, so neither is a
    blueprint. The publisher stores the archives, merges the index and succeeds only once
    `https://krateo-blueprints.github.io/charts/operators/index.yaml` lists both and
    `helm pull --repo` installs each anonymously.
