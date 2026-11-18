@@ -11,6 +11,19 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-18 — ci: the shared release path is pinned end to end
+
+Since 2026-11-17 the four shared workflows from `krateo-platformops/.github`
+(`release-oci`, `release-notes`, `lint-docs`, `security`) were pinned by commit. Inside them,
+however, `release-oci` still called `chart-images`, `chart-version-guard` and `chart-push` at
+`@main`, and `security` called `release-download` and `go-download` at `@main`. So a change to
+`chart-push` on 2026-11-18 reached this repository's releases with no commit here. Decision:
+the shared workflows pin their own internal calls by commit (krateo-platformops/.github#60,
+#62), and this repository moves to that commit, `0144434`. A caller's pin now freezes the
+whole path: none of the internal calls is left at `@main`, and the next level down calls only
+third-party actions, which are out of scope for the pinning rule. The `pinned-uses` check moves
+from 1.2.0 to 1.4.0.
+
 ## 2026-11-17 — fix: `PullRequest` finds only open pull requests (state=open)
 
 `PullRequest`'s findby listed every pull request (`state=all`) and matched `head` and
