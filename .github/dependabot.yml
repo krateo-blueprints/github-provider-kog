@@ -5,7 +5,7 @@
 #
 # The github-actions ecosystem also covers the actions/* refs in every workflow. The shared
 # krateo-platformops/.github reusables and the krateo-blueprints/charts pinned-uses check are pinned by SHA
-# with their release tag in the trailing comment (`# 1.0.0`, `# 1.4.2`), so Dependabot advances them as
+# with their release tag in the trailing comment (`# X.Y.Z`), so Dependabot advances them as
 # reviewed pull requests too.
 version: 2
 updates:
