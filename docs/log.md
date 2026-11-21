@@ -11,6 +11,24 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-21 — oasgen-provider 0.85.2 checked against this chart
+
+0.85.0 and 0.85.1 are retracted: each broke the Deployment that oasgen-provider generates for
+every controller, so no controller could start. 0.85.2 was checked on main `463353f` at three
+layers:
+
+- **Generated CRDs:** byte-identical to 0.84.0 (32 resource and 32 Configuration CRDs, the same
+  5 known warnings, the `maxLength: 7` positive control present on both).
+- **Admission:** all 32 RestDefinitions pass a server-side dry run against the 0.85.2
+  `oasgen-provider-crds` chart; the negative control is refused.
+- **Install:** oasgen-provider 0.85.2 with the whole chart on kind, no token. All 32
+  RestDefinitions reach `Ready`, and all 32 generated controller Deployments are created and
+  `Available`, on `rest-dynamic-controller:0.85.2`, each with a readiness probe.
+
+The third layer is the only one that would have caught 0.85.0 and 0.85.1: the first two never
+create a generated Deployment. Every oasgen-provider release is checked at all three layers from
+now on.
+
 ## 2026-11-18 — oasgen-provider 0.84.0 checked against this chart
 
 Main at `e74d2a1` was checked against oasgen-provider 0.84.0:
