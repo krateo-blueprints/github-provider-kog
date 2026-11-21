@@ -896,7 +896,11 @@ ends about 30 s after it starts. The next series starts on the controller's next
 read `resyncInterval` 3m with `maxErrorRetry` 5 and a 1 s minimum retry interval.
 The series started 114 s and then 180.0 s apart. The first gap is shorter because the first
 series started when the CRs were applied, not on a resync. So a CR whose repository never
-appears sends 6 `POST`s every resync, indefinitely. `409` and 5xx stay out on every version: a `409` can mean the object already exists, and
+appears sends 6 `POST`s every resync, indefinitely. That was measured on 2026-11-21 with 0.84.0: two
+`Issue` CRs pointed at a repository that never existed, watched for 21 minutes. Each CR made exactly
+6 refused attempts in each of 8 series: the one started when the CRs were applied, and 7 resyncs
+180 s apart. Every series started its backoff again at about 1 s, with no taper. The retry limit
+of 5 counts per queued event, and each resync queues a new one (oasgen-provider#846). `409` and 5xx stay out on every version: a `409` can mean the object already exists, and
 after a 5xx GitHub may have created it and lost the answer. Before 0.76.0 such a create was
 sent again instead (see the fourth duplicate-create route under
 [Work tracking](#work-tracking--issues-releases-deployments)), and this state was reached
