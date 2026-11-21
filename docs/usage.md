@@ -979,6 +979,24 @@ What happens next depends on how the kind is read:
   `Issue`, `RepoDeployment` and a draft `Release` are the ones where a second create would
   be a duplicate.
 
+  From oasgen-provider 0.86.0 each RestDefinition says in advance which group it is in, with
+  an `ExistenceAnswerable` condition. On this chart, installed on kind on 2026-11-21, it is
+  `False` on 15 of the 32 kinds:
+
+  | kind | GET parameter | mapped from | correct? |
+  |---|---|---|---|
+  | `Autolink`, `CodeSecurityConfig`, `DeployKey`, `DeploymentBranchPolicy`, `OrgRuleset`, `OrgWebhook`, `Release`, `RepoDeployment`, `RepoRuleset`, `RepoWebhook`, `RunnerGroup` | the kind's `*_id` | `status.id` | yes: GitHub assigns the id |
+  | `Issue`, `Milestone` | `issue_number` / `milestone_number` | `status.number` | yes: GitHub assigns the number |
+  | `Team` | `team_slug` | `status.slug` | yes: GitHub derives the slug, and it is not a spec field |
+  | `Repository` | `name` | `status.name` | **no, a false positive** |
+
+  `Repository` reads its GET path from `status.name` (the name GitHub actually assigned, see
+  [configuration](configuration.md)), but before the first create that field is absent and
+  the mapping is skipped. The path is then filled from `spec.name`, so the existence check
+  can read the repository. The controller behaves that way on 0.86.0: the condition is wrong
+  and the runtime is not. A fix to the condition is planned in oasgen-provider. The other 14
+  are correct; the remaining 17 kinds show `ExistenceAnswerable=True`.
+
 The second query, for 0.77.0 only. A CR with a create in flight shows this message briefly,
 so look at the ones that keep it across several resyncs:
 

@@ -11,6 +11,20 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-21 — oasgen-provider 0.86.0 checked against this chart
+
+Main at `84610ed` passes all three layers on 0.86.0. Its CRDs are byte-identical to 0.85.2's,
+all 32 RestDefinitions are admitted by the 0.86.0 `oasgen-provider-crds` chart, and a
+token-free install brings all 32 to `Ready` and all 32 generated controllers to `Available`.
+
+0.86.0 adds an `ExistenceAnswerable` condition on every RestDefinition. It is `False` on 15 of
+this chart's 32 kinds; 14 are right and `Repository` is a false positive.
+[Usage](usage.md#a-cr-stuck-after-an-unknown-create) has the table and the reason. The
+controller code at 0.86.0 still checks a `Repository` by its spec name before the first create
+(`builder.go` fills path parameters from the spec, then applies mappings, and skips a mapping
+whose source is absent). Only the condition's rule overlooks this. The lost-response path itself
+was not measured: producing it needs a server error or a timeout from GitHub.
+
 ## 2026-11-21 — oasgen-provider 0.85.2 checked against this chart
 
 0.85.0 and 0.85.1 are retracted: each broke the Deployment that oasgen-provider generates for
