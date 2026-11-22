@@ -11,8 +11,9 @@ type: application
 # release-oci substitutes CHART_VERSION from the pushed semver tag.
 version: CHART_VERSION
 # No provider image is shipped (the git-write kinds are OAS-only; oasgen spawns the
-# rest-dynamic-controller). appVersion tracks the OpenAPI/mapping revision.
-appVersion: "0.1.9"
+# rest-dynamic-controller), so there is no separate app version: appVersion is the chart version,
+# stamped from the same tag (krateo-blueprints/charts REPOSITORY.md R4).
+appVersion: "CHART_VERSION"
 
 keywords:
   - krateo

@@ -12,7 +12,14 @@ jobs:
   pinned-uses:
     permissions:
       contents: read
-    uses: krateo-blueprints/charts/.github/workflows/pinned-uses.yaml@70095ab05f1c5dc6c8dd39d0b1fdbbc7382a841c # 1.4.3
+    uses: krateo-blueprints/charts/.github/workflows/pinned-uses.yaml@c54f614c86e489878ea154d65dacee2ad6aa82a6 # 1.5.1
+
+  # krateo-blueprints/charts REPOSITORY.md: one layout, naming and release standard across the org's
+  # provider and operator repositories. Files only: no network, no token.
+  repository-standard:
+    permissions:
+      contents: read
+    uses: krateo-blueprints/charts/.github/workflows/repository-standard.yaml@c54f614c86e489878ea154d65dacee2ad6aa82a6 # 1.5.1
 
   lint-docs:
     uses: krateo-platformops/.github/.github/workflows/lint-docs.yaml@3ff640fd0dbef64c29b7a63a88b98da7f99e8052 # 1.0.1

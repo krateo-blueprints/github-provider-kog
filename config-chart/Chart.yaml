@@ -9,8 +9,9 @@ type: application
 
 # release-oci substitutes CHART_VERSION from the pushed semver tag.
 version: CHART_VERSION
-# Tracks the github-provider-kog appVersion: these objects follow the auth scheme in its assets.
-appVersion: "0.1.9"
+# The chart version, stamped from the same tag as github-provider-kog's (REPOSITORY.md R4): one tag
+# publishes both charts, so the Configurations always match that release's auth scheme.
+appVersion: "CHART_VERSION"
 
 keywords:
   - krateo
