@@ -11,6 +11,18 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-22 — oasgen-provider 0.89.0 checked against this chart
+
+Main at `671b5b1` passes all three layers on 0.89.0. Its CRDs are byte-identical to 0.88.0's,
+all 32 RestDefinitions are admitted, and a token-free install brings all 32 to `Ready` and all
+32 generated controllers to `Available`. On every RestDefinition the conditions match the
+0.88.0 install exactly.
+
+This run is a regression check only. 0.89.0's one change (oasgen-provider#887) relaxes an
+admission rule for definitions that pair `createApiRef` with an `observeApiRef` carrying
+`notFoundExpr`. None of this chart's 32 definitions uses `createApiRef`, `observeApiRef` or
+`notFoundExpr`.
+
 ## 2026-11-22 — oasgen-provider 0.88.0 checked against this chart
 
 Main at `4ed1302` passes all three layers on 0.88.0. Its CRDs are byte-identical to 0.87.0's,
