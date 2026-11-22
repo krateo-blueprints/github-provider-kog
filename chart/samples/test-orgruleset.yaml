@@ -30,6 +30,7 @@ spec:
     ref_name:
       include:
         - "~DEFAULT_BRANCH"
+      exclude: []   # required by GitHub (422 without it), even when empty
     repository_name:
       include:
         - "~ALL"

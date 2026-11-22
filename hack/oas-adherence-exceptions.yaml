@@ -1184,6 +1184,45 @@ exceptions:
   fields:
   - events
   reason: "GitHub keeps webhook events as a set: measured 2026-11-16, a GET returns them sorted and de-duplicated whatever order was sent (docs/log.md). Without the declaration a list not in GitHub's order is compared positionally and PATCHed again on resync; with it oasgen >= 0.62.0 compares it as a set and the CRD refuses duplicates. chart/assets/orgwebhook.yaml Org hooks are inferred from the same API shape (org-level writes are out of scope)."
+- row: new
+  category: C
+  kind: RepoRuleset
+  method: POST
+  path: /repos/{owner}/{repo}/rulesets
+  deviation: required-added
+  fields:
+  - conditions.ref_name.exclude
+  reason: 'GitHub 422s "Missing required parameter `exclude`" for a ref_name without it (measured live 2026-11-22),
+    though its OpenAPI marks it optional. Required so the CR is refused at apply time rather than retrying the 422
+    on every reconcile. chart/assets/reporuleset.yaml'
+- row: new
+  category: C
+  kind: RepoRuleset
+  method: PUT
+  path: /repos/{owner}/{repo}/rulesets/{ruleset_id}
+  deviation: required-added
+  fields:
+  - conditions.ref_name.exclude
+  reason: As the RepoRuleset POST entry above. chart/assets/reporuleset.yaml
+- row: new
+  category: C
+  kind: OrgRuleset
+  method: POST
+  path: /orgs/{org}/rulesets
+  deviation: required-added
+  fields:
+  - conditions.ref_name.exclude
+  reason: 'As RepoRuleset conditions.ref_name.exclude: the same ref_name object; measured on a repository ruleset,
+    not on this endpoint (no org-level writes). chart/assets/orgruleset.yaml'
+- row: new
+  category: C
+  kind: OrgRuleset
+  method: PUT
+  path: /orgs/{org}/rulesets/{ruleset_id}
+  deviation: required-added
+  fields:
+  - conditions.ref_name.exclude
+  reason: As the OrgRuleset POST entry above. chart/assets/orgruleset.yaml
 defaults:
 - kind: Autolink
   method: POST
