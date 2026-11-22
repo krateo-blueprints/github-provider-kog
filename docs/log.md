@@ -11,6 +11,21 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-22 — oasgen-provider 0.88.0 checked against this chart
+
+Main at `4ed1302` passes all three layers on 0.88.0. Its CRDs are byte-identical to 0.87.0's,
+all 32 RestDefinitions are admitted, and a token-free install brings all 32 to `Ready` and all
+32 generated controllers to `Available`. On every RestDefinition the conditions (type, status,
+reason, message) match the 0.87.0 install exactly.
+
+This run is a regression check only. It does not test 0.88.0's one change, a stricter
+`ExistenceAnswerable` rule (oasgen-provider#883). That rule changes the result only when a
+`get` or `findby` path parameter has the same name as a top-level spec field that is an object
+or an array. The chart has 89 such path parameters: 73 have the name of a string spec field and
+16 match no spec field, so the rule had nothing to act on. A positive control confirmed the
+count: when `Repository`'s `spec.name` was retyped to an object, exactly that parameter was
+flagged.
+
 ## 2026-11-22 — oasgen-provider 0.87.0 checked against this chart
 
 Main at `4d7cf3d` passes all three layers on 0.87.0. Its CRDs are byte-identical to 0.86.0's,
