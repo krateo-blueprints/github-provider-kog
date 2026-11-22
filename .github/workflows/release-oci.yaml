@@ -105,7 +105,7 @@ jobs:
   # none, so that half passes and says so.
   release-preflight:
     needs: preflight
-    uses: krateo-blueprints/charts/.github/workflows/release-preflight.yaml@70095ab05f1c5dc6c8dd39d0b1fdbbc7382a841c # 1.4.3
+    uses: krateo-blueprints/charts/.github/workflows/release-preflight.yaml@c54f614c86e489878ea154d65dacee2ad6aa82a6 # 1.5.1
     permissions:
       contents: read
     with:
@@ -182,7 +182,7 @@ jobs:
   # `helm pull --repo` installs each anonymously (rule 8).
   publish-index:
     needs: [preflight, collect]
-    uses: krateo-blueprints/charts/.github/workflows/publish-chart.yaml@70095ab05f1c5dc6c8dd39d0b1fdbbc7382a841c # 1.4.3
+    uses: krateo-blueprints/charts/.github/workflows/publish-chart.yaml@c54f614c86e489878ea154d65dacee2ad6aa82a6 # 1.5.1
     with:
       source_repo: ${{ github.repository }}
       git_tag: ${{ needs.preflight.outputs.version }}

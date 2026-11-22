@@ -37,7 +37,7 @@ docs/design-pullrequest.md: restoring PullRequest natively (now shipped) — the
 examples/blueprint-authoring/README.md: the runnable example — the one-time token + <Kind>Configuration wiring, then github.krateo.io CRs applied in order against a scratch repo
 README.md: the repo front door — what it is (the 32 kinds grouped by family, what is deliberately not covered, and the git-write kinds with their design docs — RepoContent, PullRequest and GitRef all returned), install, configure, examples, docs, develop & release
 # Source (read at the same tag; the docs above are derived from these):
-chart/Chart.yaml: chart metadata; version is the CHART_VERSION placeholder, appVersion tracks the OpenAPI/mapping revision
+chart/Chart.yaml: chart metadata; version and appVersion are both the CHART_VERSION placeholder, stamped from the release tag
 chart/values.yaml: the values resourceGroup (the group all 32 generated CRDs land under) and kinds (which kinds render; empty means all), with their rationale
 chart/values.schema.json: the typed schema the CDC derives the component CRD from (resourceGroup, and kinds with its 32-name enum)
 chart/templates/configmap-<kind>.yaml: one ConfigMap per kind wrapping chart/assets/<kind>.yaml; all 32 are a plain .Files.Get, copied verbatim — no template action anywhere in the assets
