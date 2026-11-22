@@ -11,6 +11,16 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-22 — oasgen-provider 0.87.0 checked against this chart
+
+Main at `4d7cf3d` passes all three layers on 0.87.0. Its CRDs are byte-identical to 0.86.0's,
+all 32 RestDefinitions are admitted, and a token-free install brings all 32 to `Ready` and all
+32 generated controllers to `Available`.
+
+The `Repository` false positive in `ExistenceAnswerable` is fixed (oasgen-provider#880).
+Before the run the expected result was written down: exactly these 14 kinds `False` and
+`Repository` `True`. The install matched it on every name.
+
 ## 2026-11-21 — oasgen-provider 0.86.0 checked against this chart
 
 Main at `84610ed` passes all three layers on 0.86.0. Its CRDs are byte-identical to 0.85.2's,
