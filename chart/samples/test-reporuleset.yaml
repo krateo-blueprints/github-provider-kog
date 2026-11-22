@@ -34,6 +34,7 @@ spec:
     ref_name:
       include:
         - "~DEFAULT_BRANCH"
+      exclude: []   # required by GitHub (422 without it), even when empty
   rules:
     - type: non_fast_forward
     - type: deletion

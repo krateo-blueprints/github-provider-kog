@@ -192,6 +192,14 @@ components:
       properties:
         ref_name:
           type: object
+          # CONSTRAINT: GitHub refuses a ref_name with `include` but no `exclude` -- 422 "Missing
+          # required parameter `exclude`" -- although its OpenAPI marks `exclude` optional. Measured
+          # live on a REPOSITORY ruleset (2026-11-22); this endpoint takes the same ref_name object but
+          # was not tested (no org-level writes). Required here so the CR is refused at apply time
+          # instead of retrying a 422 on every reconcile. Recorded as a required-added deviation in
+          # hack/oas-adherence-exceptions.yaml. Use `exclude: []` for none.
+          required:
+            - exclude
           properties:
             # `~DEFAULT_BRANCH` and `~ALL` are the two magic values; anything else is an fnmatch
             # pattern over full ref names (refs/heads/...).
@@ -201,6 +209,9 @@ components:
                 type: string
             exclude:
               type: array
+              description: >-
+                Ref names or patterns to exclude. Required by GitHub whenever ref_name is set
+                (a 422 otherwise), although its OpenAPI marks it optional; use [] for none.
               items:
                 type: string
         repository_name:
