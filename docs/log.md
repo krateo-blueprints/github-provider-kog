@@ -11,6 +11,26 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-22 — oasgen-provider 0.90.0 checked, and live on cluster 057
+
+Main at `671b5b1` passes all three layers on 0.90.0. Its CRDs are byte-identical to 0.89.0's,
+all 32 RestDefinitions are admitted, and a token-free install brings all 32 to `Ready` and all
+32 generated controllers to `Available`, with conditions identical to the 0.89.0 install.
+
+0.90.0 makes the generated controller send an `Accept` header taken from the operation's
+declared 2xx media type, where it sent none before (oasgen-provider#892). In this chart all 123
+verbs declare either `application/json` (87) or a 204 with no body (36), so every request now
+carries `Accept: application/json`, which GitHub accepts. `TeamRepo`'s `get` keeps its own
+`Accept: application/vnd.github.v3.repository+json`, which a verb header still overrides.
+Without it GitHub answers 204 and the permission cannot be read.
+
+The installer rolled 057 from 0.80.0 to 0.90.0 in tag 0.3.700, with nothing else in the roll.
+The read-only comparison of the 32 controllers before and after found no failures: every
+controller redeployed on 0.90.0 with `-lease-name` and its own Lease, all 32 RestDefinitions
+stayed `Ready` with unchanged definitions, and the 19 `PullRequest` CRs kept their uid and
+number. Each controller got two new ReplicaSets. The second is oasgen's conditional restart
+(`kubectl.kubernetes.io/restartedAt`), and no controller got a third.
+
 ## 2026-11-22 — oasgen-provider 0.89.0 checked against this chart
 
 Main at `671b5b1` passes all three layers on 0.89.0. Its CRDs are byte-identical to 0.88.0's,
