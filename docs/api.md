@@ -375,7 +375,8 @@ and it is handled entirely in the RestDefinition, by two jq transforms:
   users/teams/apps reduced to `login`/`slug` strings, the review object's
   `dismissal_restrictions` and `bypass_pull_request_allowances` reduced the same way, and
   an unset control (key absent) normalised to `null`, which is what the spec omitting it
-  means.
+  means. `bypass_pull_request_allowances` is the exception: absent is normalised to three
+  empty lists, because GitHub drops the object when it is set to empty lists.
 
 Status checks are managed through `contexts` (plain check names). GitHub's newer `checks`
 (`[{context, app_id}]`) form, which pins the reporting GitHub App, is **not modelled yet**:
@@ -391,10 +392,27 @@ validation (CEL passthrough requested in
 The review object can carry `dismissal_restrictions` and `bypass_pull_request_allowances`
 (`{users, teams, apps}` login/slug lists, org-owned repos only). Unlike the four top-level
 controls, **omitting these from the review object does not clear them** — verified live on
-2026-11-03, GitHub retains previously-set actors when the PUT's review object omits them. To
-clear them a CR sends the object with explicit empty `users`/`teams`/`apps`; modelling them is
-what lets a CR express and manage them at all. All of these are additive: a CR that sets none of
-them behaves exactly as before.
+2026-11-03, GitHub retains previously-set actors when the PUT's review object omits them. All of
+these are additive: a CR that sets none of them behaves exactly as before.
+
+Empty values mean different things on the two (measured live on 2026-11-23):
+
+| the CR sends | `bypass_pull_request_allowances` | `dismissal_restrictions` |
+|---|---|---|
+| the field omitted | unchanged on GitHub | unchanged on GitHub |
+| empty `users`, `teams` and `apps` | nobody may bypass; GitHub stores it as unset | the restriction stays **on**, with nobody allowed to dismiss |
+| `{}` | not tested | the restriction is turned **off** |
+
+`dismissal_restrictions: {}` takes effect when an update is sent, and editing the spec sends one.
+It should not be enforced afterwards (read from the controller's code, not tested): an empty object
+has no field to compare, so a restriction added on GitHub later is left alone.
+
+Up to 0.16.0, a CR with empty `bypass_pull_request_allowances` lists never settles: on
+oasgen-provider 0.90.0 the controller sends 4 updates, then reports `Ready=False`, `DriftNotConverging`. While it is in that state, fields
+compared after it are not corrected either. Measured: required approvals raised on GitHub stayed
+raised, and were corrected on the same branch once the transform was fixed. On 0.16.0 or
+earlier, removing the field from the CR should let it settle (not tested): an omitted field is not
+compared.
 
 Every list in that transform is **sorted**, because the comparison is order-sensitive and
 GitHub does not return these in the order they were sent. Write the lists in the CR sorted

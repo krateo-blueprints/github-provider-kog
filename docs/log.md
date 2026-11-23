@@ -11,6 +11,28 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-23 — BranchProtection: empty bypass lists settle, and what empty values mean
+
+A CR that set `required_pull_request_reviews.bypass_pull_request_allowances` to empty `users`,
+`teams` and `apps`, which these docs gave as the way to clear it, could not settle. GitHub drops
+the object when it is set to empty lists, the `get` transform turned the missing object into
+`null`, and `null` never equals three empty lists. The transform now reports three empty lists
+when the object is missing. `dismissal_restrictions` and `restrictions` still become `null`:
+GitHub returns their empty lists, and there "nobody" and "no restriction" are different states.
+
+Measured on kind with oasgen-provider 0.90.0 and a throwaway repository, against a control CR with
+the same spec and no bypass field:
+
+| | before | after |
+|---|---|---|
+| updates after the create | 4, then none | 0 over 3 resyncs |
+| `Ready` | `False`, `DriftNotConverging` | `True` |
+| required approvals changed on GitHub | not corrected in 2 resyncs (the control was, at its next one) | corrected |
+| a bypass user added on GitHub | not tested | removed |
+
+The correction to the 2026-11-03 entry below: empty lists do **not** clear `dismissal_restrictions`.
+They leave the restriction on with nobody allowed; `{}` turns it off. [api](./api.md) has the table.
+
 ## 2026-11-22 — oasgen-provider 0.90.0 checked, and live on cluster 057
 
 Main at `671b5b1` passes all three layers on 0.90.0. Its CRDs are byte-identical to 0.89.0's,

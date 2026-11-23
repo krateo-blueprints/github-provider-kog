@@ -91,13 +91,19 @@ paths:
                     # OMISSION DOES NOT CLEAR THEM. Unlike the four top-level controls, these two
                     # nested actor lists are NOT part of the wholesale replace: VERIFIED LIVE on
                     # 2026-11-03, a PUT whose required_pull_request_reviews omits them LEAVES the
-                    # previously-set actors in place (GitHub retains them). To CLEAR them, the CR
-                    # must send the object with explicit empty `users`/`teams`/`apps` — omitting is
-                    # "leave as is", not "off". A CR that never sets them never compares them (the
-                    # drift walk skips keys the spec omits), so this is safe for existing CRs.
+                    # previously-set actors in place (GitHub retains them): omitting is "leave as
+                    # is", not "off". A CR that never sets them never compares them (the drift walk
+                    # skips keys the spec omits), so this is safe for existing CRs.
                     #
-                    # Modelling these lets the CR DECLARATIVELY MANAGE them — set, update, or clear
-                    # (explicit empties) — which the CR previously could not express at all.
+                    # EMPTY LISTS MEAN DIFFERENT THINGS (measured live 2026-11-23):
+                    #   bypass_pull_request_allowances  empty lists = nobody may bypass. GitHub stores
+                    #       this as "unset" and OMITS the object on GET, so the get responseTransform
+                    #       reports empty lists for an omitted one.
+                    #   dismissal_restrictions          empty lists = the restriction stays ON with
+                    #       nobody allowed (GitHub returns the empty lists). `{}` turns it OFF. But
+                    #       `{}` is applied only when an update is sent (a spec edit sends one): an
+                    #       empty object carries no field to compare, so a restriction added on GitHub
+                    #       later should not be reverted (read from the controller's code, not tested).
                     dismissal_restrictions:
                       type: object
                       properties:
