@@ -87,6 +87,7 @@ spec:
         #   review dismissal_restrictions /  -> login / slug strings (same shape, nested under
         #     bypass_pull_request_allowances     required_pull_request_reviews)
         #   an unset control (key ABSENT)    -> null, which is what the spec omitting it means
+        #     (except bypass_pull_request_allowances, see there)
         #
         # Every list is sorted, because the comparison is order-sensitive and GitHub does not
         # return these in the order they were sent; sorting makes the comparison deterministic
