@@ -123,13 +123,17 @@ spec:
                       apps: ((.required_pull_request_reviews.dismissal_restrictions.apps // []) | map(.slug) | sort)
                     } end
                   ),
-                  bypass_pull_request_allowances: (
-                    if .required_pull_request_reviews.bypass_pull_request_allowances == null then null else {
-                      users: ((.required_pull_request_reviews.bypass_pull_request_allowances.users // []) | map(.login) | sort),
-                      teams: ((.required_pull_request_reviews.bypass_pull_request_allowances.teams // []) | map(.slug) | sort),
-                      apps: ((.required_pull_request_reviews.bypass_pull_request_allowances.apps // []) | map(.slug) | sort)
-                    } end
-                  )
+                  # NOT null when absent, unlike its two siblings. GitHub OMITS this object when it was
+                  # set to empty lists (measured 2026-11-23), so absent and "nobody may bypass" are one
+                  # state, and null would differ forever from a CR declaring the empty lists that clear
+                  # it. A CR that omits it is unaffected: a key the spec lacks is not compared.
+                  # dismissal_restrictions and restrictions keep null: GitHub returns THEIR empty lists,
+                  # and there "no actors" and "no restriction" are different states.
+                  bypass_pull_request_allowances: {
+                    users: ((.required_pull_request_reviews.bypass_pull_request_allowances.users // []) | map(.login) | sort),
+                    teams: ((.required_pull_request_reviews.bypass_pull_request_allowances.teams // []) | map(.slug) | sort),
+                    apps: ((.required_pull_request_reviews.bypass_pull_request_allowances.apps // []) | map(.slug) | sort)
+                  }
                 } end
               ),
               restrictions: (
