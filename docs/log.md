@@ -11,6 +11,21 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-23 — oasgen-provider 0.91.1 checked against this chart
+
+Main at `cf8377d` passes all three layers on 0.91.1. Its CRDs are byte-identical to 0.90.0's,
+all 32 RestDefinitions are admitted, and a token-free install brings all 32 to `Ready` and all
+32 generated controllers to `Available`. On every RestDefinition the conditions match the
+0.90.0 install, which was taken at `671b5b1`.
+
+0.91.0 published its two images and none of its charts, and is retracted upstream: do not pin it.
+
+This is a regression check. 0.91.x adds two opt-in fields, `requirePresentFields`
+(oasgen-provider#903, #911) and `observeApiRef.statusSchema` (#905), and no RestDefinition here
+uses either. What reaches this chart is wording: the error for a body that is not JSON now names
+the `Content-Type` the server sent (#895), and the remedy on a pending create says what removing
+the `external-create-pending` annotation does (#904). No CR was reconciled against GitHub on 0.91.1, so neither was exercised.
+
 ## 2026-11-23 — BranchProtection: empty bypass lists settle, and what empty values mean
 
 A CR that set `required_pull_request_reviews.bypass_pull_request_allowances` to empty `users`,
