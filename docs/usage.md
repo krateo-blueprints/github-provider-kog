@@ -873,11 +873,19 @@ pending (`krateo.io/external-create-pending` is newer than any succeeded or fail
 Before creating again it asks whether the object already exists. When it gets no answer, it
 refuses rather than risk a second create. The `Ready` condition (`CreateOutcomeUnknown` from
 oasgen-provider 0.76.0, `Creating` before it), the `Synced` message and a
-`CannotInitializeManagedResource` Warning event all carry this text:
+`CannotInitializeManagedResource` Warning event all carry a message that starts with
+`cannot determine creation result`. The advice in it depends on the version and the kind, and
+the reason the check could not answer follows it:
 
-```
-cannot determine creation result - remove the krateo.io/external-create-pending annotation if it is safe to proceed: existence check: this kind declares no findby verb, so existence cannot be read
-```
+| oasgen-provider | what the message says to do |
+|---|---|
+| up to 0.82.0 | remove the `krateo.io/external-create-pending` annotation "if it is safe to proceed" |
+| 0.83.0 and later | it clears by itself once the check answers; remove the annotation only if it never can, "after verifying whether the external resource exists". From 0.91.1: "only after verifying that the external resource does NOT exist", because removing it sends a create at once |
+| 0.86.0 and later, on the 14 kinds listed below | "cannot determine creation result, and never will": verify by hand whether the resource exists "and then remove" the annotation, or delete the CR and keep the resource |
+
+**Do not follow the last one as written.** It does not say what to do when the resource does
+exist. Removing the annotation then sends a second create, which GitHub accepts for `Issue`,
+`RepoDeployment` and a draft `Release`; the two recoveries are below.
 
 On oasgen-provider 0.76.0 or later this is how a create whose outcome is unknown ends: a
 5xx, a timeout, a dropped connection, a success the controller could not process, or a
@@ -1049,11 +1057,28 @@ on GitHub an issue matching each CR:
   it creates whether or not the object exists. In the measurement the issue already existed
   and the CR was re-created anyway: GitHub then held two issues with that title, the CR
   tracked the new one (`#3`), and the first (`#2`) was tracked by nothing. That is the
-  advice in the message above, followed without the check it asks for.
+  advice in the message, followed without checking first.
 
-The release notes of oasgen-provider 0.76.0 state that deleting a CR in this state orphans
-the object on GitHub; that has not been measured here. `Issue` has no delete verb in any
-case.
+**Deleting the CR instead depends on the version and the kind.** For the 14 kinds above, from
+0.86.0 the CR goes away and **anything the create made on GitHub stays there**, also for a kind
+whose CR normally deletes it. The controller records an
+`ExternalResourceKeptExistenceUnanswerable` Warning event and calls nothing. To delete the object
+too, write its identifier to the CR's status first, wait for `Ready=True`, then delete the CR.
+Adopting it that way is the measurement above, on 0.76.0; the delete that follows was not
+measured.
+
+Measured on kind on 2026-11-24, with no access to GitHub: three CRs carrying the pending
+annotation and the controller's finalizer, then deleted. The annotation was set by hand, so no
+create had been sent.
+
+| | 0.85.2 | 0.91.1 |
+|---|---|---|
+| `Issue` (no delete verb) | still there after 5 minutes | gone within 60 s |
+| `Milestone` (has a delete verb) | still there after 5 minutes | gone within 60 s, no request sent |
+| `Label` (control: read by name, GitHub unreachable) | still there after 5 minutes | still there after 5 minutes |
+
+The `Label` row is intended: its existence can be read once GitHub answers, so deletion waits.
+The branch was added in 0.86.0 and has been measured on 0.91.1.
 
 To trace what a kind's controller does against GitHub, set the opt-in
 `krateo.io/connector-verbose: "true"` annotation on a single CR and read that kind's own
