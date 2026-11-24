@@ -11,6 +11,16 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-24 — Deleting a CR whose create outcome is unknown, and what the message says now
+
+The stuck-create runbook in [usage](./usage.md) quoted a message oasgen-provider changed in 0.83.0
+and again in 0.86.0 and 0.91.1, and left deleting such a CR unmeasured. On kind, without GitHub
+access, an `Issue` and a `Milestone` in that state were gone within 60 s of a delete on 0.91.1 and
+still there after 5 minutes on 0.85.2; a `Label`, whose existence can be read, waited on both.
+From 0.86.0 deleting one of the 14 kinds whose existence can never be read keeps whatever the
+create made on GitHub. The message those kinds show says to verify and then remove the annotation
+without saying what to do when the object exists; that was reported upstream.
+
 ## 2026-11-23 — oasgen-provider 0.91.1 checked against this chart
 
 Main at `cf8377d` passes all three layers on 0.91.1. Its CRDs are byte-identical to 0.90.0's,
@@ -24,7 +34,8 @@ This is a regression check. 0.91.x adds two opt-in fields, `requirePresentFields
 (oasgen-provider#903, #911) and `observeApiRef.statusSchema` (#905), and no RestDefinition here
 uses either. What reaches this chart is wording: the error for a body that is not JSON now names
 the `Content-Type` the server sent (#895), and the remedy on a pending create says what removing
-the `external-create-pending` annotation does (#904). No CR was reconciled against GitHub on 0.91.1, so neither was exercised.
+the `external-create-pending` annotation does (#904), though not on the 14 kinds whose existence
+can never be read. No CR was reconciled against GitHub on 0.91.1.
 
 ## 2026-11-23 — BranchProtection: empty bypass lists settle, and what empty values mean
 
