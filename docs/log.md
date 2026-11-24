@@ -11,6 +11,16 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-24 — Code-coverage thresholds: GitHub takes fractions, our CRD does not
+
+`RepoRuleset`'s `code_coverage` rule has two fields GitHub types `number`, and oasgen-provider
+renders both as `integer` (measured on 0.91.1), so a threshold such as 80.5 cannot be declared.
+Whether GitHub itself takes fractions was not known. On a throwaway repository, since deleted, it
+accepted `minimum_coverage: 80.5` with `max_coverage_drop: 0.5` and returned both unchanged; whole
+numbers came back as integers. Reported on oasgen-provider#921. The shipped documents already say
+`number`, so this chart needs no change once that is fixed. They are the only two `number` fields
+in its 32 documents.
+
 ## 2026-11-24 — Deleting a CR whose create outcome is unknown, and what the message says now
 
 The stuck-create runbook in [usage](./usage.md) quoted a message oasgen-provider changed in 0.83.0
