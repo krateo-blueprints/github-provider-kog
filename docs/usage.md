@@ -884,7 +884,8 @@ the reason the check could not answer follows it:
 | 0.86.0 and later, on the 14 kinds listed below | "cannot determine creation result, and never will": verify by hand whether the resource exists "and then remove" the annotation, or delete the CR and keep the resource |
 
 **Do not follow the last one as written.** It does not say what to do when the resource does
-exist. Removing the annotation then creates a second one; the two recoveries are below.
+exist. Removing the annotation then sends a second create, which GitHub accepts for `Issue`,
+`RepoDeployment` and a draft `Release`; the two recoveries are below.
 
 On oasgen-provider 0.76.0 or later this is how a create whose outcome is unknown ends: a
 5xx, a timeout, a dropped connection, a success the controller could not process, or a
@@ -1062,8 +1063,9 @@ on GitHub an issue matching each CR:
 0.86.0 the CR goes away and **anything the create made on GitHub stays there**, also for a kind
 whose CR normally deletes it. The controller records an
 `ExternalResourceKeptExistenceUnanswerable` Warning event and calls nothing. To delete the object
-too, write its identifier to the CR's status first, wait for `Ready=True`, then delete the CR. Adopting it that way is the
-measurement above, on 0.76.0; the delete that follows was not measured.
+too, write its identifier to the CR's status first, wait for `Ready=True`, then delete the CR.
+Adopting it that way is the measurement above, on 0.76.0; the delete that follows was not
+measured.
 
 Measured on kind on 2026-11-24, with no access to GitHub: three CRs carrying the pending
 annotation and the controller's finalizer, then deleted. The annotation was set by hand, so no
