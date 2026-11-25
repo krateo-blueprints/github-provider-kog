@@ -11,6 +11,35 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-25 — `orphan` wins over `observe-delete` from oasgen-provider 0.85.2, measured live
+
+The usage guide warned that `krateo.io/management-policy: observe-delete` deletes the GitHub
+object even when `krateo.io/deletion-policy: orphan` is set. That held only before
+oasgen-provider 0.85.2. Up to unstructured-runtime v1.28.1, which oasgen pinned through 0.85.1,
+`ShouldDelete` returned true for `observe-delete` whatever the deletion policy said. From v1.30.0,
+which oasgen first pinned in 0.85.2, the controller's delete path asks plumbing's
+`managementpolicy`, and it withholds the delete whenever `orphan` is set.
+
+Measured on kind with this chart's `main` (`1859540`) and `kinds=Repository`, one throwaway public
+repository per arm in krateo-blueprints, both deleted afterwards (404 confirmed). Each arm created
+the repository with no annotations, set both annotations, then deleted the CR:
+
+| oasgen | requests to delete the repository | CR | repository afterwards |
+|---|---|---|---|
+| 0.84.0 (control, unstructured-runtime v1.27.1) | 1 `DELETE` | gone | deleted (404) |
+| 0.94.0 (unstructured-runtime v1.32.2) | 0 | gone | still there (200) |
+
+The control runs 0.84.0 because oasgen-provider retracted 0.85.0 and 0.85.1: their generated
+controller Deployment cannot be created. The source was read at v1.28.1, v1.30.0 and v1.32.2, and
+measured at the two ends. The supported floor is 0.76.0, so the guide keeps the warning for
+versions before 0.85.2.
+
+oasgen-provider 0.95.0 (provider-runtime v1.21.1) is the same change for a RestDefinition's own
+generated CRD. This chart's RestDefinitions carry neither annotation, so it cannot affect them.
+0.95.0 passed the three checks against this chart on the same day: no render difference from
+0.94.0, all 32 RestDefinitions admitted, 32/32 controllers `Available` on a token-free install,
+and the same conditions on every kind.
+
 ## 2026-11-25 — Code-coverage fractions settle from oasgen-provider 0.94.0, measured live
 
 oasgen-provider 0.94.0 fixes #927 (#933): the copy made before the drift comparison now keeps a

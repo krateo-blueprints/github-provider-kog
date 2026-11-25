@@ -219,11 +219,17 @@ metadata:
 ```
 
 rest-dynamic-controller then releases the CR's finalizer without calling GitHub, and the
-repository stays. It reads the annotation through unstructured-runtime (`pkg/meta`
-`ShouldDelete`): `krateo.io/deletion-policy: orphan` keeps the external object, and so does
-`krateo.io/management-policy: observe-create-update` or `observe`. One combination defeats it:
-`krateo.io/management-policy: observe-delete` deletes the external object **whatever the
-deletion policy says**, so never set that management policy on a CR you protect with `orphan`.
+repository stays. It reads the annotation through unstructured-runtime (`pkg/meta`):
+`krateo.io/deletion-policy: orphan` keeps the external object, and so does
+`krateo.io/management-policy: observe-create-update` or `observe`. **Before oasgen-provider
+0.85.2** one combination defeats it: `krateo.io/management-policy: observe-delete` deletes the
+external object **whatever the deletion policy says**. From 0.85.2 (unstructured-runtime
+v1.30.0) `orphan` wins over every management policy: the controller releases the finalizer
+without calling GitHub. Measured live on 2026-11-25 with a `Repository` carrying both
+annotations: on 0.84.0 the controller sent `DELETE` and the repository was deleted; on 0.94.0 it
+sent nothing and the repository stayed. This chart supports oasgen-provider from 0.76.0, so on a
+cluster that may run an older version, still never set `observe-delete` on a CR you protect with
+`orphan`.
 The annotation must be on the CR **before** it is deleted. The portal's builder-publish chart sets it on the `Repository` it
 renders, so uninstalling a publish never removes the published repository.
 
@@ -250,7 +256,8 @@ whose CR is not annotated. Before you restore anything:
 
 1. annotate every CR you want to keep with `krateo.io/deletion-policy: orphan`. This works on a CR that
    already has a `deletionTimestamp`, because the policy is read when the controller reconciles it;
-2. check that none of them sets `krateo.io/management-policy: observe-delete`, which overrides it;
+2. on oasgen-provider before 0.85.2, check that none of them sets
+   `krateo.io/management-policy: observe-delete`, which overrides it there (from 0.85.2 `orphan` wins);
 3. only then restore the RestDefinition.
 
 Measured on kind with oasgen-provider 0.60.0, using a local fake API that logged every request it
@@ -989,7 +996,7 @@ What happens next depends on how the kind is read:
 
   From oasgen-provider 0.86.0 each RestDefinition says in advance which group it is in, with
   an `ExistenceAnswerable` condition. On this chart it is `False` on these 14 kinds, measured
-  on kind on 0.87.0 through 0.90.0 (2026-11-22), on 0.91.1 (2026-11-23), on 0.92.0 (2026-11-24) and on 0.93.0 (2026-11-25); `True` on the other 18:
+  on kind on 0.87.0 through 0.90.0 (2026-11-22), on 0.91.1 (2026-11-23), on 0.92.0 (2026-11-24), and on 0.93.0, 0.94.0 and 0.95.0 (2026-11-25); `True` on the other 18:
 
   | kind | GET parameter | mapped from | correct? |
   |---|---|---|---|
