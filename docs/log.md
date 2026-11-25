@@ -11,6 +11,22 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-24 — oasgen-provider 0.92.0 checked against this chart
+
+Main at `ad047cd` passes all three layers on 0.92.0. Exactly one generated CRD differs from
+0.91.1: `reporulesets`, whose `minimum_coverage` and `max_coverage_drop` are now `number`, so a
+threshold such as 80.5 can be declared (oasgen-provider#921). Every other CRD and Configuration CRD
+is identical, with the same 5 warnings. All 32 RestDefinitions are admitted, a token-free install
+brings all 32 to `Ready` and all 32 controllers to `Available`, and the conditions match 0.91.1's
+on every RestDefinition. No CR was reconciled against GitHub on 0.92.0.
+
+Before the release, on kind with Kubernetes 1.36.4: a `RepoRuleset` stored with 80 under the
+`integer` CRD survives the change to `number` and stays writable. Going back the other way, an
+object storing 80.5 under the older CRD still accepts writes that leave the fraction as it is,
+including edits elsewhere in `rules`, and can be deleted; creating one with a fraction, or changing
+the fraction, is refused until the value is whole. That relies on the API server's validation
+ratcheting and was measured on that one version.
+
 ## 2026-11-24 — Code-coverage thresholds: GitHub takes fractions, our CRD does not
 
 `RepoRuleset`'s `code_coverage` rule has two fields GitHub types `number`, and oasgen-provider
