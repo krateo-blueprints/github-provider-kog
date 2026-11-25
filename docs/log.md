@@ -11,6 +11,26 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-25 — Code-coverage fractions settle from oasgen-provider 0.94.0, measured live
+
+oasgen-provider 0.94.0 fixes #927 (#933): the copy made before the drift comparison now keeps a
+fraction as a fraction. Measured the same day on kind with this chart's `main` (`1245ce9`),
+`kinds=RepoRuleset`, against a throwaway public repository in krateo-blueprints, since deleted
+(404 confirmed). Predictions were written before the run:
+
+| arm | oasgen | CR | result |
+|---|---|---|---|
+| bug | 0.93.0 | `minimum_coverage: 80.5`, `max_coverage_drop: 0.5` | 1 create, 4 updates, then `Ready=False/DriftNotConverging` after 5 identical reports on `rules[0].parameters.max_coverage_drop` |
+| control | 0.93.0 | 80 and 1 | 1 create, 0 updates, `Ready=True` |
+| fix | 0.94.0 | a fresh CR with 80.5 and 0.5 | 1 create, `Ready=True`, 0 updates in an 11-minute window that held 3 reads (one per 3-minute resync); GitHub stores 80.5 and 0.5 |
+
+The control shows the run could see a ruleset settle, and the reads show the fixed one was
+reconciled while it stayed quiet. The CR that latched on 0.93.0 recovered on its own after the
+upgrade: `Ready=True`, 0 updates. The drift message names only `max_coverage_drop` (its 0.5
+compared as 0) because the comparison stops at the first difference in key order;
+`minimum_coverage` (80.5 compared as 80) would have differed too, by the same code, but the
+message cannot show it.
+
 ## 2026-11-25 — Code-coverage thresholds: whole percentages only, after all
 
 The 2026-11-24 entries said a fractional threshold such as 80.5 can be declared from
