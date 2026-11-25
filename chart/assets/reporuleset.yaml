@@ -482,8 +482,8 @@ components:
               min_entries_to_merge_wait_minutes:
                 type: integer
               # type: code_coverage — both optional (GitHub's schema). GitHub types them `number`
-              # (float, 0-100); oasgen converts `number` to `integer` when generating the CRD, so
-              # whole percentages only until it carries `number` through.
+              # (float, 0-100). oasgen-provider before 0.92.0 generated `integer` for them, so
+              # whole percentages only there; 0.92.0 keeps `number` (oasgen-provider#921).
               minimum_coverage:
                 type: number
                 description: The absolute minimum line coverage percentage required. Pull requests with line coverage below this threshold will be blocked.
