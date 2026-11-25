@@ -11,6 +11,16 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-25 — oasgen-provider 0.97.0 checked against this chart
+
+Main at `e301d03` passes all three layers on 0.97.0, and nothing differs from 0.96.0. The 32
+generated CRDs and 32 Configuration CRDs are identical, all 32 RestDefinitions are admitted, a
+token-free install brings all 32 controllers to `Available`, and the RestDefinition conditions
+match 0.96.0's on every kind. The release makes the oasgen-provider manager log at debug level
+only when `OASGEN_PROVIDER_DEBUG` is `"true"` (oasgen-provider#943); the generated controllers'
+logging is unchanged. It also rewords the condition message on a kind with no create verb
+(#942).
+
 ## 2026-11-25 — oasgen-provider 0.96.0 checked against this chart
 
 Main at `9fb9666` passes all three layers on 0.96.0, and nothing differs from 0.95.0. The 32

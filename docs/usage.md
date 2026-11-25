@@ -996,7 +996,7 @@ What happens next depends on how the kind is read:
 
   From oasgen-provider 0.86.0 each RestDefinition says in advance which group it is in, with
   an `ExistenceAnswerable` condition. On this chart it is `False` on these 14 kinds, measured
-  on kind on 0.87.0 through 0.90.0 (2026-11-22), on 0.91.1 (2026-11-23), on 0.92.0 (2026-11-24), and on 0.93.0, 0.94.0, 0.95.0 and 0.96.0 (2026-11-25); `True` on the other 18:
+  on kind on 0.87.0 through 0.90.0 (2026-11-22), on 0.91.1 (2026-11-23), on 0.92.0 (2026-11-24), and on 0.93.0 to 0.97.0 (2026-11-25); `True` on the other 18:
 
   | kind | GET parameter | mapped from | correct? |
   |---|---|---|---|
