@@ -11,6 +11,17 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-25 — oasgen-provider 0.93.0 checked against this chart
+
+Main at `8aa511d` passes all three layers on 0.93.0, and nothing differs from 0.92.0: the 32
+generated CRDs and 32 Configuration CRDs are identical, with the same 5 warnings. All 32
+RestDefinitions are admitted, a token-free install brings all 32 to `Ready` and all 32 controllers
+to `Available`, and the RestDefinition conditions match 0.92.0's on every kind. The release changes
+the controller's drift comparison: the empty-remote guard now respects leaves the author both
+declares and lists in `requirePresentFields` (oasgen-provider#926). Nothing in this chart lists
+such a leaf yet. It also adds a Go type to each value it reports, but only at debug level
+(oasgen-provider#928). No CR was reconciled against GitHub on 0.93.0.
+
 ## 2026-11-25 — Merging to main requires this repository's own CI checks
 
 Until today the only rule on `main` was the organization's (a pull request, no force push, no
