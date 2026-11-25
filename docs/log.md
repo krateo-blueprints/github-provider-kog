@@ -11,6 +11,21 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-25 — Merging to main requires this repository's own CI checks
+
+Until today the only rule on `main` was the organization's (a pull request, no force push, no
+deletion), so a pull request could be merged before its CI had run. A repository ruleset,
+`require-own-ci-checks`, now requires the eight checks defined in this repository's workflows to
+pass, each reported by GitHub Actions: `drift-invariants`, `kinds-selectable`,
+`config-chart-matches`, `status-fields-in-response`, `oas-operations`, `oas-adherence`,
+`server-url` and `preflight`. None of them is path-filtered, so every pull request runs all eight.
+
+Checks that come from shared workflows (`lint-docs`, `pinned-uses`, `repository-standard`,
+`security / *`) still run on every pull request but are not required: a version bump of a shared
+workflow can rename one of its jobs, and a required check that no longer exists would leave every
+pull request waiting. They are still read before merging. The branch need not be up to date with
+`main`.
+
 ## 2026-11-24 — oasgen-provider 0.92.0 checked against this chart
 
 Main at `ad047cd` passes all three layers on 0.92.0. Exactly one generated CRD differs from
