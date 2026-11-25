@@ -11,6 +11,15 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-25 — oasgen-provider 0.96.0 checked against this chart
+
+Main at `9fb9666` passes all three layers on 0.96.0, and nothing differs from 0.95.0. The 32
+generated CRDs and 32 Configuration CRDs are identical, all 32 RestDefinitions are admitted, a
+token-free install brings all 32 controllers to `Available`, and the RestDefinition conditions
+match 0.95.0's on every kind. The release refuses `statusSchema` at admission on the three
+write ApiRefs (oasgen-provider#925). This chart declares no ApiRef, so nothing here relies on the
+change.
+
 ## 2026-11-25 — `orphan` wins over `observe-delete` from oasgen-provider 0.85.2, measured live
 
 The usage guide warned that `krateo.io/management-policy: observe-delete` deletes the GitHub
