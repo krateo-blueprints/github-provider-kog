@@ -483,7 +483,9 @@ components:
                 type: integer
               # type: code_coverage — both optional (GitHub's schema). GitHub types them `number`
               # (float, 0-100). oasgen-provider before 0.92.0 generated `integer` for them, so
-              # whole percentages only there; 0.92.0 keeps `number` (oasgen-provider#921).
+              # whole percentages only there; 0.92.0 keeps `number` (oasgen-provider#921), but the
+              # drift comparison truncates a declared fraction (80.5 as 80, oasgen-provider#927), so
+              # use whole percentages until that is fixed.
               minimum_coverage:
                 type: number
                 description: The absolute minimum line coverage percentage required. Pull requests with line coverage below this threshold will be blocked.

@@ -515,8 +515,10 @@ above). The whole-value hazard and the sub-controls still left unmodelled are in
   `tag_name_pattern`), and the remaining eight (`workflows`, `code_scanning`,
   `copilot_code_review`, `license_compliance_scanning`, `file_path_restriction`,
   `max_file_path_length`, `file_extension_restriction`, `max_file_size`), plus `code_coverage`
-  (`minimum_coverage`, `max_coverage_drop`; fractions such as 80.5 from oasgen-provider 0.92.0, whole
-  percentages only before it, which generated `integer` for GitHub's `number`: oasgen-provider#921) and `code_quality` (`severity`) on `RepoRuleset`. Nothing is left to
+  (`minimum_coverage`, `max_coverage_drop`; **whole percentages only**. Before oasgen-provider 0.92.0 the
+  CRD types them `integer` (oasgen-provider#921). From 0.92.0 it accepts a fraction such as 80.5, but the
+  controller compares the declared value truncated, 80.5 as 80, against GitHub's 80.5
+  (oasgen-provider#927), so a fractional threshold is reported as drift on every reconcile) and `code_quality` (`severity`) on `RepoRuleset`. Nothing is left to
   be configured only in the UI, so an out-of-band rule is now reverted to the CR's declared
   set rather than deleted-and-unrecoverable — ordinary declarative management.
   The branch-protection set, `merge_queue` and the pattern rules were **verified live**

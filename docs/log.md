@@ -11,6 +11,23 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-25 — Code-coverage thresholds: whole percentages only, after all
+
+The 2026-11-24 entries said a fractional threshold such as 80.5 can be declared from
+oasgen-provider 0.92.0. The CRD does accept it, but the controller cannot settle it.
+oasgen-provider#927: when `compareScope` is `updatable` or `identifiersAndStatus`, the controller
+copies the declared fields before comparing them with GitHub's, and that copy turns every
+floating-point value into an integer. `RepoRuleset` compares under `updatable`, so a declared
+`minimum_coverage: 80.5` is compared as 80 against GitHub's 80.5 and reported as drift on every
+reconcile. Whole numbers are unaffected. Read in the 0.93.0 source (`deepcopy.DeepCopyJSONValue`,
+called by `projectSpecFields`), on top of oasgen-provider's measurement of the copy. Not run
+against GitHub.
+
+It reaches only these two fields: across the 32 API descriptions, `minimum_coverage` and
+`max_coverage_drop` are the only `number`-typed fields in any request body, and no response
+declares one. 057 had no `RepoRuleset` when this was found. Until #927 is fixed, declare whole
+percentages.
+
 ## 2026-11-25 — Releases go through release-oci 2.1.0, and a manual run is a rehearsal
 
 `release-oci.yaml` now calls the organisation's `release-oci` 2.1.0 (repository standard R5),
