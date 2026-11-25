@@ -18,7 +18,9 @@ which runs the version check, the publish-token check, the GHCR push and the ind
 itself. The three jobs this repository ran beside it (`release-preflight`, `collect`,
 `publish-index`) are gone, along with the `app_version` input, which neither chart uses. The
 channel stays `operators` and the registry stays `oci://ghcr.io/krateo-blueprints/charts`, so
-nothing changes for anyone installing.
+nothing changes for anyone installing. The two krateo-blueprints/charts workflows still called
+directly, `pinned-uses` and `repository-standard`, move from 1.5.1 to 1.13.2: 1.5.1's R5 still
+required the old shape (`release-preflight` and `publish-chart` called beside `release-oci`).
 
 Two checks stay with this repository because the shared workflow does not make them: the commit
 being released must have a successful `lint.yaml` run, and the packages built must be exactly
