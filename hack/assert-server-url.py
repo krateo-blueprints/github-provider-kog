@@ -46,7 +46,12 @@ for d in withurl:
     if got != URL:
         errors.append("%s: spec.serverURL is %r with githubBaseUrl=%s" % (d["metadata"]["name"], got, URL))
 
-for path in sorted(glob.glob(os.path.join(root, "chart", "assets", "*.yaml"))):
+assets = sorted(glob.glob(os.path.join(root, "chart", "assets", "*.yaml")))
+# One asset per RestDefinition. Without this, a moved or empty assets directory makes the loop below
+# check nothing and the gate pass.
+if len(assets) != len(default):
+    errors.append("%d assets in chart/assets for %d RestDefinitions: expected one each" % (len(assets), len(default)))
+for path in assets:
     doc = yaml.safe_load(open(path))
     servers = [s.get("url") for s in doc.get("servers") or []]
     if servers != ["https://api.github.com"]:
@@ -62,4 +67,4 @@ if errors:
     print("\n".join(errors))
     sys.exit(1)
 print("ok: %d RestDefinitions; serverURL absent by default, %s on all when set; %d assets single-server"
-      % (len(default), URL, len(glob.glob(os.path.join(root, "chart", "assets", "*.yaml")))))
+      % (len(default), URL, len(assets)))
