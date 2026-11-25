@@ -11,6 +11,26 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-25 — Releases go through release-oci 2.1.0, and a manual run is a rehearsal
+
+`release-oci.yaml` now calls the organisation's `release-oci` 2.1.0 (repository standard R5),
+which runs the version check, the publish-token check, the GHCR push and the index publish
+itself. The three jobs this repository ran beside it (`release-preflight`, `collect`,
+`publish-index`) are gone, along with the `app_version` input, which neither chart uses. The
+channel stays `operators` and the registry stays `oci://ghcr.io/krateo-blueprints/charts`, so
+nothing changes for anyone installing. The two krateo-blueprints/charts workflows still called
+directly, `pinned-uses` and `repository-standard`, move from 1.5.1 to 1.13.2: 1.5.1's R5 still
+required the old shape (`release-preflight` and `publish-chart` called beside `release-oci`).
+
+Two checks stay with this repository because the shared workflow does not make them: the commit
+being released must have a successful `lint.yaml` run, and the packages built must be exactly
+our two charts at the release version. The shared workflow compares the index with the set of
+charts it discovered, so a chart missing from discovery would go unnoticed there.
+
+A manual run (`workflow_dispatch`) is now a dry run unless `dry_run` is set to `false`, so a
+mistyped rehearsal cannot publish. This change was rehearsed that way on its branch before it
+was merged.
+
 ## 2026-11-25 — oasgen-provider 0.93.0 checked against this chart
 
 Main at `8aa511d` passes all three layers on 0.93.0, and nothing differs from 0.92.0: the 32

@@ -16,32 +16,47 @@ every chart is published twice, with the same bytes.
 
 ## What a tag ships
 
+`release-oci.yaml` has three jobs. The middle one is the organisation's release workflow,
+`krateo-platformops/.github` `release-oci` 2.1.0, pinned by full commit SHA with its release in a
+comment and moved by Dependabot.
+
 1. **`preflight`** resolves the version (the tag, or `chart_version` on a manual run) and
-   refuses the release before anything is published if the tagged commit has no successful
-   `lint.yaml` run, or if `CHARTS_PUBLISH_TOKEN` is not configured. A failure after the GHCR
-   push would leave a version in GHCR and missing from the index.
-2. **`release-preflight`** is the organisation's shared check (PUBLISHING.md rule 12). It refuses
-   any version that is not a plain `X.Y.Z` with no `v`, no leading zeros, no pre-release and no
-   build suffix (rule 13). This is the same definition the publisher applies at index time, kept
-   identical by a test in krateo-blueprints/charts, so a version it would refuse never reaches GHCR.
-3. **`release-oci`** (the canonical org workflow) stamps the `CHART_VERSION` (and
-   `SOURCE_REF`) placeholders in each `Chart.yaml` with the tag, discovers `chart/` and
-   `config-chart/` as first-class charts, packages both, and pushes them to
-   `oci://ghcr.io/krateo-blueprints/charts`. A collision guard refuses to push to a bare
-   registry root, and a version already published with identical contents is skipped rather
-   than re-pushed.
-4. **`collect`** pulls both charts back from GHCR and uploads them as the `charts-dist`
-   artifact. Pulling is what guarantees the index gets the bytes GHCR holds: `helm package`
-   writes fresh timestamps, and a skipped push means the local archive was never published.
-   It asserts the artifact holds exactly the two charts at the tag version.
-5. **`publish-index`** calls the organisation's publisher,
-   `krateo-blueprints/charts/.github/workflows/publish-chart.yaml`, pinned by full
-   commit SHA with its charts release in a comment (one charts version for every pin in this
-   repository, `release-preflight` and `pinned-uses` included) and moved by Dependabot, with
-   `channel: operators`. Neither chart ships a CompositionDefinition, so neither is a
-   blueprint. The publisher stores the archives, merges the index and succeeds only once
-   `https://krateo-blueprints.github.io/charts/operators/index.yaml` lists both and
-   `helm pull --repo` installs each anonymously.
+   refuses the release before anything is published if the commit being released has no
+   successful `lint.yaml` run (PUBLISHING.md rule 10).
+2. **`release-oci`** does the rest in one call, in this order:
+   - before anything is pushed: the image gate (no chart here references an image), the
+     organisation's `release-preflight` (rules 12 and 13: a plain `X.Y.Z` with no `v`, no
+     leading zeros, no pre-release and no build suffix, the same definition the publisher
+     applies at index time), a check that `CHARTS_PUBLISH_TOKEN` is present and has no
+     whitespace (it never prints or uses the value), and the index's own content gate on every
+     package;
+   - it stamps the `CHART_VERSION` placeholders in each `Chart.yaml`, discovers `chart/` and
+     `config-chart/` as first-class charts, packages both and pushes them to
+     `oci://ghcr.io/krateo-blueprints/charts`. A version already published with identical
+     contents is skipped, and one published with different contents is refused;
+   - it pulls both charts back from GHCR, so the index gets exactly the bytes GHCR holds
+     (rule 1), and calls the organisation's publisher with `index_channel: operators`. Neither
+     chart ships a CompositionDefinition, so neither is a blueprint. The publisher succeeds only
+     once `https://krateo-blueprints.github.io/charts/operators/index.yaml` lists both and
+     `helm pull --repo` installs each anonymously.
+3. **`packages-are-our-two-charts`** reads the packages `release-oci` built and requires exactly
+   `github-provider-kog` and `github-provider-kog-config` at the release version, as both
+   `version` and `appVersion`. `release-oci` checks the index against the set it discovered, so
+   a chart that discovery missed would fail nothing there. On a tag this runs after the push, so
+   it reports a wrong set; on a rehearsal it stops one.
+
+## Rehearsing a change to the release
+
+A manual run is a dry run unless `dry_run` is set to `false`: it runs every check and builds
+every package, pushes nothing, and uploads the packages as the `release-oci-charts` artifact.
+A manual run's ref is a branch, so it needs `chart_version`:
+
+```console
+$ gh workflow run release-oci.yaml --ref <branch> -f chart_version=X.Y.Z
+```
+
+Use a version that is not yet published, or the version guard reports it as already published.
+Rehearse every change to `release-oci.yaml` this way before merging it.
 
 That is the whole release. `github-provider-kog` renders 32 ConfigMaps + 32 RestDefinitions
 and `github-provider-kog-config` renders two Configurations. Neither has a Deployment, a
