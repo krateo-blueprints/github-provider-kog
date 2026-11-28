@@ -35,11 +35,15 @@ controller's redirect path did not fire: no "method-rewriting redirect" line and
 
 The test script's own automatic verdict for 0.98.0 was "inconclusive": it refuses to decide on a
 request within 0.5 s of the rename, and the confirm `GET` came after GitHub applied the rename but
-before the rename call returned. The `GET`'s `200` itself shows the label existed at that moment,
-so the result is read as a pass. oasgen-provider#919 (a refused create retried without looking
-again) is therefore fixed in 0.98.0 for a resource that appears before the retry, on kinds whose existence check can answer. The two runs do not cover a vendor creating its own default object after the controller's create succeeded; a confirm cannot prevent that, because it can only see what already exists. For the 14 kinds
-with `ExistenceAnswerable=False`, the fix falls back to the old retry by design; GitHub's unique
-label, ref and path names turn such a retry into a refused `POST`, not a duplicate. The
+before the rename call returned. The `GET`'s `200` itself shows the label existed at that moment, so
+the result is read as a pass. oasgen-provider#919 (a refused create retried without looking again)
+is therefore fixed in 0.98.0 for a resource that appears before the retry, on kinds whose existence
+check can answer. The two runs do not cover a vendor creating its own default object after the
+controller's create succeeded; a confirm cannot prevent that, because it can only see what already
+exists. For the 14 kinds with `ExistenceAnswerable=False` the confirm cannot answer, so the fix
+falls back to the old retry by design. #919's case is a resource that appears by another route
+between the refusal and the retry, and none of those 14 is created by GitHub on its own when its
+parent appears, so a duplicate is not expected there (from reading the API, not measured). The
 transport-error strand (#901) stays open.
 
 ## 2026-11-28 — oasgen-provider 0.98.0 checked against this chart
