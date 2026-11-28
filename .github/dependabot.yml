@@ -15,3 +15,16 @@ updates:
       interval: weekly
     commit-message:
       prefix: ci
+    # One pull request per shared repository, so our direct pins of a shared repo never sit at two commits (a shared
+    # internal script would then run at two versions). Dependabot names a reusable-workflow dependency
+    # `owner/repo/.github/workflows/file`, not `owner/repo`: this repository's own history has
+    # "bump krateo-blueprints/charts/.github/workflows/publish-chart.yaml from 1.0.3 to 1.0.4". Group
+    # patterns use `*` as a wildcard, and dependabot-core's WildcardMatcher turns it into `.*`, which
+    # matches `/` (common/lib/wildcard_matcher.rb), so `owner/repo/*` covers every workflow file of that repo.
+    groups:
+      krateo-platformops-dotgithub:
+        patterns:
+          - "krateo-platformops/.github/*"
+      krateo-blueprints-charts:
+        patterns:
+          - "krateo-blueprints/charts/*"
