@@ -11,6 +11,24 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-28 — oasgen-provider 0.98.0 checked against this chart
+
+Main at `34ad5e9` passes all three layers on 0.98.0, and nothing differs from 0.97.0. The 32
+generated CRDs and 32 Configuration CRDs are identical, with 0 whole-object differences, errors 0
+and warnings 5 on both versions, and the control field (`spec.description` `maxLength` 7) present
+on both. The 0.98.0 crds chart admits all 32 RestDefinitions and refuses the negative control (a
+`method` of type integer). On kind all 32 RestDefinitions are `Ready` and all 32 controllers
+`Available` on rest-dynamic-controller 0.98.0, and the RestDefinition conditions match 0.97.0's on
+every kind (`ExistenceAnswerable` `False` on 14, `True` on 18, `Synced` `True` on 32). The
+`oasgen-provider-crds` chart differs from 0.97.0 in one leaf only, the description of the
+RestDefinition's `spec.resource.excludedSpecFields` (oasgen-provider#946); no type, required, enum,
+default or `x-kubernetes-*` key changed (rendered with `--kube-version 1.36.4`, as the chart
+declares kubeVersion >=1.36.0). The release moves rest-dynamic-controller to unstructured-runtime
+v1.34.0 (#945), which includes unstructured-runtime#130: after a create the vendor refused as
+not-committed, the controller confirms the resource is absent before retrying and adopts it if it
+now exists. This is the fix for oasgen-provider#919. The transport-error strand (#901) stays open.
+A live check of #919 on the `Label` kind is in progress and will be logged separately.
+
 ## 2026-11-28 — One commit for the shared `.github` repo, and Dependabot groups per shared repo
 
 The four `krateo-platformops/.github` workflows this repository calls (`lint-docs`,
