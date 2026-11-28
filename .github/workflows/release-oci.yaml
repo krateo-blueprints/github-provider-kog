@@ -91,7 +91,7 @@ jobs:
 
   release-oci:
     needs: preflight
-    uses: krateo-platformops/.github/.github/workflows/release-oci.yaml@aa90d48e1a101d5e9b3e547bca116b97c49513b5 # 2.1.0
+    uses: krateo-platformops/.github/.github/workflows/release-oci.yaml@705b79c738b9ccb78b5070abfe344d3b18850e44 # 2.2.0
     permissions:
       contents: read
       packages: write

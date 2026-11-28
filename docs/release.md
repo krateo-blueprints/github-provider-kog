@@ -17,7 +17,7 @@ every chart is published twice, with the same bytes.
 ## What a tag ships
 
 `release-oci.yaml` has three jobs. The middle one is the organisation's release workflow,
-`krateo-platformops/.github` `release-oci` 2.1.0, pinned by full commit SHA with its release in a
+`krateo-platformops/.github` `release-oci` 2.2.0, pinned by full commit SHA with its release in a
 comment and moved by Dependabot.
 
 1. **`preflight`** resolves the version (the tag, or `chart_version` on a manual run) and

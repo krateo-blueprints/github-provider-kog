@@ -11,6 +11,23 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-28 — One commit for the shared `.github` repo, and Dependabot groups per shared repo
+
+The four `krateo-platformops/.github` workflows this repository calls (`lint-docs`,
+`release-notes`, `security`, `release-oci`) now all sit at one commit, 2.2.0
+(`705b79c`). Before, three were at 1.0.1 and `release-oci` at 2.1.0: a shared repository pinned
+at two commits is how a shared internal script ends up called at two versions. In the 1.0.1 to
+2.2.0 compare `lint-docs` and `release-notes` are unchanged and `security` has benign changes
+(gitleaks allowlist comments and a fixture path, a govulncheck memory limit and timeout, a helm
+v3.19.0 pin); the only script changes are `*_test.py` files. `release-oci` 2.1.0 to 2.2.0 was
+read separately and is benign. This covers our direct pins only: our direct `krateo-blueprints/charts` pins stay at 1.13.2, while `release-oci` makes its own transitive calls into `krateo-blueprints/charts` that are pinned inside it (`0ef7c10 # 1.9.3` at 2.1.0, `db05838 # 1.11.0` at 2.2.0), so after this change `krateo-blueprints/charts` still runs at two commits in our CI, 1.13.2 directly and 1.11.0 through `release-oci`, which is `release-oci`'s choice and outside this repository's control.
+
+`.github/dependabot.yml` now has two groups, `krateo-platformops/.github/*` and
+`krateo-blueprints/charts/*`, so each shared repository moves in a single pull request. Dependabot
+names a reusable workflow `owner/repo/.github/workflows/file`, and its group wildcard matches `/`;
+the evidence is in the file. This change was rehearsed with a manual `release-oci` dry run on its
+branch before merging.
+
 ## 2026-11-25 — oasgen-provider 0.97.0 checked against this chart
 
 Main at `e301d03` passes all three layers on 0.97.0, and nothing differs from 0.96.0. The 32
