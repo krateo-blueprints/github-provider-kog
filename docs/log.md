@@ -11,6 +11,37 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-28 — oasgen-provider#919 measured live on the Label kind
+
+Measured 2026-11-28 on a local kind cluster against two throwaway public repositories in
+krateo-blueprints, deleted afterwards (404 confirmed). The `Label` kind is used because its
+RestDefinition declares `get` on `/repos/{owner}/{repo}/labels/{name}`, so the existence check can
+answer by name. The `Label` CR targets a repository that does not exist yet, so the first create
+(`POST .../labels`) is refused with `404`, which oasgen classifies as not committed. Right after
+that refusal, a staging repository that already holds the label is renamed onto the CR's
+repository name, so the repository and the label appear at the same moment. The rename is needed
+because GitHub creates a new repository's default labels asynchronously: a first attempt (07:46Z)
+let the controller's own retry create the label, `201` in both versions, so it measured nothing
+about adoption.
+
+On 0.97.0, the control, 1 `POST` was refused with `404`, then 5 retries followed, every one a
+`POST` answered `422` (already exists), with no `GET` between them. The CR became Ready at the
+next resync's observe. On 0.98.0 the controller first issues `GET .../labels/l919` before each
+retry; in the first attempt that GET ran before every retry, and in this one the first confirm was
+answered `200`. The controller logged "Create was refused, but the external resource now exists;
+adopting it instead of creating again" and stamped `krateo.io/external-create-succeeded`. It sent
+no further `POST`: 1 `POST` in the whole log, Ready `True`, exactly one label on GitHub. The
+controller's redirect path did not fire: no "method-rewriting redirect" line and no 3xx responses.
+
+The test script's own automatic verdict for 0.98.0 was "inconclusive": it refuses to decide on a
+request within 0.5 s of the rename, and the confirm `GET` came after GitHub applied the rename but
+before the rename call returned. The `GET`'s `200` itself shows the label existed at that moment,
+so the result is read as a pass. oasgen-provider#919 (a refused create retried without looking
+again) is therefore fixed in 0.98.0 for a resource that appears before the retry, on kinds whose existence check can answer. The two runs do not cover a vendor creating its own default object after the controller's create succeeded; a confirm cannot prevent that, because it can only see what already exists. For the 14 kinds
+with `ExistenceAnswerable=False`, the fix falls back to the old retry by design; GitHub's unique
+label, ref and path names turn such a retry into a refused `POST`, not a duplicate. The
+transport-error strand (#901) stays open.
+
 ## 2026-11-28 — oasgen-provider 0.98.0 checked against this chart
 
 Main at `34ad5e9` passes all three layers on 0.98.0, and nothing differs from 0.97.0. The 32
@@ -27,7 +58,7 @@ declares kubeVersion >=1.36.0). The release moves rest-dynamic-controller to uns
 v1.34.0 (#945), which includes unstructured-runtime#130: after a create the vendor refused as
 not-committed, the controller confirms the resource is absent before retrying and adopts it if it
 now exists. This is the fix for oasgen-provider#919. The transport-error strand (#901) stays open.
-A live check of #919 on the `Label` kind is in progress and will be logged separately.
+The live check of #919 on the `Label` kind is the next entry above.
 
 ## 2026-11-28 — One commit for the shared `.github` repo, and Dependabot groups per shared repo
 
