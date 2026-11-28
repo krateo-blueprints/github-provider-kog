@@ -11,6 +11,34 @@ timestamp: 2026-09-15T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-28 — oasgen-provider 0.99.0 checked against this chart, and #919 re-measured on it
+
+Main at `0800efc` passes all three layers on 0.99.0, and nothing differs from 0.98.0. The 32
+generated CRDs and 32 Configuration CRDs are identical, with 0 whole-object differences, errors 0
+and warnings 5 on both versions, and the control field (`spec.description` `maxLength` 7) present
+on both. The 0.99.0 crds chart admits all 32 RestDefinitions and refuses the negative control (a
+`method` of type integer). On kind all 32 RestDefinitions are `Ready` and all 32 controllers
+`Available` on rest-dynamic-controller 0.99.0, and the RestDefinition conditions match 0.98.0's on
+every kind (`ExistenceAnswerable` `False` on 14, `True` on 18, `Synced` `True` on 32). The
+`oasgen-provider-crds` chart renders the same RestDefinition CRD as 0.98.0, with 0 differing leaves
+(rendered with `--kube-version 1.36.4`; the render holds 80 validation rules, so it is not empty).
+The release moves rest-dynamic-controller to unstructured-runtime v1.35.0, which adds a hint that
+lets a controller re-check a resource sooner (oasgen-provider#648). The published 0.99.0 controller
+binary contains a string from that change and the 0.98.0 binary does not, while a control string
+is present in both, so the change is in the image and not only in the tag.
+
+The #919 test from the entry below was run again with 0.98.0 as the reference and 0.99.0 under
+test, the same way (local kind, throwaway public repositories in krateo-blueprints, deleted
+afterwards with 404 confirmed). Both versions behaved the same: the first `POST .../labels` refused
+with `404`, the staging repository renamed onto the CR's repository, a confirm
+`GET .../labels/l919` answered `200` about 1.2 s later, the "adopting it instead of creating
+again" line, and no further `POST` through the next resync. Each version sent 1 `POST` and 3
+`GET`s of the label in the whole log, with no redirect line and no 3xx responses; each left
+exactly one label on GitHub and the CR `Ready`. As in the first run, the script's conservative
+verdict was "inconclusive" for both, because the confirm `GET` came after GitHub applied the rename
+but before the rename call returned; the `200` shows the label existed then, so both read as a
+pass. The #919 fix is unchanged in 0.99.0. The transport-error strand (#901) stays open.
+
 ## 2026-11-28 — oasgen-provider#919 measured live on the Label kind
 
 Measured 2026-11-28 on a local kind cluster against two throwaway public repositories in
